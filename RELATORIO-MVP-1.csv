@@ -1,0 +1,152 @@
+CASANOVA ANALYTICS MVP — RELATORIO COMPLETO
+Status: 13 fases implementadas e funcionais
+Stack: Next.js 16 + React 19 + TypeScript + Tailwind CSS v4 + Recharts + Google Ads API
+
+===========================
+INTEGRACAO GOOGLE ADS API
+===========================
+Recurso,Descricao
+Autenticacao,OAuth2 com refresh token e suporte a conta MCC
+Queries GAQL,shopping_performance_view (SKUs) + campaign (conta/campanhas)
+Cache,In-memory com TTL de 2 minutos
+Mock fallback,Todas as 5 rotas tem dados mock se nao houver credenciais
+
+===========================
+API ROUTES (5 ENDPOINTS)
+===========================
+Endpoint,Funcao,Queries Google Ads,Mock Fallback
+GET /api/overview,Ranking de todos os SKUs + totais da conta + metas,2 queries,Sim
+GET /api/metrics,Metricas detalhadas de 1 SKU (KPIs alertas funil),1 query,Sim
+GET /api/timeseries,Serie temporal diaria (4 escopos: SKU Shopping conta campanha),1-4 queries,Sim
+GET /api/campaigns,Listagem de campanhas com metricas computadas,1 query,Sim
+GET /api/alerts,Alertas inteligentes (periodo atual vs anterior),7 queries em paralelo,Sim
+
+===========================
+FUNCIONALIDADES DO DASHBOARD
+===========================
+Categoria,Funcionalidade,Detalhes
+Filtros,Calendario estilo Google Ads,Dois meses lado a lado com presets (Hoje Ontem 7/14/30/60/90 dias Este mes Mes passado) e selecao personalizada
+Filtros,Seletor de SKU,Input com Enter para buscar
+Filtros,Indicador de status,Spinner animado timestamp de atualizacao fonte de dados
+KPIs Conta,Cards de metricas,Gasto Ads Impressoes Cliques Conversoes
+KPIs Conta,Barras de progresso,Faturamento vs Meta (R$150k) ROAS vs Meta (7.0) Margem vs Meta (25%)
+KPIs Conta,Fonte de dados,Resource campaign (inclui ALL campaign types)
+Ranking SKUs,Tabela paginada,20 por pagina com SKU Nome Receita Ads ROAS Margem Estoque Conversoes Status
+Ranking SKUs,Busca,Por SKU ou nome do produto
+Ranking SKUs,Filtros,Por status (Todos / Escalar / Manter / Pausar)
+Ranking SKUs,Colunas ordenaveis,Receita Ads ROAS Conversoes CPA com indicador de direcao
+Ranking SKUs,Badges de status,Verde=Escalar Amarelo=Manter Vermelho=Pausar
+Ranking SKUs,Totais,Linha de totais Shopping + Account
+Ranking SKUs,Interacao,Click em SKU carrega metricas detalhadas
+Campanhas,Toggle,SKUs / Campanhas
+Campanhas,Tabela,Nome Tipo Status Gasto Conversoes Receita CPA ROAS Impressoes Cliques
+Campanhas,Busca,Por nome de campanha
+Campanhas,Filtros canal,Shopping PMax Search Display Video Discovery
+Campanhas,Filtros status,Ativas / Pausadas
+Campanhas,Colunas ordenaveis,7 colunas com indicador de direcao
+Campanhas,Badges,Tipo de canal com cores
+Campanhas,Interacao,Click em campanha carrega time series especifica
+SKU Detalhado,KPI cards linha 1,ROAS CPA Margem Apos Ads (com indicador ok/warn/danger)
+SKU Detalhado,KPI cards linha 2,Receita Gasto Ads Estoque Lead Time
+SKU Detalhado,KPI cards linha 3,CPC CPM ARPUR Lucro Bruto
+SKU Detalhado,Alertas,ROAS baixo CPA alto margem baixa estoque critico lucro negativo
+SKU Detalhado,Funil,Impressoes > Cliques > Compra (qtd taxa custo)
+Graficos,Receita vs Gasto,Area (receita) + Line (custo)
+Graficos,ROAS,LineChart com linhas de referencia (meta 7.0 pausar 5.0)
+Graficos,Conversoes,Bar (conversoes) + Line (CPC)
+Graficos,Trafego,Area (impressoes) + Bar (cliques) + Line (CTR%) com eixo Y duplo
+Graficos,Formatacao,Tooltips e legendas em pt-BR
+Graficos,Escopos,Conta inteira ou campanha individual
+Alertas Inteligentes,Comparacao,Periodo atual vs periodo anterior (mesmo tamanho)
+Alertas Inteligentes,Nivel Conta,ROAS queda 20% gasto subida 40% conversoes queda 25% receita queda 25%
+Alertas Inteligentes,Nivel Campanha,ROAS crash 30% CPA spike 30% zero conversoes com gasto >R$50
+Alertas Inteligentes,Nivel SKU,Top 20 por gasto — ROAS queda 20% receita queda 25% zero conversoes >R$30
+Alertas Inteligentes,Nivel Tendencia,3+ dias ROAS caindo CPA subindo 4+ dias receita caindo
+Alertas Inteligentes,UI,Secao colapsavel badges de severidade delta percentual recomendacoes acionar
+Alertas Inteligentes,Limite,Maximo 15 alertas ordenados por severidade
+Polish Visual,Header,Gradiente escuro (zinc-900 a zinc-800) badge MVP subtitulo
+Polish Visual,Footer,Versao MVP v1.0 fonte de dados ultima atualizacao
+Polish Visual,Loading,Spinner SVG animado com texto Carregando
+Polish Visual,Erro,Banner vermelho com botao Tentar novamente
+Polish Visual,Empty states,Mensagens quando tabela vazia apos filtro/busca
+Polish Visual,Responsivo,Padding adaptativo calendario responsivo tabelas com scroll horizontal
+
+===========================
+ARQUITETURA DE CODIGO
+===========================
+Arquivo,Funcao
+app/page.tsx,Dashboard principal (~1.900 linhas 13+ sub-componentes)
+app/layout.tsx,Root layout (Geist fonts)
+app/api/overview/route.ts,Ranking SKUs + totais
+app/api/metrics/route.ts,Metricas de 1 SKU
+app/api/timeseries/route.ts,Serie temporal
+app/api/campaigns/route.ts,Campanhas
+app/api/alerts/route.ts,Alertas inteligentes
+lib/google-ads.ts,Cliente Google Ads cache datas
+lib/queries.ts,8 funcoes GAQL (SKU conta campanha time series)
+lib/alert-types.ts,Types (SmartAlert SmartAlertsResponse)
+lib/alert-engine.ts,Motor de alertas (4 detectores + orquestrador)
+
+===========================
+SUB-COMPONENTES
+===========================
+Componente,Funcao
+DateRangePicker,Calendario com presets e selecao personalizada
+CalendarMonth,Renderiza um mes do calendario
+ChartsSection,Container de abas de graficos
+RevenueChart,Grafico receita vs gasto
+RoasChart,Grafico ROAS com linhas de referencia
+ConversionsChart,Grafico conversoes + CPC
+TrafficChart,Grafico impressoes cliques CTR
+Kpi,Card de KPI com titulo valor subtitulo e cor de status
+ProgressBar,Barra de progresso com meta e percentual
+StatusBadge,Badge de status (escalar/manter/pausar)
+ChannelBadge,Badge de tipo de canal (Shopping/PMax/Search etc)
+CampaignStatusBadge,Indicador de status da campanha (ativa/pausada)
+SortableHeader,Header de tabela clicavel com icone de ordenacao
+
+===========================
+STACK TECNICA
+===========================
+Camada,Tecnologia
+Framework,Next.js 16 (App Router)
+UI,React 19 client components
+Linguagem,TypeScript (strict mode)
+Estilo,Tailwind CSS v4
+Graficos,Recharts
+API externa,Google Ads API via google-ads-api (Opteo)
+Lint,ESLint flat config (core-web-vitals + TypeScript)
+
+===========================
+HISTORICO DE FASES
+===========================
+Fase,Nome,O que inclui
+1,MVP funcional,Mock API KPIs alertas funil
+2,Analise estrategica,Thresholds CPC/CPM indicadores visuais
+3,Ranking SKUs,Ranking completo metas mensais comparacao ML
+4,Polish,Metadata error handling formatacao
+5,Google Ads API,Integracao real queries GAQL cache
+6,Calendario,Date picker estilo Google Ads presets custom range
+7,Charts e trends,Recharts: receita ROAS conversoes trafego
+8,Precisao de dados,Datas locais arredondamento correto alinhamento com Google Ads
+9,Campanhas,Totais por campanha paginacao atribuicao conta vs Shopping
+10,Dashboard campanha,Tabs SKU/Campanhas badges de tipo time series por campanha
+11,Alertas inteligentes,Comparacao periodos deteccao tendencias 3 niveis
+12,Busca e filtros,Busca por nome/SKU filtros status/canal colunas sortaveis
+13,Polish visual,Spinner empty states retry header footer responsivo
+
+===========================
+PROXIMOS PASSOS POSSIVEIS
+===========================
+Prioridade,Item,Complexidade,Impacto
+Alta,Deploy (Vercel),Baixa,Necessario para o time acessar
+Alta,Autenticacao (NextAuth / login simples),Media,Proteger dados sensiveis
+Alta,Documentacao de setup (.env.example README),Baixa,Onboarding de devs
+Media,Exportacao CSV/PDF,Media,Compartilhar dados offline
+Media,Relatorio automatico (email/WhatsApp semanal),Alta,Visibilidade sem dashboard
+Media,Metas editaveis por campanha,Media,Targets personalizados
+Media,Loading state ao clicar campanha no time series,Baixa,UX mais clara
+Baixa,Testes automatizados (Vitest),Alta,CI/CD confiabilidade
+Baixa,Componentizar page.tsx (1.900 linhas em modulos),Media,Manutenibilidade
+Baixa,Acessibilidade (ARIA teclado),Media,Inclusao
+Baixa,Error monitoring (Sentry),Baixa,Producao
