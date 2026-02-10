@@ -3,7 +3,7 @@ import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
 import { fetchEcommerceFunnel, fetchGA4Summary, fetchGA4FunnelTimeSeries, fetchChannelAcquisition } from "@/lib/ga4-queries";
 
 /* =========================
-   GET handler
+   GET handler — v2
 ========================= */
 
 export async function GET(request: NextRequest) {
