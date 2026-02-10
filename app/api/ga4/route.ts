@@ -15,19 +15,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "startDate and endDate are required" }, { status: 400 });
   }
 
-  /* ---- Debug: verificar formato da chave (remover depois) ---- */
-  if (searchParams.get("debug") === "key") {
-    const raw = process.env.GA4_PRIVATE_KEY ?? "";
-    return NextResponse.json({
-      hasKey: !!raw,
-      length: raw.length,
-      first30: raw.slice(0, 30),
-      hasLiteralBackslashN: raw.includes("\\n"),
-      hasRealNewline: raw.includes("\n"),
-      configured: isGA4Configured(),
-    });
-  }
-
   /* ---- GA4 não configurado ---- */
   if (!isGA4Configured()) {
     return NextResponse.json({ source: "not_configured" }, { status: 200 });
