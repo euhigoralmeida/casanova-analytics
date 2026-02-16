@@ -12,6 +12,9 @@ import type {
   GA4Slice,
   ChannelSlice,
   PlanningSlice,
+  DeviceSlice,
+  DemographicSlice,
+  GeographicSlice,
 } from "./types";
 import type {
   AccountMetrics,
@@ -20,6 +23,9 @@ import type {
   GA4Metrics,
   ChannelData,
   PlanningMetrics,
+  DeviceData,
+  DemographicData,
+  GeographicData,
 } from "../types";
 
 /**
@@ -40,10 +46,14 @@ export function buildDataCube(params: {
   channels: ChannelData[];
   planning: PlanningMetrics;
   skuExtras?: Record<string, { marginPct: number; stock: number }>;
+  devices?: DeviceData[];
+  demographics?: DemographicData[];
+  geographic?: GeographicData[];
 }): DataCube {
   const {
     tenantId, periodStart, periodEnd, daysInPeriod, dayOfMonth, daysInMonth,
     account, skus, campaigns, ga4, channels, planning, skuExtras,
+    devices, demographics, geographic,
   } = params;
 
   // Account slice (pass-through)
@@ -110,6 +120,53 @@ export function buildDataCube(params: {
   // Planning slice (pass-through)
   const planningSlice: PlanningSlice = { ...planning };
 
+  // Device slices with derived fields
+  const totalDeviceRevenue = devices?.reduce((s, d) => s + d.revenue, 0) ?? 0;
+  const deviceSlices: DeviceSlice[] | undefined = devices?.map((d) => ({
+    device: d.device,
+    impressions: d.impressions,
+    clicks: d.clicks,
+    conversions: d.conversions,
+    revenue: d.revenue,
+    costBRL: d.costBRL,
+    roas: d.costBRL > 0 ? Math.round((d.revenue / d.costBRL) * 100) / 100 : 0,
+    cpa: d.conversions > 0 ? Math.round((d.costBRL / d.conversions) * 100) / 100 : 0,
+    ctr: d.impressions > 0 ? Math.round((d.clicks / d.impressions) * 10000) / 100 : 0,
+    convRate: d.clicks > 0 ? Math.round((d.conversions / d.clicks) * 10000) / 100 : 0,
+    revenueShare: totalDeviceRevenue > 0 ? Math.round((d.revenue / totalDeviceRevenue) * 10000) / 100 : 0,
+  }));
+
+  // Demographic slices with derived fields
+  const totalDemoRevenue = demographics?.reduce((s, d) => s + d.revenue, 0) ?? 0;
+  const demographicSlices: DemographicSlice[] | undefined = demographics?.map((d) => ({
+    segment: d.segment,
+    type: d.type,
+    impressions: d.impressions,
+    clicks: d.clicks,
+    conversions: d.conversions,
+    revenue: d.revenue,
+    costBRL: d.costBRL,
+    roas: d.costBRL > 0 ? Math.round((d.revenue / d.costBRL) * 100) / 100 : 0,
+    cpa: d.conversions > 0 ? Math.round((d.costBRL / d.conversions) * 100) / 100 : 0,
+    ctr: d.impressions > 0 ? Math.round((d.clicks / d.impressions) * 10000) / 100 : 0,
+    revenueShare: totalDemoRevenue > 0 ? Math.round((d.revenue / totalDemoRevenue) * 10000) / 100 : 0,
+  }));
+
+  // Geographic slices with derived fields
+  const totalGeoRevenue = geographic?.reduce((s, d) => s + d.revenue, 0) ?? 0;
+  const geographicSlices: GeographicSlice[] | undefined = geographic?.map((d) => ({
+    region: d.region,
+    impressions: d.impressions,
+    clicks: d.clicks,
+    conversions: d.conversions,
+    revenue: d.revenue,
+    costBRL: d.costBRL,
+    roas: d.costBRL > 0 ? Math.round((d.revenue / d.costBRL) * 100) / 100 : 0,
+    cpa: d.conversions > 0 ? Math.round((d.costBRL / d.conversions) * 100) / 100 : 0,
+    ctr: d.impressions > 0 ? Math.round((d.clicks / d.impressions) * 10000) / 100 : 0,
+    revenueShare: totalGeoRevenue > 0 ? Math.round((d.revenue / totalGeoRevenue) * 10000) / 100 : 0,
+  }));
+
   return {
     meta: { tenantId, periodStart, periodEnd, daysInPeriod, dayOfMonth, daysInMonth },
     account: accountSlice,
@@ -118,5 +175,8 @@ export function buildDataCube(params: {
     ga4: ga4Slice,
     channels: channelSlices,
     planning: planningSlice,
+    devices: deviceSlices,
+    demographics: demographicSlices,
+    geographic: geographicSlices,
   };
 }

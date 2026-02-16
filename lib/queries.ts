@@ -501,6 +501,261 @@ export async function fetchAllCampaignMetrics(
    Query: série temporal de uma campanha
 ========================= */
 
+/* =========================
+   Tipos: device / demographic / geographic
+========================= */
+
+export type DeviceMetrics = {
+  device: string;
+  impressions: number;
+  clicks: number;
+  costBRL: number;
+  conversions: number;
+  revenue: number;
+};
+
+export type DemographicMetrics = {
+  segment: string;
+  type: "age" | "gender";
+  impressions: number;
+  clicks: number;
+  costBRL: number;
+  conversions: number;
+  revenue: number;
+};
+
+export type GeographicMetrics = {
+  region: string;
+  impressions: number;
+  clicks: number;
+  costBRL: number;
+  conversions: number;
+  revenue: number;
+};
+
+/* =========================
+   Enum maps: device
+========================= */
+
+const DEVICE_MAP: Record<number, string> = {
+  0: "UNSPECIFIED",
+  1: "UNKNOWN",
+  2: "MOBILE",
+  3: "TABLET",
+  4: "DESKTOP",
+  5: "CONNECTED_TV",
+  6: "OTHER",
+};
+
+function resolveDevice(raw: unknown): string {
+  if (typeof raw === "number") return DEVICE_MAP[raw] ?? "UNKNOWN";
+  if (typeof raw === "string") return raw;
+  return "UNKNOWN";
+}
+
+/* =========================
+   Query: métricas por dispositivo
+========================= */
+
+export async function fetchDeviceMetrics(
+  customer: Customer,
+  period: string,
+  startDate?: string,
+  endDate?: string,
+): Promise<DeviceMetrics[]> {
+  const cacheKey = startDate && endDate ? `dev:${startDate}:${endDate}` : `dev:${period}`;
+  const cached = getCached<DeviceMetrics[]>(cacheKey);
+  if (cached) return cached;
+
+  const dateClause = buildDateClause(period, startDate, endDate);
+
+  const rows = await customer.query(`
+    SELECT
+      segments.device,
+      metrics.impressions,
+      metrics.clicks,
+      metrics.cost_micros,
+      metrics.conversions,
+      metrics.conversions_value
+    FROM campaign
+    WHERE ${dateClause}
+      AND campaign.status = 'ENABLED'
+  `);
+
+  const map = new Map<string, DeviceMetrics>();
+
+  for (const row of rows) {
+    const r = row as Record<string, Record<string, unknown>>;
+    const device = resolveDevice(r.segments?.device);
+    const existing = map.get(device) ?? {
+      device,
+      impressions: 0,
+      clicks: 0,
+      costBRL: 0,
+      conversions: 0,
+      revenue: 0,
+    };
+
+    existing.impressions += (r.metrics?.impressions as number) || 0;
+    existing.clicks += (r.metrics?.clicks as number) || 0;
+    existing.costBRL += ((r.metrics?.cost_micros as number) || 0) / 1_000_000;
+    existing.conversions += (r.metrics?.conversions as number) || 0;
+    existing.revenue += (r.metrics?.conversions_value as number) || 0;
+
+    map.set(device, existing);
+  }
+
+  const result = Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
+  setCache(cacheKey, result);
+  return result;
+}
+
+/* =========================
+   Query: métricas demográficas (age_range_view + gender_view)
+========================= */
+
+export async function fetchDemographicMetrics(
+  customer: Customer,
+  period: string,
+  startDate?: string,
+  endDate?: string,
+): Promise<DemographicMetrics[]> {
+  const cacheKey = startDate && endDate ? `demo:${startDate}:${endDate}` : `demo:${period}`;
+  const cached = getCached<DemographicMetrics[]>(cacheKey);
+  if (cached) return cached;
+
+  const dateClause = buildDateClause(period, startDate, endDate);
+
+  const [ageRows, genderRows] = await Promise.all([
+    customer.query(`
+      SELECT
+        ad_group_criterion.age_range.type,
+        metrics.impressions,
+        metrics.clicks,
+        metrics.cost_micros,
+        metrics.conversions,
+        metrics.conversions_value
+      FROM age_range_view
+      WHERE ${dateClause}
+    `),
+    customer.query(`
+      SELECT
+        ad_group_criterion.gender.type,
+        metrics.impressions,
+        metrics.clicks,
+        metrics.cost_micros,
+        metrics.conversions,
+        metrics.conversions_value
+      FROM gender_view
+      WHERE ${dateClause}
+    `),
+  ]);
+
+  const result: DemographicMetrics[] = [];
+
+  // Aggregate age rows by segment
+  const ageMap = new Map<string, DemographicMetrics>();
+  for (const row of ageRows) {
+    const r = row as Record<string, Record<string, Record<string, unknown>>>;
+    const segment = String(r.ad_group_criterion?.age_range?.type ?? "UNKNOWN");
+    const existing = ageMap.get(segment) ?? {
+      segment,
+      type: "age" as const,
+      impressions: 0, clicks: 0, costBRL: 0, conversions: 0, revenue: 0,
+    };
+    existing.impressions += (r.metrics?.impressions as unknown as number) || 0;
+    existing.clicks += (r.metrics?.clicks as unknown as number) || 0;
+    existing.costBRL += ((r.metrics?.cost_micros as unknown as number) || 0) / 1_000_000;
+    existing.conversions += (r.metrics?.conversions as unknown as number) || 0;
+    existing.revenue += (r.metrics?.conversions_value as unknown as number) || 0;
+    ageMap.set(segment, existing);
+  }
+  result.push(...ageMap.values());
+
+  // Aggregate gender rows by segment
+  const genderMap = new Map<string, DemographicMetrics>();
+  for (const row of genderRows) {
+    const r = row as Record<string, Record<string, Record<string, unknown>>>;
+    const segment = String(r.ad_group_criterion?.gender?.type ?? "UNKNOWN");
+    const existing = genderMap.get(segment) ?? {
+      segment,
+      type: "gender" as const,
+      impressions: 0, clicks: 0, costBRL: 0, conversions: 0, revenue: 0,
+    };
+    existing.impressions += (r.metrics?.impressions as unknown as number) || 0;
+    existing.clicks += (r.metrics?.clicks as unknown as number) || 0;
+    existing.costBRL += ((r.metrics?.cost_micros as unknown as number) || 0) / 1_000_000;
+    existing.conversions += (r.metrics?.conversions as unknown as number) || 0;
+    existing.revenue += (r.metrics?.conversions_value as unknown as number) || 0;
+    genderMap.set(segment, existing);
+  }
+  result.push(...genderMap.values());
+
+  setCache(cacheKey, result);
+  return result;
+}
+
+/* =========================
+   Query: métricas geográficas
+========================= */
+
+export async function fetchGeographicMetrics(
+  customer: Customer,
+  period: string,
+  startDate?: string,
+  endDate?: string,
+): Promise<GeographicMetrics[]> {
+  const cacheKey = startDate && endDate ? `geo:${startDate}:${endDate}` : `geo:${period}`;
+  const cached = getCached<GeographicMetrics[]>(cacheKey);
+  if (cached) return cached;
+
+  const dateClause = buildDateClause(period, startDate, endDate);
+
+  const rows = await customer.query(`
+    SELECT
+      segments.geo_target_region,
+      metrics.impressions,
+      metrics.clicks,
+      metrics.cost_micros,
+      metrics.conversions,
+      metrics.conversions_value
+    FROM geographic_view
+    WHERE ${dateClause}
+      AND geographic_view.location_type = 'LOCATION_OF_PRESENCE'
+  `);
+
+  const map = new Map<string, GeographicMetrics>();
+
+  for (const row of rows) {
+    const r = row as Record<string, Record<string, unknown>>;
+    const region = String(r.segments?.geo_target_region ?? "Desconhecido");
+    const existing = map.get(region) ?? {
+      region,
+      impressions: 0,
+      clicks: 0,
+      costBRL: 0,
+      conversions: 0,
+      revenue: 0,
+    };
+
+    existing.impressions += (r.metrics?.impressions as number) || 0;
+    existing.clicks += (r.metrics?.clicks as number) || 0;
+    existing.costBRL += ((r.metrics?.cost_micros as number) || 0) / 1_000_000;
+    existing.conversions += (r.metrics?.conversions as number) || 0;
+    existing.revenue += (r.metrics?.conversions_value as number) || 0;
+
+    map.set(region, existing);
+  }
+
+  const result = Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
+  setCache(cacheKey, result);
+  return result;
+}
+
+/* =========================
+   Query: série temporal de uma campanha
+========================= */
+
 export async function fetchCampaignTimeSeries(
   customer: Customer,
   campaignId: string,

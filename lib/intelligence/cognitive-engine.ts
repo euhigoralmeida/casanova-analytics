@@ -14,6 +14,9 @@ import { analyzeEfficiency } from "./analyzers/efficiency";
 import { detectOpportunities } from "./analyzers/opportunity";
 import { evaluateRisks } from "./analyzers/risk";
 import { analyzeComposition } from "./analyzers/composition";
+import { analyzeDevices } from "./analyzers/device";
+import { analyzeDemographics } from "./analyzers/demographic";
+import { analyzeGeographic } from "./analyzers/geographic";
 
 // Camada de dados
 import { buildDataCube } from "./data-layer/cube-builder";
@@ -52,6 +55,9 @@ function contextToCube(ctx: AnalysisContext): DataCube {
     ga4: ctx.ga4,
     channels: ctx.channels,
     planning: ctx.planning,
+    devices: ctx.devices,
+    demographics: ctx.demographics,
+    geographic: ctx.geographic,
   });
 }
 
@@ -164,6 +170,9 @@ export async function analyzeCognitive(ctx: AnalysisContext): Promise<CognitiveR
     ...detectOpportunities(ctx, cube),
     ...evaluateRisks(ctx, cube),
     ...analyzeComposition(ctx, cube),
+    ...analyzeDevices(ctx, cube),
+    ...analyzeDemographics(ctx, cube),
+    ...analyzeGeographic(ctx, cube),
   ];
 
   // 4. Correlacionar findings (identificar causas raiz)

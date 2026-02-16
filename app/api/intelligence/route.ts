@@ -3,13 +3,13 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isConfigured, getCustomer } from "@/lib/google-ads";
 import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
-import { fetchAllSkuMetrics, fetchAccountTotals, fetchAllCampaignMetrics } from "@/lib/queries";
+import { fetchAllSkuMetrics, fetchAccountTotals, fetchAllCampaignMetrics, fetchDeviceMetrics, fetchDemographicMetrics, fetchGeographicMetrics } from "@/lib/queries";
 import { fetchGA4Summary, fetchChannelAcquisition } from "@/lib/ga4-queries";
 import { computeTargetMonth } from "@/lib/planning-target-calc";
 import { analyzeCognitive } from "@/lib/intelligence/cognitive-engine";
 import { loadSkuExtras } from "@/lib/sku-master";
 import { persistDailySnapshot } from "@/lib/intelligence/snapshot";
-import type { AnalysisContext, PlanningMetrics, AccountMetrics, SkuMetrics, CampaignMetrics, GA4Metrics, ChannelData } from "@/lib/intelligence/types";
+import type { AnalysisContext, PlanningMetrics, AccountMetrics, SkuMetrics, CampaignMetrics, GA4Metrics, ChannelData, DeviceData, DemographicData, GeographicData } from "@/lib/intelligence/types";
 
 function deriveStatus(roas: number, cpa: number, marginPct: number, stock: number, conversions: number): "escalar" | "manter" | "pausar" {
   if (conversions === 0 && roas === 0) return "pausar";
@@ -88,14 +88,20 @@ export async function GET(req: NextRequest) {
   let account: AccountMetrics | undefined;
   let skus: SkuMetrics[] = [];
   let campaigns: CampaignMetrics[] = [];
+  let devices: DeviceData[] = [];
+  let demographics: DemographicData[] = [];
+  let geographic: GeographicData[] = [];
 
   if (isConfigured()) {
     try {
       const customer = getCustomer();
-      const [acctData, allSkuData, campData] = await Promise.all([
+      const [acctData, allSkuData, campData, deviceData, demoData, geoData] = await Promise.all([
         fetchAccountTotals(customer, period, startDate, endDate),
         fetchAllSkuMetrics(customer, period, startDate, endDate),
         fetchAllCampaignMetrics(customer, period, startDate, endDate),
+        fetchDeviceMetrics(customer, period, startDate, endDate).catch(() => []),
+        fetchDemographicMetrics(customer, period, startDate, endDate).catch(() => []),
+        fetchGeographicMetrics(customer, period, startDate, endDate).catch(() => []),
       ]);
 
       account = {
@@ -141,6 +147,10 @@ export async function GET(req: NextRequest) {
         impressions: c.impressions,
         clicks: c.clicks,
       }));
+
+      devices = deviceData;
+      demographics = demoData;
+      geographic = geoData;
     } catch (err) {
       console.error("Intelligence: Google Ads error:", err);
     }
@@ -194,6 +204,9 @@ export async function GET(req: NextRequest) {
     ga4,
     channels,
     planning,
+    devices,
+    demographics,
+    geographic,
   };
 
   let result;

@@ -57,6 +57,18 @@ const CAUSAL_PATTERNS: CausalPattern[] = [
     evidence: { category: "planning_gap", idPattern: /^pg-(revenue|conversion)/ },
     rootCauseTemplate: "Problema de conversão no funil está contribuindo para o gap de receita vs planejamento",
   },
+  {
+    id: "device-inefficiency",
+    trigger: { category: "efficiency", idPattern: /^dev-mobile-low-roas/ },
+    evidence: { category: "efficiency", idPattern: /^eff-(budget-dist|low-roas)/ },
+    rootCauseTemplate: "Budget em Mobile com baixo ROAS está contribuindo para ineficiência geral da operação",
+  },
+  {
+    id: "geo-concentration",
+    trigger: { category: "risk", idPattern: /^geo-top-region/ },
+    evidence: { category: "risk", idPattern: /^risk-/ },
+    rootCauseTemplate: "Concentração geográfica amplifica o risco de dependência da operação",
+  },
 ];
 
 /**

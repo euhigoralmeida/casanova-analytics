@@ -103,6 +103,47 @@ export type PlanningSlice = {
   pct_aprovacao_receita?: number;
 };
 
+export type DeviceSlice = {
+  device: string; // "DESKTOP" | "MOBILE" | "TABLET" | ...
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  costBRL: number;
+  roas: number;
+  cpa: number;
+  ctr: number;
+  convRate: number;
+  revenueShare: number;
+};
+
+export type DemographicSlice = {
+  segment: string; // "AGE_RANGE_18_24", "MALE", etc.
+  type: "age" | "gender";
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  costBRL: number;
+  roas: number;
+  cpa: number;
+  ctr: number;
+  revenueShare: number;
+};
+
+export type GeographicSlice = {
+  region: string;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  revenue: number;
+  costBRL: number;
+  roas: number;
+  cpa: number;
+  ctr: number;
+  revenueShare: number;
+};
+
 /**
  * DataCube — Estrutura centralizada consumida por todas as camadas do Motor Cognitivo.
  * Substitui o AnalysisContext com dados enriquecidos e campos derivados.
@@ -115,6 +156,10 @@ export type DataCube = {
   ga4?: GA4Slice;
   channels: ChannelSlice[];
   planning: PlanningSlice;
+  // Segmentation slices
+  devices?: DeviceSlice[];
+  demographics?: DemographicSlice[];
+  geographic?: GeographicSlice[];
   // Trend data from historical snapshots
   trends?: {
     account?: TrendData;

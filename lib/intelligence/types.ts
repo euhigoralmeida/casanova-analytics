@@ -149,6 +149,34 @@ export type ChannelData = {
   revenue: number;
 };
 
+export type DeviceData = {
+  device: string;
+  impressions: number;
+  clicks: number;
+  costBRL: number;
+  conversions: number;
+  revenue: number;
+};
+
+export type DemographicData = {
+  segment: string;
+  type: "age" | "gender";
+  impressions: number;
+  clicks: number;
+  costBRL: number;
+  conversions: number;
+  revenue: number;
+};
+
+export type GeographicData = {
+  region: string;
+  impressions: number;
+  clicks: number;
+  costBRL: number;
+  conversions: number;
+  revenue: number;
+};
+
 export type AnalysisContext = {
   tenantId: string;
   periodStart: string;
@@ -162,4 +190,7 @@ export type AnalysisContext = {
   ga4?: GA4Metrics;
   channels: ChannelData[];
   planning: PlanningMetrics;
+  devices?: DeviceData[];
+  demographics?: DemographicData[];
+  geographic?: GeographicData[];
 };
