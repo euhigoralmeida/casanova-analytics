@@ -56,9 +56,13 @@ export async function POST(req: NextRequest) {
   try {
     // Fetch cognitive context directly (no HTTP round-trip)
     let contextSummary = "Dados de análise não disponíveis no momento.";
-    const cognitiveData = await fetchCognitiveDirectly(session.tenantId, context.startDate, context.endDate);
-    if (cognitiveData) {
-      contextSummary = buildContextSummary(cognitiveData);
+    try {
+      const cognitiveData = await fetchCognitiveDirectly(session.tenantId, context.startDate, context.endDate);
+      if (cognitiveData) {
+        contextSummary = buildContextSummary(cognitiveData);
+      }
+    } catch (ctxErr) {
+      console.error("Chat: cognitive context error (non-fatal):", ctxErr);
     }
 
     const periodContext = buildPeriodContext(context.startDate, context.endDate);

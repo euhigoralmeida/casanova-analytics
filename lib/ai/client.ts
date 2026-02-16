@@ -1,4 +1,5 @@
 // Anthropic SDK client singleton
+// The SDK reads ANTHROPIC_API_KEY from process.env automatically
 
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -6,11 +7,8 @@ let _client: Anthropic | null = null;
 
 export function getAnthropicClient(): Anthropic {
   if (!_client) {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) {
-      throw new Error("ANTHROPIC_API_KEY env var is required");
-    }
-    _client = new Anthropic({ apiKey });
+    // SDK auto-reads process.env.ANTHROPIC_API_KEY
+    _client = new Anthropic();
   }
   return _client;
 }
