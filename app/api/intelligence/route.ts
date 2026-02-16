@@ -222,7 +222,7 @@ export async function GET(req: NextRequest) {
         recommendations: i.recommendations as any,
         source: i.source,
       })),
-    }).catch((err) => console.error("Intelligence: insight persist error:", err));
+    }).catch((e: unknown) => console.error("Intelligence: insight persist error:", e));
   }
 
   return NextResponse.json(result);
