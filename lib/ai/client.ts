@@ -1,14 +1,14 @@
-// Anthropic SDK client singleton
-// The SDK reads ANTHROPIC_API_KEY from process.env automatically
+// Anthropic SDK client — reads API key explicitly from process.env each time
+// Avoids singleton caching issues on Vercel serverless
 
 import Anthropic from "@anthropic-ai/sdk";
 
-let _client: Anthropic | null = null;
-
 export function getAnthropicClient(): Anthropic {
-  if (!_client) {
-    // SDK auto-reads process.env.ANTHROPIC_API_KEY
-    _client = new Anthropic();
+  const apiKey = process.env["ANTHROPIC_API_KEY"];
+  if (!apiKey) {
+    throw new Error(
+      `ANTHROPIC_API_KEY not found. Keys available: ${Object.keys(process.env).filter(k => k.includes("ANTHROPIC")).join(", ") || "none with ANTHROPIC"}`
+    );
   }
-  return _client;
+  return new Anthropic({ apiKey });
 }
