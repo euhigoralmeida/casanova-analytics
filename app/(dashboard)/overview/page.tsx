@@ -14,6 +14,7 @@ import { KpiSkeleton, AlertsSkeleton, ChartSkeleton } from "@/components/ui/skel
 import { ExecutiveSummary } from "@/components/intelligence/executive-summary";
 import { InsightsGrid } from "@/components/intelligence/insights-grid";
 import { RecommendationsPanel } from "@/components/intelligence/recommendations-panel";
+import { BudgetPlanCard } from "@/components/intelligence/budget-plan-card";
 
 /* ─── KPI Mini Card ─── */
 function KpiCard({ label, value, sublabel, color }: { label: string; value: string; sublabel?: string; color?: string }) {
@@ -196,6 +197,7 @@ export default function VisaoGeralPage() {
           bottleneck={intelligence.bottleneck}
           pacingProjections={intelligence.pacingProjections}
           executiveSummary={intelligence.executiveSummary}
+          accountTrend={intelligence.accountTrend}
         />
       )}
 
@@ -268,6 +270,11 @@ export default function VisaoGeralPage() {
             onFollowAction={handleFollowAction}
           />
         </div>
+      )}
+
+      {/* ─── BUDGET OPTIMIZATION ─── */}
+      {intelligence?.budgetPlan && !loading && (
+        <BudgetPlanCard plan={intelligence.budgetPlan} />
       )}
 
       {/* ─── RESUMO EXECUTIVO LEGADO ─── */}

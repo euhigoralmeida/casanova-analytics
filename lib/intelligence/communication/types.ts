@@ -9,6 +9,8 @@ import type {
   PacingProjection,
   RankedDecision,
 } from "../cognitive/types";
+import type { BudgetPlan } from "../strategy/budget-optimizer";
+import type { TrendData } from "../data-layer/trend-analyzer";
 import type { IntelligenceInsight, IntelligenceSummary } from "../types";
 
 /** Dados estruturados para o Executive Summary */
@@ -27,6 +29,8 @@ export type CognitiveResponse = {
   findings: RankedDecision[];
   pacingProjections: PacingProjection[];
   executiveSummary: ExecutiveSummaryData;
+  budgetPlan: BudgetPlan | null;
+  accountTrend?: TrendData;
 
   // Campos legacy para backward compatibility
   insights: IntelligenceInsight[];

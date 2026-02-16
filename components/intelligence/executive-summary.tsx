@@ -3,6 +3,7 @@
 import type { IntelligenceSummary } from "@/lib/intelligence/types";
 import type { ModeAssessment, Bottleneck, PacingProjection } from "@/lib/intelligence/cognitive/types";
 import type { ExecutiveSummaryData } from "@/lib/intelligence/communication/types";
+import type { TrendData } from "@/lib/intelligence/data-layer/trend-analyzer";
 import { AlertTriangle, TrendingUp, Zap, Target, Crosshair } from "lucide-react";
 import { formatBRL } from "@/lib/format";
 
@@ -13,6 +14,7 @@ interface ExecutiveSummaryProps {
   bottleneck?: Bottleneck;
   pacingProjections?: PacingProjection[];
   executiveSummary?: ExecutiveSummaryData;
+  accountTrend?: TrendData;
 }
 
 function healthColor(score: number): string {
@@ -84,7 +86,13 @@ function ScoreRing({ score }: { score: number }) {
   );
 }
 
-export function ExecutiveSummary({ summary, mode, bottleneck, pacingProjections, executiveSummary }: ExecutiveSummaryProps) {
+const TREND_DISPLAY: Record<string, { arrow: string; label: string; color: string }> = {
+  improving: { arrow: "↑", label: "Em melhoria", color: "text-emerald-600" },
+  stable: { arrow: "→", label: "Estável", color: "text-zinc-500" },
+  declining: { arrow: "↓", label: "Em queda", color: "text-red-600" },
+};
+
+export function ExecutiveSummary({ summary, mode, bottleneck, pacingProjections, executiveSummary, accountTrend }: ExecutiveSummaryProps) {
   const { healthScore, topPriority, quickWins } = summary;
   const hasCognitive = !!mode;
   const modeStyle = mode ? MODE_COLORS[mode.mode] ?? MODE_COLORS.OTIMIZAR : MODE_COLORS.OTIMIZAR;
@@ -100,6 +108,11 @@ export function ExecutiveSummary({ summary, mode, bottleneck, pacingProjections,
               <span className={`text-sm font-bold ${modeStyle.text}`}>
                 Modo: {MODE_LABELS[mode!.mode]}
               </span>
+              {accountTrend && (
+                <span className={`text-xs font-medium ${TREND_DISPLAY[accountTrend.classification]?.color ?? "text-zinc-500"}`}>
+                  {TREND_DISPLAY[accountTrend.classification]?.arrow} {TREND_DISPLAY[accountTrend.classification]?.label}
+                </span>
+              )}
             </div>
             {bottleneck && (
               <div className="flex items-center gap-1.5 text-xs text-zinc-600">

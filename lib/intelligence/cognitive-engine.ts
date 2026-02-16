@@ -17,21 +17,26 @@ import { analyzeComposition } from "./analyzers/composition";
 
 // Camada de dados
 import { buildDataCube } from "./data-layer/cube-builder";
+import { analyzeTrends } from "./data-layer/trend-analyzer";
+
+// Camada cognitiva
+import { computePacingProjections } from "./cognitive/pacing";
+import { correlateFindings } from "./cognitive/correlation";
 
 // Camada de estratégia
 import { detectStrategicMode } from "./strategy/mode-detector";
 import { detectBottleneck } from "./strategy/bottleneck";
 import { rankDecisions } from "./strategy/ranker";
+import { optimizeBudget } from "./strategy/budget-optimizer";
 
-// Camada cognitiva
-import { computePacingProjections } from "./cognitive/pacing";
+// Snapshot (dados históricos)
+import { fetchHistoricalSnapshots } from "./snapshot";
 
 // Camada de comunicação
 import { generateExecutiveSummary } from "./communication/templates";
 
 /**
  * Converte AnalysisContext legado para DataCube.
- * Usado para manter compatibilidade com os analyzers existentes.
  */
 function contextToCube(ctx: AnalysisContext): DataCube {
   return buildDataCube({
@@ -63,22 +68,21 @@ function findingToLegacyInsight(f: CognitiveFinding): IntelligenceInsight {
     metrics: f.metrics,
     recommendations: f.recommendations,
     source: f.source,
+    rootCause: f.rootCause,
+    relatedFindingIds: f.relatedFindingIds,
   };
 }
 
 /**
  * Calcula health score ponderado por impacto financeiro.
- * Substitui o health score ingênuo (100 - 15*danger - 8*warning).
  */
 function computeWeightedHealthScore(
   findings: CognitiveFinding[],
   modeScore: number,
   accountRevenue: number,
 ): number {
-  // Base do score vem do modo estratégico
   let score = modeScore;
 
-  // Ajustar pelo impacto financeiro negativo como % da receita
   const negativeImpact = findings
     .filter((f) => f.severity !== "success")
     .reduce((s, f) => s + Math.abs(f.financialImpact.netImpact), 0);
@@ -86,10 +90,8 @@ function computeWeightedHealthScore(
   const revenue = Math.max(accountRevenue, 1);
   const impactRatio = negativeImpact / revenue;
 
-  // Cada 10% de receita em risco = -10 pontos
   score -= Math.min(impactRatio * 100, 40);
 
-  // Boost por findings positivos
   const positiveCount = findings.filter((f) => f.severity === "success").length;
   score += Math.min(positiveCount * 3, 12);
 
@@ -97,14 +99,65 @@ function computeWeightedHealthScore(
 }
 
 /**
- * Ponto de entrada principal do Motor Cognitivo.
- * Recebe AnalysisContext (mesmo formato do engine antigo) e retorna CognitiveResponse.
+ * Busca dados históricos e computa tendências para o DataCube.
+ * Graceful degradation: retorna sem trends se falhar.
  */
-export function analyzeCognitive(ctx: AnalysisContext): CognitiveResponse {
+async function enrichCubeWithTrends(cube: DataCube, tenantId: string): Promise<void> {
+  try {
+    // Buscar snapshots em paralelo: account + top 20 SKUs
+    const skuSlice = cube.skus.slice(0, 20);
+    const promises: Promise<{ scope: string; snaps: Array<{ date: string; metrics: Record<string, unknown> }> }>[] = [
+      fetchHistoricalSnapshots(tenantId, "account", 30)
+        .then((snaps) => ({ scope: "account", snaps })),
+      ...skuSlice.map((s) =>
+        fetchHistoricalSnapshots(tenantId, `sku:${s.sku}`, 30)
+          .then((snaps) => ({ scope: `sku:${s.sku}`, snaps }))
+      ),
+    ];
+
+    const results = await Promise.all(promises);
+
+    // Separar account e SKU snapshots
+    const accountResult = results.find((r) => r.scope === "account");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const accountSnaps = (accountResult?.snaps ?? []) as any;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const skuSnapsMap: Record<string, any> = {};
+    for (const r of results) {
+      if (r.scope.startsWith("sku:")) {
+        const sku = r.scope.slice(4);
+        skuSnapsMap[sku] = r.snaps;
+      }
+    }
+
+    const trends = analyzeTrends(accountSnaps, skuSnapsMap);
+    cube.trends = trends;
+
+    // Enriquecer SkuSlices individuais
+    for (const skuSlice of cube.skus) {
+      if (trends.skus[skuSlice.sku]) {
+        skuSlice.trend = trends.skus[skuSlice.sku];
+      }
+    }
+  } catch (err) {
+    console.error("Intelligence: trend analysis error (graceful degrade):", err);
+  }
+}
+
+/**
+ * Ponto de entrada principal do Motor Cognitivo.
+ * Recebe AnalysisContext e retorna CognitiveResponse.
+ * Async para suportar busca de dados históricos (trends).
+ */
+export async function analyzeCognitive(ctx: AnalysisContext): Promise<CognitiveResponse> {
   // 1. Construir DataCube enriquecido
   const cube = contextToCube(ctx);
 
-  // 2. Rodar analyzers (agora retornam CognitiveFinding[])
+  // 2. Buscar dados históricos e computar tendências
+  await enrichCubeWithTrends(cube, ctx.tenantId);
+
+  // 3. Rodar analyzers
   const allFindings: CognitiveFinding[] = [
     ...analyzePlanningGap(ctx, cube),
     ...analyzeEfficiency(ctx, cube),
@@ -113,29 +166,35 @@ export function analyzeCognitive(ctx: AnalysisContext): CognitiveResponse {
     ...analyzeComposition(ctx, cube),
   ];
 
-  // 3. Detectar modo estratégico
+  // 4. Correlacionar findings (identificar causas raiz)
+  const correlated = correlateFindings(allFindings);
+
+  // 5. Detectar modo estratégico (agora lê cube.trends)
   const mode = detectStrategicMode(cube);
 
-  // 4. Detectar gargalo principal
+  // 6. Detectar gargalo principal
   const bottleneck = detectBottleneck(cube);
 
-  // 5. Rankear decisions por impacto financeiro
-  const ranked = rankDecisions(allFindings);
+  // 7. Otimizar alocação de budget
+  const budgetPlan = optimizeBudget(cube);
 
-  // 6. Computar projeções de pacing
+  // 8. Rankear decisions por impacto financeiro
+  const ranked = rankDecisions(correlated);
+
+  // 9. Computar projeções de pacing
   const pacingProjections = computePacingProjections(cube);
 
-  // 7. Health score ponderado
+  // 10. Health score ponderado
   const healthScore = computeWeightedHealthScore(
-    allFindings,
+    correlated,
     mode.score,
     cube.account?.revenue ?? 0,
   );
 
-  // 8. Gerar executive summary
+  // 11. Gerar executive summary
   const executiveSummary = generateExecutiveSummary(mode, bottleneck, ranked, pacingProjections);
 
-  // 9. Mapear para formatos legacy (backward compatibility)
+  // 12. Mapear para formatos legacy (backward compatibility)
   const legacyInsights = ranked.slice(0, 12).map((r) => findingToLegacyInsight(r.finding));
 
   const topPriority = legacyInsights.find(
@@ -160,6 +219,8 @@ export function analyzeCognitive(ctx: AnalysisContext): CognitiveResponse {
     findings: ranked.slice(0, 15),
     pacingProjections,
     executiveSummary,
+    budgetPlan,
+    accountTrend: cube.trends?.account,
     // Legacy
     insights: legacyInsights,
     summary,

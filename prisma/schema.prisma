@@ -61,3 +61,31 @@ model ActionLog {
 
   @@index([tenantId, createdAt])
 }
+
+model SkuMaster {
+  id          String   @id @default(cuid())
+  tenantId    String   @default("default")
+  sku         String
+  nome        String
+  marginPct   Float    @default(30)
+  costOfGoods Float?
+  stock       Int      @default(0)
+  category    String?
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@unique([tenantId, sku])
+  @@index([tenantId])
+}
+
+model MetricSnapshot {
+  id        String   @id @default(cuid())
+  tenantId  String   @default("default")
+  date      String   // yyyy-mm-dd
+  scope     String   // "account" | "sku:{id}" | "campaign:{id}"
+  metrics   Json     @default("{}")
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, date, scope])
+  @@index([tenantId, scope, date])
+}

@@ -78,6 +78,12 @@ export type CognitiveFinding = {
   source: InsightSource;
   /** Impacto financeiro quantificado — sempre presente */
   financialImpact: FinancialImpact;
+  /** Causa raiz identificada pela correlation engine */
+  rootCause?: string;
+  /** IDs de findings relacionados */
+  relatedFindingIds?: string[];
+  /** ID do padrão de correlação */
+  correlationId?: string;
 };
 
 /** Decisão rankeada por score de prioridade */

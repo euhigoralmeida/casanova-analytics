@@ -7,14 +7,9 @@ import { fetchAllSkuMetrics, fetchAccountTotals, fetchAllCampaignMetrics } from 
 import { fetchGA4Summary, fetchChannelAcquisition } from "@/lib/ga4-queries";
 import { computeTargetMonth } from "@/lib/planning-target-calc";
 import { analyzeCognitive } from "@/lib/intelligence/cognitive-engine";
+import { loadSkuExtras } from "@/lib/sku-master";
+import { persistDailySnapshot } from "@/lib/intelligence/snapshot";
 import type { AnalysisContext, PlanningMetrics, AccountMetrics, SkuMetrics, CampaignMetrics, GA4Metrics, ChannelData } from "@/lib/intelligence/types";
-
-/* SKU extras for margin/stock (same as overview) */
-const skuExtras: Record<string, { nome: string; marginPct: number; stock: number }> = {
-  "27290BR-CP": { nome: "Torneira Cozinha CP", marginPct: 35, stock: 42 },
-  "31450BR-LX": { nome: "Ducha Luxo LX", marginPct: 22, stock: 6 },
-  "19820BR-ST": { nome: "Misturador ST", marginPct: 28, stock: 18 },
-};
 
 function deriveStatus(roas: number, cpa: number, marginPct: number, stock: number, conversions: number): "escalar" | "manter" | "pausar" {
   if (conversions === 0 && roas === 0) return "pausar";
@@ -86,7 +81,10 @@ export async function GET(req: NextRequest) {
     console.error("Intelligence: planning fetch error:", err);
   }
 
-  // 2. Fetch Google Ads data
+  // 2. Load SKU extras from DB (margin, stock, cost)
+  const skuExtras = await loadSkuExtras(session.tenantId);
+
+  // 3. Fetch Google Ads data
   let account: AccountMetrics | undefined;
   let skus: SkuMetrics[] = [];
   let campaigns: CampaignMetrics[] = [];
@@ -148,7 +146,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 3. Fetch GA4 data
+  // 4. Fetch GA4 data
   let ga4: GA4Metrics | undefined;
   let channels: ChannelData[] = [];
 
@@ -182,7 +180,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // 4. Build context and run analysis
+  // 5. Build context and run analysis
   const ctx: AnalysisContext = {
     tenantId: session.tenantId,
     periodStart: startDate ?? "",
@@ -200,16 +198,15 @@ export async function GET(req: NextRequest) {
 
   let result;
   try {
-    result = analyzeCognitive(ctx);
+    result = await analyzeCognitive(ctx);
   } catch (err) {
     console.error("Intelligence: analyze error:", err);
     return NextResponse.json({ error: "Erro ao analisar", detail: String(err) }, { status: 500 });
   }
 
-  // 5. Persist insights (async, don't block response)
+  // 6. Persist insights (async, don't block response)
   if (result.insights.length > 0 && startDate && endDate) {
     prisma.insight.createMany({
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: result.insights.map((i) => ({
         tenantId: session.tenantId,
         periodStart: startDate,
@@ -218,11 +215,29 @@ export async function GET(req: NextRequest) {
         severity: i.severity,
         title: i.title,
         description: i.description,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         metrics: i.metrics as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         recommendations: i.recommendations as any,
         source: i.source,
       })),
     }).catch((e: unknown) => console.error("Intelligence: insight persist error:", e));
+  }
+
+  // 7. Persist daily metric snapshot (async, don't block response)
+  if (account) {
+    const today = new Date().toISOString().slice(0, 10);
+    persistDailySnapshot(
+      session.tenantId,
+      today,
+      { revenue: account.revenue, ads: account.ads, roas: account.roas, cpa: account.cpa,
+        impressions: account.impressions, clicks: account.clicks, conversions: account.conversions, ctr: account.ctr },
+      skus.map((s) => ({
+        sku: s.sku,
+        metrics: { revenue: s.revenue, ads: s.ads, roas: s.roas, cpa: s.cpa,
+                   impressions: s.impressions, clicks: s.clicks, conversions: s.conversions },
+      })),
+    ).catch((e: unknown) => console.error("Intelligence: snapshot persist error:", e));
   }
 
   return NextResponse.json(result);

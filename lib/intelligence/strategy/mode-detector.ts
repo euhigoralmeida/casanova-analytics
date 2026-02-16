@@ -13,11 +13,12 @@ type Signal = { label: string; score: number; weight: number };
  * Detecta o modo estratégico baseado em scoring ponderado.
  *
  * Score ponderado (0-100):
- *   ROAS vs meta        (peso 0.30)
+ *   ROAS vs meta        (peso 0.25)
  *   Pacing receita      (peso 0.25)
  *   CPA vs threshold    (peso 0.15)
- *   Margem              (peso 0.15)
- *   Composição          (peso 0.15)
+ *   Margem              (peso 0.12)
+ *   Composição          (peso 0.10)
+ *   Tendência           (peso 0.13)
  *
  * Score ≥ 75 → ESCALAR
  * Score 50-74 → OTIMIZAR
@@ -39,7 +40,7 @@ export function detectStrategicMode(cube: DataCube): ModeAssessment {
     else if (ratio >= 0.6) score = 30;
     else score = 10;
 
-    signals.push({ label: `ROAS ${actual.toFixed(1)} vs meta ${target.toFixed(1)}`, score, weight: 0.30 });
+    signals.push({ label: `ROAS ${actual.toFixed(1)} vs meta ${target.toFixed(1)}`, score, weight: 0.25 });
   } else if (cube.account) {
     // Sem meta, usar threshold padrão
     const roas = cube.account.roas;
@@ -49,7 +50,7 @@ export function detectStrategicMode(cube: DataCube): ModeAssessment {
     else if (roas >= 3) score = 30;
     else score = 10;
 
-    signals.push({ label: `ROAS ${roas.toFixed(1)} (sem meta definida)`, score, weight: 0.30 });
+    signals.push({ label: `ROAS ${roas.toFixed(1)} (sem meta definida)`, score, weight: 0.25 });
   }
 
   // 2. Pacing receita (weight: 0.25)
@@ -93,7 +94,7 @@ export function detectStrategicMode(cube: DataCube): ModeAssessment {
     else if (margin >= 20) score = 40;
     else score = 15;
 
-    signals.push({ label: `Margem bruta: ${margin.toFixed(0)}%`, score, weight: 0.15 });
+    signals.push({ label: `Margem bruta: ${margin.toFixed(0)}%`, score, weight: 0.12 });
   }
 
   // 5. Composição / Saúde dos SKUs (weight: 0.15)
@@ -109,7 +110,21 @@ export function detectStrategicMode(cube: DataCube): ModeAssessment {
     else if (healthRatio >= 0) score = 40;
     else score = 15;
 
-    signals.push({ label: `SKUs: ${escalar} escalar, ${pausar} pausar de ${total}`, score, weight: 0.15 });
+    signals.push({ label: `SKUs: ${escalar} escalar, ${pausar} pausar de ${total}`, score, weight: 0.10 });
+  }
+
+  // 6. Tendência (weight: 0.13)
+  if (cube.trends?.account) {
+    const trend = cube.trends.account;
+    let score: number;
+    if (trend.classification === "improving") score = 90;
+    else if (trend.classification === "stable") score = 60;
+    else score = 20;
+
+    const arrow = trend.slopePct > 0 ? "+" : "";
+    signals.push({ label: `Tendência: ${trend.classification} (${arrow}${trend.slopePct.toFixed(1)}%/dia)`, score, weight: 0.13 });
+  } else {
+    signals.push({ label: "Tendência: sem dados históricos", score: 60, weight: 0.13 });
   }
 
   // Se não temos sinais suficientes, retornar modo neutro

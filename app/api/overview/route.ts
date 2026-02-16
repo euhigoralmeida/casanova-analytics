@@ -4,6 +4,7 @@ import { fetchAllSkuMetrics, fetchAccountTotals } from "@/lib/queries";
 import { extractTenantId } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { computeTargetMonth } from "@/lib/planning-target-calc";
+import { loadSkuExtras } from "@/lib/sku-master";
 
 /* =========================
    Mock data (fallback)
@@ -46,12 +47,7 @@ const catalog: Record<string, SkuData> = {
   },
 };
 
-// Dados extras por SKU que não vêm do Google Ads
-const skuExtras: Record<string, { nome: string; marginPct: number; stock: number; ecomPrice: number; mlPrice: number; mlSales: number }> = {
-  "27290BR-CP": { nome: "Torneira Cozinha CP", marginPct: 35, stock: 42, ecomPrice: 279.90, mlPrice: 289.90, mlSales: 31 },
-  "31450BR-LX": { nome: "Ducha Luxo LX", marginPct: 22, stock: 6, ecomPrice: 349.90, mlPrice: 329.90, mlSales: 18 },
-  "19820BR-ST": { nome: "Misturador ST", marginPct: 28, stock: 18, ecomPrice: 199.90, mlPrice: 209.90, mlSales: 22 },
-};
+// Dados extras por SKU agora vêm do banco (SkuMaster) via loadSkuExtras()
 
 function deriveStatus(roas: number, cpa: number, marginPct: number, stock: number, conversions: number): "escalar" | "manter" | "pausar" {
   // SKUs sem conversões mas com ROAS alto (receita orgânica?) → manter
@@ -113,7 +109,10 @@ export async function GET(request: NextRequest) {
   const endDate = searchParams.get("endDate") ?? undefined;
 
   const tenantId = extractTenantId(request);
-  const targets = await getPlanningTargets(tenantId);
+  const [targets, skuExtras] = await Promise.all([
+    getPlanningTargets(tenantId),
+    loadSkuExtras(tenantId),
+  ]);
 
   /* ---- DADOS REAIS (Google Ads) ---- */
   if (isConfigured()) {
@@ -165,9 +164,9 @@ export async function GET(request: NextRequest) {
           conversions: purchases,
           status: deriveStatus(roas, cpa, marginPct, stock, purchases),
           ml: {
-            price: extras?.mlPrice ?? 0,
-            ecomPrice: extras?.ecomPrice ?? 0,
-            mlSales: extras?.mlSales ?? 0,
+            price: 0,
+            ecomPrice: 0,
+            mlSales: 0,
           },
         };
       });

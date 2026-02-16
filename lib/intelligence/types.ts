@@ -48,6 +48,10 @@ export type IntelligenceInsight = {
     timeframe: "immediate" | "short" | "medium";
     calculation: string;
   };
+  /** Causa raiz identificada pela correlation engine */
+  rootCause?: string;
+  /** IDs de findings relacionados */
+  relatedFindingIds?: string[];
 };
 
 export type IntelligenceSummary = {

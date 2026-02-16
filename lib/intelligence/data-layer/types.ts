@@ -3,6 +3,8 @@
    Estrutura unificada de dados para o Motor Cognitivo
 ========================= */
 
+import type { TrendData } from "./trend-analyzer";
+
 export type CubeMeta = {
   tenantId: string;
   periodStart: string;
@@ -44,6 +46,8 @@ export type SkuSlice = {
   // Share of total
   revenueShare: number;    // % of total revenue
   adsShare: number;        // % of total spend
+  // Trend (populated from historical snapshots)
+  trend?: TrendData;
 };
 
 export type CampaignSlice = {
@@ -111,4 +115,9 @@ export type DataCube = {
   ga4?: GA4Slice;
   channels: ChannelSlice[];
   planning: PlanningSlice;
+  // Trend data from historical snapshots
+  trends?: {
+    account?: TrendData;
+    skus: Record<string, TrendData>;
+  };
 };

@@ -79,6 +79,13 @@ export function InsightCard({ insight, onFollowAction }: InsightCardProps) {
           <h4 className="text-sm font-semibold text-zinc-900">{title}</h4>
           <p className="text-xs text-zinc-500 leading-relaxed mt-1">{description}</p>
 
+          {/* Root cause (from correlation engine) */}
+          {insight.rootCause && (
+            <p className="text-[10px] text-indigo-600 mt-1 italic">
+              Causa raiz: {insight.rootCause}
+            </p>
+          )}
+
           {/* Financial impact detail */}
           {hasImpact && financialImpact.calculation && (
             <p className="text-[10px] text-zinc-400 mt-1 italic">
