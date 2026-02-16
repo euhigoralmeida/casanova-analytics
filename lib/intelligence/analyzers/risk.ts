@@ -1,18 +1,30 @@
-import type { AnalysisContext, IntelligenceInsight } from "../types";
+import type { AnalysisContext } from "../types";
+import type { CognitiveFinding } from "../cognitive/types";
+import type { DataCube } from "../data-layer/types";
 import { formatBRL } from "@/lib/format";
+import {
+  quantifyPauseSkus,
+  quantifyBounceImpact,
+  quantifyCartAbandonmentImpact,
+  quantifyConcentrationRisk,
+  ZERO_IMPACT,
+} from "../cognitive/financial-impact";
 
 /**
  * Avalia tendências de risco e padrões negativos.
  */
-export function evaluateRisks(ctx: AnalysisContext): IntelligenceInsight[] {
-  const { skus, campaigns, account, ga4 } = ctx;
-  const insights: IntelligenceInsight[] = [];
+export function evaluateRisks(ctx: AnalysisContext, cube?: DataCube): CognitiveFinding[] {
+  const { skus, account, ga4 } = ctx;
+  const findings: CognitiveFinding[] = [];
 
-  if (!account) return insights;
+  if (!account) return findings;
 
   // 1. ROAS geral abaixo do limite de pausa
   if (account.ads > 500 && account.roas < 5) {
-    insights.push({
+    // Quanto de gasto é "desperdiçado" com ROAS < 5?
+    const lostRevenue = account.ads * (5 - account.roas); // revenue gap vs breakeven
+
+    findings.push({
       id: "risk-roas-critical",
       category: "risk",
       severity: "danger",
@@ -30,15 +42,25 @@ export function evaluateRisks(ctx: AnalysisContext): IntelligenceInsight[] {
         ],
       }],
       source: "pattern",
+      financialImpact: {
+        estimatedRevenueGain: Math.round(Math.max(lostRevenue, 0) * 100) / 100,
+        estimatedCostSaving: 0,
+        netImpact: Math.round(Math.max(lostRevenue, 0) * 100) / 100,
+        confidence: 0.6,
+        timeframe: "immediate",
+        calculation: `ROAS de ${account.roas.toFixed(1)} vs breakeven 5.0: gap de ${formatBRL(Math.max(lostRevenue, 0))} em receita`,
+      },
     });
   }
 
-  // 2. Muitas campanhas em status "pausar"
+  // 2. SKUs que precisam ser pausados
   const toPause = skus.filter((s) => s.status === "pausar");
   if (toPause.length > 0) {
     const wastedAds = toPause.reduce((s, sk) => s + sk.ads, 0);
     if (wastedAds > 500) {
-      insights.push({
+      const avgRoas = toPause.reduce((s, sk) => s + sk.roas * sk.ads, 0) / Math.max(wastedAds, 1);
+
+      findings.push({
         id: "risk-pause-skus",
         category: "risk",
         severity: "warning",
@@ -52,13 +74,16 @@ export function evaluateRisks(ctx: AnalysisContext): IntelligenceInsight[] {
           steps: toPause.slice(0, 3).map((s) => `Pausar "${s.nome}" (ROAS ${s.roas.toFixed(1)}, CPA ${formatBRL(s.cpa)})`),
         }],
         source: "pattern",
+        financialImpact: quantifyPauseSkus(wastedAds, avgRoas),
       });
     }
   }
 
-  // 3. Taxa de rejeição alta (GA4)
+  // 3. Bounce rate alto
   if (ga4 && ga4.bounceRate > 0.55) {
-    insights.push({
+    const fi = cube ? quantifyBounceImpact(cube) : ZERO_IMPACT;
+
+    findings.push({
       id: "risk-bounce",
       category: "risk",
       severity: ga4.bounceRate > 0.65 ? "danger" : "warning",
@@ -72,12 +97,15 @@ export function evaluateRisks(ctx: AnalysisContext): IntelligenceInsight[] {
         steps: ["Testar velocidade de carregamento", "Revisar relevância dos anúncios vs landing page", "Melhorar CTA acima da dobra"],
       }],
       source: "pattern",
+      financialImpact: fi,
     });
   }
 
-  // 4. Abandono de carrinho alto (GA4)
+  // 4. Abandono de carrinho alto
   if (ga4 && ga4.cartAbandonmentRate > 75) {
-    insights.push({
+    const fi = cube ? quantifyCartAbandonmentImpact(cube) : ZERO_IMPACT;
+
+    findings.push({
       id: "risk-cart-abandon",
       category: "risk",
       severity: ga4.cartAbandonmentRate > 85 ? "danger" : "warning",
@@ -91,17 +119,18 @@ export function evaluateRisks(ctx: AnalysisContext): IntelligenceInsight[] {
         steps: ["Simplificar etapas de checkout", "Oferecer frete grátis acima de X", "Adicionar mais opções de pagamento"],
       }],
       source: "pattern",
+      financialImpact: fi,
     });
   }
 
-  // 5. Concentração de receita em poucos SKUs
+  // 5. Concentração de receita
   if (skus.length > 5) {
     const sorted = [...skus].sort((a, b) => b.revenue - a.revenue);
     const totalRev = sorted.reduce((s, sk) => s + sk.revenue, 0);
     if (totalRev > 0) {
       const top1Pct = (sorted[0].revenue / totalRev) * 100;
       if (top1Pct > 50) {
-        insights.push({
+        findings.push({
           id: "risk-concentration",
           category: "risk",
           severity: "warning",
@@ -114,10 +143,11 @@ export function evaluateRisks(ctx: AnalysisContext): IntelligenceInsight[] {
             effort: "medium",
           }],
           source: "pattern",
+          financialImpact: quantifyConcentrationRisk(sorted[0].revenue, totalRev),
         });
       }
     }
   }
 
-  return insights;
+  return findings;
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import type { IntelligenceInsight } from "@/lib/intelligence/types";
-import { TrendingDown, TrendingUp, AlertTriangle, Lightbulb, BarChart3, ChevronRight } from "lucide-react";
+import { TrendingDown, TrendingUp, AlertTriangle, Lightbulb, BarChart3, ChevronRight, DollarSign } from "lucide-react";
+import { formatBRL } from "@/lib/format";
 
 interface InsightCardProps {
   insight: IntelligenceInsight;
@@ -43,8 +44,9 @@ const SEVERITY_STYLES: Record<string, { border: string; icon: string; badge: str
 };
 
 export function InsightCard({ insight, onFollowAction }: InsightCardProps) {
-  const { category, severity, title, description, recommendations } = insight;
+  const { category, severity, title, description, recommendations, financialImpact } = insight;
   const styles = SEVERITY_STYLES[severity] ?? SEVERITY_STYLES.warning;
+  const hasImpact = financialImpact && financialImpact.netImpact > 0;
 
   return (
     <div className={`rounded-xl border border-l-4 p-4 transition-shadow hover:shadow-sm ${styles.border}`}>
@@ -56,16 +58,33 @@ export function InsightCard({ insight, onFollowAction }: InsightCardProps) {
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400">
               {CATEGORY_LABELS[category] ?? category}
             </span>
             <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${styles.badge}`}>
               {severity === "danger" ? "Crítico" : severity === "warning" ? "Atenção" : "Positivo"}
             </span>
+            {/* Financial impact badge */}
+            {hasImpact && (
+              <span className="inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-semibold bg-emerald-100 text-emerald-700">
+                <DollarSign className="h-2.5 w-2.5" />
+                {financialImpact.netImpact >= 1000
+                  ? `+${(financialImpact.netImpact / 1000).toFixed(1).replace(".", ",")}k`
+                  : `+${formatBRL(financialImpact.netImpact)}`
+                }
+              </span>
+            )}
           </div>
           <h4 className="text-sm font-semibold text-zinc-900">{title}</h4>
           <p className="text-xs text-zinc-500 leading-relaxed mt-1">{description}</p>
+
+          {/* Financial impact detail */}
+          {hasImpact && financialImpact.calculation && (
+            <p className="text-[10px] text-zinc-400 mt-1 italic">
+              {financialImpact.calculation}
+            </p>
+          )}
 
           {/* First recommendation inline */}
           {recommendations.length > 0 && (

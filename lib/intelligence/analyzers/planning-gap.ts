@@ -1,19 +1,23 @@
-import type { AnalysisContext, IntelligenceInsight, Recommendation } from "../types";
+import type { AnalysisContext } from "../types";
+import type { CognitiveFinding } from "../cognitive/types";
+import type { DataCube } from "../data-layer/types";
 import { formatBRL } from "@/lib/format";
+import { quantifyRevenueGap, ZERO_IMPACT } from "../cognitive/financial-impact";
 
 /**
  * Compara métricas atuais vs Planejamento 2026 (planType=target).
- * Gera insights sobre gaps de receita captada, faturada, ROAS, budget, conversão, ticket, sessões.
+ * Gera CognitiveFindings com impacto financeiro quantificado.
  */
-export function analyzePlanningGap(ctx: AnalysisContext): IntelligenceInsight[] {
+export function analyzePlanningGap(ctx: AnalysisContext, _cube?: DataCube): CognitiveFinding[] {
   const { planning, account, ga4, dayOfMonth, daysInMonth } = ctx;
-  const insights: IntelligenceInsight[] = [];
+  const findings: CognitiveFinding[] = [];
 
-  if (!account && !ga4) return insights;
+  if (!account && !ga4) return findings;
 
-  const paceRatio = dayOfMonth / daysInMonth; // ex: 0.5 = metade do mês
+  const paceRatio = dayOfMonth / daysInMonth;
+  const remaining = daysInMonth - dayOfMonth;
 
-  // 1. Receita Captada gap — "Para faturar X, precisamos captar Y"
+  // 1. Receita Captada gap
   if (planning.receita_captada && account) {
     const target = planning.receita_captada;
     const actual = account.revenue;
@@ -21,21 +25,14 @@ export function analyzePlanningGap(ctx: AnalysisContext): IntelligenceInsight[] 
     const gap = prorated > 0 ? ((actual - prorated) / prorated) * 100 : 0;
 
     if (Math.abs(gap) > 10) {
-      const recs: Recommendation[] = [];
-      if (gap < 0) {
-        const dailyNeeded = (target - actual) / Math.max(daysInMonth - dayOfMonth, 1);
-        recs.push({
-          action: `Aumentar captação em ${formatBRL(dailyNeeded)}/dia para atingir meta`,
-          impact: "high",
-          effort: "medium",
-        });
-      }
+      const dailyNeeded = remaining > 0 ? (target - actual) / remaining : 0;
+      const fi = quantifyRevenueGap(actual, target, dayOfMonth, daysInMonth);
 
       const approvalNote = planning.pct_aprovacao_receita
         ? ` (com ${(planning.pct_aprovacao_receita * 100).toFixed(0)}% de aprovação → meta faturada: ${formatBRL(planning.receita_faturada ?? 0)})`
         : "";
 
-      insights.push({
+      findings.push({
         id: "pg-revenue-captada",
         category: "planning_gap",
         severity: gap < -20 ? "danger" : gap < 0 ? "warning" : "success",
@@ -46,8 +43,13 @@ export function analyzePlanningGap(ctx: AnalysisContext): IntelligenceInsight[] 
           ? `Atual ${formatBRL(actual)} vs ritmo esperado ${formatBRL(prorated)} (meta mensal: ${formatBRL(target)})${approvalNote}. Faltam ${formatBRL(target - actual)} até o fim do mês.`
           : `Atual ${formatBRL(actual)} vs ritmo esperado ${formatBRL(prorated)}. No caminho para superar a meta de ${formatBRL(target)}${approvalNote}.`,
         metrics: { current: actual, target, gap, trendPct: gap },
-        recommendations: recs,
+        recommendations: gap < 0 ? [{
+          action: `Aumentar captação em ${formatBRL(dailyNeeded)}/dia para atingir meta`,
+          impact: "high",
+          effort: "medium",
+        }] : [],
         source: "planning",
+        financialImpact: fi,
       });
     }
   }
@@ -59,7 +61,11 @@ export function analyzePlanningGap(ctx: AnalysisContext): IntelligenceInsight[] 
     const gap = targetRoas > 0 ? ((actualRoas - targetRoas) / targetRoas) * 100 : 0;
 
     if (Math.abs(gap) > 15) {
-      insights.push({
+      // Impacto: se ROAS subisse para meta, quanto a mais de receita?
+      const revenueIfTarget = account.ads * targetRoas;
+      const revenueGain = Math.max(revenueIfTarget - account.revenue, 0);
+
+      findings.push({
         id: "pg-roas",
         category: "planning_gap",
         severity: gap < -20 ? "danger" : gap < 0 ? "warning" : "success",
@@ -75,11 +81,19 @@ export function analyzePlanningGap(ctx: AnalysisContext): IntelligenceInsight[] 
           steps: ["Identificar campanhas com ROAS < 5", "Pausar as com gasto > R$ 500 e sem conversões"],
         }] : [],
         source: "planning",
+        financialImpact: {
+          estimatedRevenueGain: Math.round(revenueGain * 100) / 100,
+          estimatedCostSaving: 0,
+          netImpact: Math.round(revenueGain * 100) / 100,
+          confidence: 0.5,
+          timeframe: "short",
+          calculation: `Se ROAS subir de ${actualRoas.toFixed(1)} para ${targetRoas.toFixed(1)}: +${formatBRL(revenueGain)}`,
+        },
       });
     }
   }
 
-  // 3. Budget pacing — Investimento Total planejado vs gasto real
+  // 3. Budget pacing
   if (planning.investimento_ads && account) {
     const budgetTarget = planning.investimento_ads;
     const actualSpend = account.ads;
@@ -87,7 +101,10 @@ export function analyzePlanningGap(ctx: AnalysisContext): IntelligenceInsight[] 
     const paceGap = expectedSpend > 0 ? ((actualSpend - expectedSpend) / expectedSpend) * 100 : 0;
 
     if (Math.abs(paceGap) > 20) {
-      insights.push({
+      const overSpend = Math.max(actualSpend - expectedSpend, 0);
+      const underSpend = Math.max(expectedSpend - actualSpend, 0);
+
+      findings.push({
         id: "pg-budget",
         category: "planning_gap",
         severity: paceGap > 40 ? "danger" : paceGap > 20 ? "warning" : "success",
@@ -106,6 +123,9 @@ export function analyzePlanningGap(ctx: AnalysisContext): IntelligenceInsight[] 
           effort: "low",
         }],
         source: "planning",
+        financialImpact: paceGap > 0
+          ? { estimatedRevenueGain: 0, estimatedCostSaving: Math.round(overSpend * 100) / 100, netImpact: Math.round(overSpend * 100) / 100, confidence: 0.7, timeframe: "immediate", calculation: `Overspend de ${formatBRL(overSpend)} no período` }
+          : { estimatedRevenueGain: Math.round(underSpend * account.roas * 100) / 100, estimatedCostSaving: 0, netImpact: Math.round(underSpend * account.roas * 100) / 100, confidence: 0.5, timeframe: "short", calculation: `Investir +${formatBRL(underSpend)} × ROAS ${account.roas.toFixed(1)} = +${formatBRL(underSpend * account.roas)}` },
       });
     }
   }
@@ -117,7 +137,11 @@ export function analyzePlanningGap(ctx: AnalysisContext): IntelligenceInsight[] 
     const gap = targetConv > 0 ? ((actualConv - targetConv) / targetConv) * 100 : 0;
 
     if (gap < -15) {
-      insights.push({
+      const aov = ga4.purchaseRevenue > 0 && ga4.purchases > 0 ? ga4.purchaseRevenue / ga4.purchases : 500;
+      const additionalOrders = ga4.sessions * (targetConv - actualConv);
+      const revenueGain = additionalOrders * aov;
+
+      findings.push({
         id: "pg-conversion",
         category: "planning_gap",
         severity: gap < -25 ? "danger" : "warning",
@@ -131,6 +155,14 @@ export function analyzePlanningGap(ctx: AnalysisContext): IntelligenceInsight[] 
           steps: ["Verificar taxa de abandono de carrinho", "Analisar página de checkout", "Revisar preços vs concorrência"],
         }],
         source: "planning",
+        financialImpact: {
+          estimatedRevenueGain: Math.round(revenueGain * 100) / 100,
+          estimatedCostSaving: 0,
+          netImpact: Math.round(revenueGain * 100) / 100,
+          confidence: 0.4,
+          timeframe: "medium",
+          calculation: `+${additionalOrders.toFixed(0)} pedidos × ${formatBRL(aov)} = ${formatBRL(revenueGain)}`,
+        },
       });
     }
   }
@@ -142,7 +174,9 @@ export function analyzePlanningGap(ctx: AnalysisContext): IntelligenceInsight[] 
     const gap = targetTicket > 0 ? ((actualTicket - targetTicket) / targetTicket) * 100 : 0;
 
     if (Math.abs(gap) > 15) {
-      insights.push({
+      const revenueGain = gap < 0 ? (targetTicket - actualTicket) * account.conversions : 0;
+
+      findings.push({
         id: "pg-ticket",
         category: "planning_gap",
         severity: gap < -20 ? "danger" : gap < 0 ? "warning" : "success",
@@ -158,6 +192,9 @@ export function analyzePlanningGap(ctx: AnalysisContext): IntelligenceInsight[] 
           steps: ["Analisar mix de produtos vendidos", "Criar bundles/kits", "Revisar estratégia de upsell"],
         }] : [],
         source: "planning",
+        financialImpact: gap < 0
+          ? { estimatedRevenueGain: Math.round(revenueGain * 100) / 100, estimatedCostSaving: 0, netImpact: Math.round(revenueGain * 100) / 100, confidence: 0.4, timeframe: "medium", calculation: `+${formatBRL(targetTicket - actualTicket)}/pedido × ${account.conversions} pedidos = ${formatBRL(revenueGain)}` }
+          : { ...ZERO_IMPACT, confidence: 0.7, calculation: "Ticket acima do planejado — performance positiva" },
       });
     }
   }
@@ -170,7 +207,13 @@ export function analyzePlanningGap(ctx: AnalysisContext): IntelligenceInsight[] 
     const gap = prorated > 0 ? ((actualSessions - prorated) / prorated) * 100 : 0;
 
     if (Math.abs(gap) > 15) {
-      insights.push({
+      // Impacto: sessões faltantes × conv rate × AOV
+      const convRate = ga4.purchases > 0 && ga4.sessions > 0 ? ga4.purchases / ga4.sessions : 0.02;
+      const aov = ga4.purchaseRevenue > 0 && ga4.purchases > 0 ? ga4.purchaseRevenue / ga4.purchases : 500;
+      const missingToEndOfMonth = Math.max(targetSessions - actualSessions, 0);
+      const revenueGain = missingToEndOfMonth * convRate * aov;
+
+      findings.push({
         id: "pg-sessions",
         category: "planning_gap",
         severity: gap < -20 ? "danger" : gap < 0 ? "warning" : "success",
@@ -185,6 +228,9 @@ export function analyzePlanningGap(ctx: AnalysisContext): IntelligenceInsight[] 
           effort: "medium",
         }] : [],
         source: "planning",
+        financialImpact: gap < 0
+          ? { estimatedRevenueGain: Math.round(revenueGain * 100) / 100, estimatedCostSaving: 0, netImpact: Math.round(revenueGain * 100) / 100, confidence: 0.35, timeframe: "medium", calculation: `${missingToEndOfMonth.toLocaleString("pt-BR")} sessões × ${(convRate * 100).toFixed(2)}% conv × ${formatBRL(aov)} = ${formatBRL(revenueGain)}` }
+          : { ...ZERO_IMPACT, confidence: 0.7, calculation: "Sessões acima do ritmo planejado" },
       });
     }
   }
@@ -193,11 +239,13 @@ export function analyzePlanningGap(ctx: AnalysisContext): IntelligenceInsight[] 
   if (planning.cpa_geral && account && account.conversions > 0) {
     const targetCpa = planning.cpa_geral;
     const actualCpa = account.cpa;
-    // CPA: lower is better, so invert the gap logic
     const gap = targetCpa > 0 ? ((actualCpa - targetCpa) / targetCpa) * 100 : 0;
 
     if (gap > 20) {
-      insights.push({
+      // Impacto: economia se CPA caísse para meta
+      const saving = (actualCpa - targetCpa) * account.conversions;
+
+      findings.push({
         id: "pg-cpa",
         category: "planning_gap",
         severity: gap > 40 ? "danger" : "warning",
@@ -211,9 +259,17 @@ export function analyzePlanningGap(ctx: AnalysisContext): IntelligenceInsight[] 
           steps: ["Pausar campanhas com CPA > R$ 100", "Otimizar lances em campanhas médias", "Melhorar qualidade dos anúncios"],
         }],
         source: "planning",
+        financialImpact: {
+          estimatedRevenueGain: 0,
+          estimatedCostSaving: Math.round(saving * 100) / 100,
+          netImpact: Math.round(saving * 100) / 100,
+          confidence: 0.5,
+          timeframe: "short",
+          calculation: `(${formatBRL(actualCpa)} - ${formatBRL(targetCpa)}) × ${account.conversions} conversões = ${formatBRL(saving)} economia`,
+        },
       });
     }
   }
 
-  return insights;
+  return findings;
 }

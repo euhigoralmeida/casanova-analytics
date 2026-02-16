@@ -40,6 +40,14 @@ export type IntelligenceInsight = {
   metrics: InsightMetrics;
   recommendations: Recommendation[];
   source: InsightSource;
+  financialImpact?: {
+    estimatedRevenueGain: number;
+    estimatedCostSaving: number;
+    netImpact: number;
+    confidence: number;
+    timeframe: "immediate" | "short" | "medium";
+    calculation: string;
+  };
 };
 
 export type IntelligenceSummary = {

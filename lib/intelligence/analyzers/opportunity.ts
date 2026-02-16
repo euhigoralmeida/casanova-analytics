@@ -1,16 +1,19 @@
-import type { AnalysisContext, IntelligenceInsight } from "../types";
+import type { AnalysisContext } from "../types";
+import type { CognitiveFinding } from "../cognitive/types";
+import type { DataCube } from "../data-layer/types";
 import { formatBRL } from "@/lib/format";
+import { quantifyUnderinvestment, ZERO_IMPACT } from "../cognitive/financial-impact";
 
 /**
  * Detecta oportunidades perdidas: SKUs subinvestidos, canais subutilizados.
  */
-export function detectOpportunities(ctx: AnalysisContext): IntelligenceInsight[] {
+export function detectOpportunities(ctx: AnalysisContext, _cube?: DataCube): CognitiveFinding[] {
   const { skus, account } = ctx;
-  const insights: IntelligenceInsight[] = [];
+  const findings: CognitiveFinding[] = [];
 
-  if (!account || skus.length === 0) return insights;
+  if (!account || skus.length === 0) return findings;
 
-  // 1. SKUs com ROAS alto mas budget limitado (stars subinvestidas)
+  // 1. SKUs com ROAS alto mas budget limitado
   const totalAds = skus.reduce((s, sk) => s + sk.ads, 0);
   const avgSpend = totalAds / Math.max(skus.filter((s) => s.ads > 0).length, 1);
 
@@ -20,7 +23,15 @@ export function detectOpportunities(ctx: AnalysisContext): IntelligenceInsight[]
 
   if (stars.length > 0) {
     const topStar = stars.sort((a, b) => b.roas - a.roas)[0];
-    insights.push({
+    const fi = quantifyUnderinvestment(topStar.ads, avgSpend, topStar.roas);
+
+    // Total opportunity across all stars
+    const totalGain = stars.reduce((s, sk) => {
+      const increase = Math.min(avgSpend - sk.ads, sk.ads * 2);
+      return s + increase * sk.roas * 0.5;
+    }, 0);
+
+    findings.push({
       id: "opp-underinvested",
       category: "opportunity",
       severity: "success",
@@ -34,14 +45,23 @@ export function detectOpportunities(ctx: AnalysisContext): IntelligenceInsight[]
         steps: stars.slice(0, 3).map((s) => `Escalar "${s.nome}" — ROAS ${s.roas.toFixed(1)}, gasto ${formatBRL(s.ads)}`),
       }],
       source: "pattern",
+      financialImpact: {
+        ...fi,
+        estimatedRevenueGain: Math.round(totalGain * 100) / 100,
+        netImpact: Math.round(totalGain * 100) / 100,
+        calculation: `${stars.length} SKUs subinvestidos: potencial de +${formatBRL(totalGain)} em receita`,
+      },
     });
   }
 
-  // 2. SKUs marcados como "escalar" — reforçar oportunidade
+  // 2. SKUs marcados como "escalar"
   const scalable = skus.filter((s) => s.status === "escalar");
   if (scalable.length > 0 && scalable.length <= 5) {
     const totalScalableRev = scalable.reduce((s, sk) => s + sk.revenue, 0);
-    insights.push({
+    // Potencial: +20% de revenue nos SKUs escaláveis
+    const potentialGain = totalScalableRev * 0.2;
+
+    findings.push({
       id: "opp-scalable",
       category: "opportunity",
       severity: "success",
@@ -54,12 +74,24 @@ export function detectOpportunities(ctx: AnalysisContext): IntelligenceInsight[]
         effort: "low",
       }],
       source: "pattern",
+      financialImpact: {
+        estimatedRevenueGain: Math.round(potentialGain * 100) / 100,
+        estimatedCostSaving: 0,
+        netImpact: Math.round(potentialGain * 100) / 100,
+        confidence: 0.45,
+        timeframe: "short",
+        calculation: `+20% sobre ${formatBRL(totalScalableRev)} = +${formatBRL(potentialGain)}`,
+      },
     });
   }
 
   // 3. Alto ROAS geral — oportunidade de crescimento
   if (account.roas > 8 && account.ads > 1000) {
-    insights.push({
+    const potentialIncrease = account.ads * 0.2;
+    // Com desconto de 30% por retorno decrescente
+    const potentialGain = potentialIncrease * account.roas * 0.7;
+
+    findings.push({
       id: "opp-growth",
       category: "opportunity",
       severity: "success",
@@ -72,8 +104,16 @@ export function detectOpportunities(ctx: AnalysisContext): IntelligenceInsight[]
         effort: "low",
       }],
       source: "pattern",
+      financialImpact: {
+        estimatedRevenueGain: Math.round(potentialGain * 100) / 100,
+        estimatedCostSaving: 0,
+        netImpact: Math.round(potentialGain * 100) / 100,
+        confidence: 0.4,
+        timeframe: "short",
+        calculation: `+20% budget (${formatBRL(potentialIncrease)}) × ROAS ${account.roas.toFixed(1)} × 70% = +${formatBRL(potentialGain)}`,
+      },
     });
   }
 
-  return insights;
+  return findings;
 }

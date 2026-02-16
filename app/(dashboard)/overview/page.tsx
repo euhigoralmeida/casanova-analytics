@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DateRange, OverviewResponse, SmartAlertsResponse, TimeSeriesResponse, GA4DataResponse } from "@/types/api";
 import type { IntelligenceResponse } from "@/lib/intelligence/types";
+import type { CognitiveResponse } from "@/lib/intelligence/communication/types";
 import { defaultRange, smartAlertStyles, categoryLabels } from "@/lib/constants";
 import { formatBRL, fmtDate } from "@/lib/format";
 import { generateInsights } from "@/lib/insights-engine";
@@ -31,7 +32,7 @@ export default function VisaoGeralPage() {
   const [smartAlerts, setSmartAlerts] = useState<SmartAlertsResponse | null>(null);
   const [timeseries, setTimeseries] = useState<TimeSeriesResponse | null>(null);
   const [ga4Data, setGa4Data] = useState<GA4DataResponse | null>(null);
-  const [intelligence, setIntelligence] = useState<IntelligenceResponse | null>(null);
+  const [intelligence, setIntelligence] = useState<IntelligenceResponse & Partial<CognitiveResponse> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [alertsCollapsed, setAlertsCollapsed] = useState(false);
@@ -189,7 +190,13 @@ export default function VisaoGeralPage() {
 
       {/* ─── INTELIGÊNCIA: Executive Summary ─── */}
       {intelligence && !loading && (
-        <ExecutiveSummary summary={intelligence.summary} />
+        <ExecutiveSummary
+          summary={intelligence.summary}
+          mode={intelligence.mode}
+          bottleneck={intelligence.bottleneck}
+          pacingProjections={intelligence.pacingProjections}
+          executiveSummary={intelligence.executiveSummary}
+        />
       )}
 
       {/* ─── PROGRESSO vs PLANEJAMENTO + RECOMENDAÇÕES ─── */}

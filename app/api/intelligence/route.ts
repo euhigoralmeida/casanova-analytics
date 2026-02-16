@@ -6,7 +6,7 @@ import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
 import { fetchAllSkuMetrics, fetchAccountTotals, fetchAllCampaignMetrics } from "@/lib/queries";
 import { fetchGA4Summary, fetchChannelAcquisition } from "@/lib/ga4-queries";
 import { computeTargetMonth } from "@/lib/planning-target-calc";
-import { analyze } from "@/lib/intelligence/core-engine";
+import { analyzeCognitive } from "@/lib/intelligence/cognitive-engine";
 import type { AnalysisContext, PlanningMetrics, AccountMetrics, SkuMetrics, CampaignMetrics, GA4Metrics, ChannelData } from "@/lib/intelligence/types";
 
 /* SKU extras for margin/stock (same as overview) */
@@ -200,7 +200,7 @@ export async function GET(req: NextRequest) {
 
   let result;
   try {
-    result = analyze(ctx);
+    result = analyzeCognitive(ctx);
   } catch (err) {
     console.error("Intelligence: analyze error:", err);
     return NextResponse.json({ error: "Erro ao analisar", detail: String(err) }, { status: 500 });
