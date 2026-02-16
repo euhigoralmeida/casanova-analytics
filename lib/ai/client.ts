@@ -1,13 +1,9 @@
-// Anthropic SDK client
-// IMPORTANT: Use dot notation for process.env so Next.js can inline the value
+// Anthropic SDK client factory
+// API key must be passed explicitly because process.env is not
+// reliably available in imported modules on Vercel serverless.
 
 import Anthropic from "@anthropic-ai/sdk";
 
-export function getAnthropicClient(): Anthropic {
-  // Dot notation is required for Next.js to inline env vars at build time
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) {
-    throw new Error("ANTHROPIC_API_KEY not available at runtime");
-  }
+export function createAnthropicClient(apiKey: string): Anthropic {
   return new Anthropic({ apiKey });
 }

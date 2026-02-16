@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { AI_CONFIG } from "@/lib/ai/config";
-import { getAnthropicClient } from "@/lib/ai/client";
+import { createAnthropicClient } from "@/lib/ai/client";
 import { buildContextSummary, buildPeriodContext } from "@/lib/ai/context-builder";
 import { insightsSystemPrompt, insightsUserPrompt } from "@/lib/ai/prompts";
 import { cacheGet, cacheSet, insightsCacheKey } from "@/lib/ai/cache";
@@ -19,6 +19,12 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
+  // Read API key directly in route handler
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return NextResponse.json({ error: "IA não disponível" }, { status: 503 });
+  }
+
   const session = getSession(req);
   if (!session) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
@@ -42,21 +48,20 @@ export async function POST(req: NextRequest) {
 
   // Rate limit
   if (!checkInsightsLimit(session.tenantId, AI_CONFIG.rateLimit.insightsPerHour)) {
-    return NextResponse.json({ error: "Limite de requisições atingido. Tente novamente em alguns minutos." }, { status: 429 });
+    return NextResponse.json({ error: "Limite de requisições atingido." }, { status: 429 });
   }
 
   try {
-    // Fetch cognitive analysis directly (no HTTP round-trip)
     const cognitiveData = await fetchCognitiveDirectly(session.tenantId, startDate, endDate);
     if (!cognitiveData) {
-      return NextResponse.json({ error: "Erro ao buscar dados de análise" }, { status: 500 });
+      return NextResponse.json({ error: "Erro ao buscar dados" }, { status: 500 });
     }
 
     const contextSummary = buildContextSummary(cognitiveData);
     const periodContext = buildPeriodContext(startDate, endDate);
 
-    // Call Claude API
-    const client = getAnthropicClient();
+    // Create client with API key read in this route handler
+    const client = createAnthropicClient(apiKey);
     const response = await client.messages.create({
       model: AI_CONFIG.insights.model,
       max_tokens: AI_CONFIG.insights.maxTokens,
@@ -65,11 +70,9 @@ export async function POST(req: NextRequest) {
       messages: [{ role: "user", content: insightsUserPrompt(contextSummary, periodContext) }],
     });
 
-    // Extract text response
     const textBlock = response.content.find((b) => b.type === "text");
     const rawText = textBlock && "text" in textBlock ? textBlock.text : "";
 
-    // Parse JSON from response
     let analysis = "";
     let highlights: string[] = [];
 
@@ -94,7 +97,6 @@ export async function POST(req: NextRequest) {
     };
 
     cacheSet(cacheKey, result, AI_CONFIG.cache.insightsTtlMs);
-
     return NextResponse.json(result);
   } catch (err) {
     console.error("AI Insights error:", err);

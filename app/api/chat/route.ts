@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth";
 import { AI_CONFIG } from "@/lib/ai/config";
-import { getAnthropicClient } from "@/lib/ai/client";
+import { createAnthropicClient } from "@/lib/ai/client";
 import { AI_TOOLS } from "@/lib/ai/tools";
 import { executeTool } from "@/lib/ai/tool-executor";
 import { buildContextSummary, buildPeriodContext } from "@/lib/ai/context-builder";
@@ -19,6 +19,15 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
+  // Read API key directly in route handler (process.env works here on Vercel)
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  if (!apiKey) {
+    return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY não configurada no servidor" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
   const session = getSession(req);
   if (!session) {
     return new Response(JSON.stringify({ error: "Não autenticado" }), {
@@ -69,7 +78,8 @@ export async function POST(req: NextRequest) {
     const periodContext = buildPeriodContext(context.startDate, context.endDate);
     const systemPrompt = chatSystemPrompt(contextSummary, periodContext);
 
-    const client = getAnthropicClient();
+    // Create client with API key read directly in this route handler
+    const client = createAnthropicClient(apiKey);
 
     // Build messages for Claude API
     const apiMessages: Anthropic.MessageParam[] = messages.map((m) => ({
