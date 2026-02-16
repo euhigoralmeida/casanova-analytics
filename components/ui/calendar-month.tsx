@@ -21,15 +21,19 @@ export default function CalendarMonth(props: {
   for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
   return (
-    <div className="flex-1 min-w-[200px]">
-      <div className="grid grid-cols-7 text-center text-xs text-zinc-400 mb-1">
+    <div className="w-full">
+      {/* Weekday headers */}
+      <div className="grid grid-cols-7 mb-1">
         {WEEKDAYS.map((d, i) => (
-          <div key={i} className="py-1">{d}</div>
+          <div key={i} className="h-8 flex items-center justify-center text-[11px] font-semibold text-zinc-400 uppercase">
+            {d}
+          </div>
         ))}
       </div>
-      <div className="grid grid-cols-7 text-center text-sm">
+      {/* Day cells */}
+      <div className="grid grid-cols-7">
         {cells.map((day, i) => {
-          if (day === null) return <div key={`e-${i}`} />;
+          if (day === null) return <div key={`e-${i}`} className="h-9" />;
 
           const dateStr = `${props.year}-${String(props.month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           const isStart = isSameDay(dateStr, props.rangeStart);
@@ -38,27 +42,40 @@ export default function CalendarMonth(props: {
           const isToday = isSameDay(dateStr, today);
           const isFuture = dateStr > today;
 
-          let cls = "py-1 cursor-pointer transition-colors ";
-          if (isStart || isEnd) {
-            cls += "bg-blue-600 text-white rounded-full font-medium ";
+          // Background shape for range
+          let rangeBg = "";
+          if (isStart && isEnd) {
+            rangeBg = "";
+          } else if (isStart) {
+            rangeBg = "bg-blue-50 rounded-l-full";
+          } else if (isEnd) {
+            rangeBg = "bg-blue-50 rounded-r-full";
           } else if (inRange) {
-            cls += "bg-blue-50 text-blue-800 ";
-          } else if (isFuture) {
-            cls += "text-zinc-300 ";
-          } else {
-            cls += "hover:bg-zinc-100 rounded-full ";
+            rangeBg = "bg-blue-50";
           }
-          if (isToday && !isStart && !isEnd) {
-            cls += "font-bold text-blue-600 ";
+
+          // Inner circle styles
+          let innerCls = "h-9 w-9 flex items-center justify-center rounded-full text-sm transition-all ";
+          if (isStart || isEnd) {
+            innerCls += "bg-blue-600 text-white font-semibold shadow-sm ";
+          } else if (inRange) {
+            innerCls += "text-blue-700 font-medium ";
+          } else if (isFuture) {
+            innerCls += "text-zinc-300 cursor-default ";
+          } else if (isToday) {
+            innerCls += "text-blue-600 font-bold ring-1 ring-blue-300 hover:bg-blue-50 cursor-pointer ";
+          } else {
+            innerCls += "text-zinc-700 hover:bg-zinc-100 cursor-pointer ";
           }
 
           return (
-            <div
-              key={dateStr}
-              className={cls}
-              onClick={() => !isFuture && props.onDayClick(dateStr)}
-            >
-              {day}
+            <div key={dateStr} className={`flex items-center justify-center ${rangeBg}`}>
+              <div
+                className={innerCls}
+                onClick={() => !isFuture && props.onDayClick(dateStr)}
+              >
+                {day}
+              </div>
             </div>
           );
         })}

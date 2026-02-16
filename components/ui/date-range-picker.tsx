@@ -21,6 +21,7 @@ export default function DateRangePicker(props: {
   const [activePreset, setActivePreset] = useState<string | null>(props.value.preset ?? null);
   const ref = useRef<HTMLDivElement>(null);
 
+  // Close on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent) {
       if (ref.current && !ref.current.contains(e.target as Node)) {
@@ -31,6 +32,15 @@ export default function DateRangePicker(props: {
     return () => document.removeEventListener("mousedown", handleClick);
   }, [open]);
 
+  // Close on Escape
+  useEffect(() => {
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    if (open) document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [open]);
+
   const presets = getPresets();
 
   function selectPreset(p: typeof presets[number]) {
@@ -38,6 +48,8 @@ export default function DateRangePicker(props: {
     setSelStart(fmtDate(start));
     setSelEnd(fmtDate(end));
     setActivePreset(p.preset);
+    // Navigate calendar to show the start date
+    setCalMonth({ year: start.getFullYear(), month: start.getMonth() });
   }
 
   function applySelection() {
@@ -91,113 +103,161 @@ export default function DateRangePicker(props: {
 
   return (
     <div className="relative" ref={ref}>
-      <div className="rounded-xl border bg-white p-4">
-        <p className="text-sm text-zinc-600">Período</p>
-        <button
-          onClick={() => {
-            if (!open) {
-              setSelStart(props.value.startDate);
-              setSelEnd(props.value.endDate);
-              setActivePreset(props.value.preset ?? null);
-              const d = new Date(props.value.startDate + "T12:00:00");
-              setCalMonth({ year: d.getFullYear(), month: d.getMonth() });
-            }
-            setOpen(!open);
-          }}
-          disabled={props.loading}
-          className="mt-2 w-full flex items-center justify-between rounded-lg border px-3 py-2 text-sm hover:bg-zinc-50 transition-colors"
-        >
-          <span className="flex items-center gap-2">
-            <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-            </svg>
-            {props.value.label}
-          </span>
-          <svg className={`w-4 h-4 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-          </svg>
-        </button>
-      </div>
+      {/* ─── Trigger Button ─── */}
+      <button
+        onClick={() => {
+          if (!open) {
+            setSelStart(props.value.startDate);
+            setSelEnd(props.value.endDate);
+            setActivePreset(props.value.preset ?? null);
+            const d = new Date(props.value.startDate + "T12:00:00");
+            // Show the month before end date so both months with selected dates are visible
+            setCalMonth({ year: d.getFullYear(), month: d.getMonth() });
+          }
+          setOpen(!open);
+        }}
+        disabled={props.loading}
+        className="inline-flex items-center gap-2.5 rounded-xl border border-zinc-200 bg-white px-4 py-2.5 text-sm font-medium text-zinc-700 shadow-sm hover:bg-zinc-50 hover:border-zinc-300 transition-all disabled:opacity-50"
+      >
+        <svg className="w-4 h-4 text-zinc-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+        <span>{props.value.label}</span>
+        <svg className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
 
+      {/* ─── Dropdown Panel ─── */}
       {open && (
-        <div className="absolute left-0 top-full mt-2 z-50 rounded-xl border bg-white shadow-xl flex flex-col sm:flex-row" style={{ width: "680px", maxWidth: "calc(100vw - 2rem)" }}>
-          <div className="sm:w-44 border-b sm:border-b-0 sm:border-r py-2 shrink-0 flex sm:flex-col flex-wrap gap-0">
-            {presets.map((p) => (
+        <>
+          {/* Backdrop for mobile */}
+          <div className="fixed inset-0 z-40 bg-black/20 sm:hidden" onClick={() => setOpen(false)} />
+
+          <div className="fixed inset-x-4 bottom-4 top-auto z-50 sm:absolute sm:right-0 sm:left-auto sm:top-full sm:bottom-auto sm:inset-x-auto sm:mt-2 rounded-2xl border border-zinc-200 bg-white shadow-2xl overflow-hidden flex flex-col sm:flex-row" style={{ maxHeight: "calc(100vh - 2rem)" }}>
+
+            {/* ─── Presets sidebar ─── */}
+            <div className="sm:w-44 border-b sm:border-b-0 sm:border-r border-zinc-100 py-2 shrink-0 flex sm:flex-col flex-wrap overflow-y-auto max-h-32 sm:max-h-none">
+              {presets.map((p) => (
+                <button
+                  key={p.preset}
+                  onClick={() => selectPreset(p)}
+                  className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                    activePreset === p.preset
+                      ? "bg-blue-50 text-blue-700 font-semibold"
+                      : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                  }`}
+                >
+                  {p.label}
+                </button>
+              ))}
+              <div className="border-t border-zinc-100 my-1 w-full" />
               <button
-                key={p.preset}
-                onClick={() => selectPreset(p)}
-                className={`w-full text-left px-4 py-2 text-sm hover:bg-zinc-50 transition-colors ${
-                  activePreset === p.preset ? "bg-blue-50 text-blue-700 font-medium" : "text-zinc-700"
+                onClick={() => {
+                  setActivePreset(null);
+                  setSelStart(null);
+                  setSelEnd(null);
+                }}
+                className={`w-full text-left px-4 py-2 text-sm transition-colors ${
+                  activePreset === null && selStart === null
+                    ? "bg-blue-50 text-blue-700 font-semibold"
+                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
                 }`}
               >
-                {p.label}
+                Personalizado
               </button>
-            ))}
-            <div className="border-t my-1" />
-            <button
-              onClick={() => {
-                setActivePreset(null);
-                setSelStart(null);
-                setSelEnd(null);
-              }}
-              className={`w-full text-left px-4 py-2 text-sm hover:bg-zinc-50 transition-colors ${
-                activePreset === null && selStart === null ? "bg-blue-50 text-blue-700 font-medium" : "text-zinc-700"
-              }`}
-            >
-              Personalizado
-            </button>
-          </div>
+            </div>
 
-          <div className="flex-1 min-w-0 p-4 overflow-auto">
-            <div className="flex items-center justify-between mb-3">
-              <button onClick={prevMonth} className="p-1 hover:bg-zinc-100 rounded">
-                <svg className="w-5 h-5 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
-              <div className="flex gap-8 text-sm font-medium">
-                <span>{MONTH_NAMES[calMonth.month]} {calMonth.year}</span>
-                <span>{MONTH_NAMES[month2.month]} {month2.year}</span>
+            {/* ─── Calendar area ─── */}
+            <div className="flex-1 min-w-0 p-5 overflow-y-auto">
+              {/* Month navigation */}
+              <div className="flex items-center justify-between mb-4">
+                <button
+                  onClick={prevMonth}
+                  className="p-1.5 hover:bg-zinc-100 rounded-lg transition-colors"
+                  aria-label="Mês anterior"
+                >
+                  <svg className="w-5 h-5 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <div className="flex gap-12 text-sm font-semibold text-zinc-800">
+                  <span>{MONTH_NAMES[calMonth.month]} {calMonth.year}</span>
+                  <span className="hidden sm:inline">{MONTH_NAMES[month2.month]} {month2.year}</span>
+                </div>
+                <button
+                  onClick={nextMonth}
+                  className="p-1.5 hover:bg-zinc-100 rounded-lg transition-colors"
+                  aria-label="Próximo mês"
+                >
+                  <svg className="w-5 h-5 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
               </div>
-              <button onClick={nextMonth} className="p-1 hover:bg-zinc-100 rounded">
-                <svg className="w-5 h-5 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                </svg>
-              </button>
-            </div>
 
-            <div className="flex flex-wrap gap-6">
-              <CalendarMonth year={calMonth.year} month={calMonth.month} rangeStart={effectiveStart} rangeEnd={effectiveEnd} onDayClick={handleDayClick} />
-              <CalendarMonth year={month2.year} month={month2.month} rangeStart={effectiveStart} rangeEnd={effectiveEnd} onDayClick={handleDayClick} />
-            </div>
+              {/* Calendars: 1 on mobile, 2 on desktop */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <CalendarMonth
+                  year={calMonth.year}
+                  month={calMonth.month}
+                  rangeStart={effectiveStart}
+                  rangeEnd={effectiveEnd}
+                  onDayClick={handleDayClick}
+                />
+                <div className="hidden sm:block">
+                  <CalendarMonth
+                    year={month2.year}
+                    month={month2.month}
+                    rangeStart={effectiveStart}
+                    rangeEnd={effectiveEnd}
+                    onDayClick={handleDayClick}
+                  />
+                </div>
+              </div>
 
-            <div className="flex flex-wrap items-center gap-3 mt-4 pt-3 border-t">
-              <input
-                type="date"
-                value={effectiveStart}
-                onChange={(e) => { setSelStart(e.target.value); setActivePreset(null); }}
-                className="rounded border px-2 py-1 text-sm flex-1"
-              />
-              <span className="text-zinc-400">—</span>
-              <input
-                type="date"
-                value={effectiveEnd}
-                onChange={(e) => { setSelEnd(e.target.value); setActivePreset(null); }}
-                className="rounded border px-2 py-1 text-sm flex-1"
-              />
-              <button onClick={() => setOpen(false)} className="px-3 py-1.5 text-sm text-zinc-600 hover:bg-zinc-100 rounded transition-colors">
-                Cancelar
-              </button>
-              <button
-                onClick={applySelection}
-                disabled={!selStart || !selEnd}
-                className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition-colors font-medium"
-              >
-                Aplicar
-              </button>
+              {/* ─── Selection display + actions ─── */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 mt-5 pt-4 border-t border-zinc-100">
+                <div className="flex items-center gap-2 flex-1">
+                  <div className="flex-1 relative">
+                    <label className="absolute -top-2 left-2 px-1 bg-white text-[10px] text-zinc-400 font-medium">Início</label>
+                    <input
+                      type="date"
+                      value={effectiveStart}
+                      onChange={(e) => { setSelStart(e.target.value); setActivePreset(null); }}
+                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                    />
+                  </div>
+                  <span className="text-zinc-300 text-lg">→</span>
+                  <div className="flex-1 relative">
+                    <label className="absolute -top-2 left-2 px-1 bg-white text-[10px] text-zinc-400 font-medium">Fim</label>
+                    <input
+                      type="date"
+                      value={effectiveEnd}
+                      onChange={(e) => { setSelEnd(e.target.value); setActivePreset(null); }}
+                      className="w-full rounded-lg border border-zinc-200 px-3 py-2 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 justify-end">
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="px-4 py-2 text-sm text-zinc-600 hover:bg-zinc-100 rounded-lg transition-colors font-medium"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={applySelection}
+                    disabled={!selStart || !selEnd}
+                    className="px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-semibold shadow-sm"
+                  >
+                    Aplicar
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
