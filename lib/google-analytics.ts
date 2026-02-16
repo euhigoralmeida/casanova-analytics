@@ -12,7 +12,8 @@ export function isGA4Configured(): boolean {
   );
 }
 
-let _client: BetaAnalyticsDataClient | null = null;
+// Multi-tenant: Map de clients por tenantId
+const _clients = new Map<string, BetaAnalyticsDataClient>();
 
 function getPrivateKey(): string {
   // Option 1: Base64-encoded key (recommended for Vercel)
@@ -24,18 +25,26 @@ function getPrivateKey(): string {
   return raw.replace(/\\n/g, "\n").trim();
 }
 
-export function getGA4Client(): BetaAnalyticsDataClient {
-  if (!_client) {
-    _client = new BetaAnalyticsDataClient({
+export function getGA4Client(tenantId?: string): BetaAnalyticsDataClient {
+  const key = tenantId ?? "default";
+  let client = _clients.get(key);
+  if (!client) {
+    // V1: todos os tenants usam as mesmas credenciais do .env
+    // V1.5: buscar credenciais do tenant via getTenantConfig(tenantId)
+    client = new BetaAnalyticsDataClient({
       credentials: {
         client_email: process.env.GA4_CLIENT_EMAIL!,
         private_key: getPrivateKey(),
       },
     });
+    _clients.set(key, client);
   }
-  return _client;
+  return client;
 }
 
-export function getPropertyId(): string {
+export function getPropertyId(tenantId?: string): string {
+  // V1: todos usam o mesmo property do .env
+  // V1.5: buscar property do tenant
+  void tenantId;
   return `properties/${process.env.GA4_PROPERTY_ID}`;
 }

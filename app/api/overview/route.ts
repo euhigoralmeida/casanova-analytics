@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isConfigured, getCustomer } from "@/lib/google-ads";
 import { fetchAllSkuMetrics, fetchAccountTotals } from "@/lib/queries";
+import { extractTenantId } from "@/lib/auth";
+import { prisma } from "@/lib/db";
+import { computeTargetMonth } from "@/lib/planning-target-calc";
 
 /* =========================
    Mock data (fallback)
@@ -65,11 +68,52 @@ function deriveStatus(roas: number, cpa: number, marginPct: number, stock: numbe
    GET handler
 ========================= */
 
+type PlanningTargets = {
+  revenueTarget: number;       // Receita Faturada target
+  revenueCaptadaTarget: number; // Receita Captada necessária
+  roasTarget: number;          // ROAS Captado target
+  roasFaturadoTarget: number;  // ROAS Faturado target
+  marginTarget: number;
+  adsTarget: number;           // Investimento Total planejado
+  approvalRate: number;        // % Aprovação Receita
+};
+
+async function getPlanningTargets(tenantId: string): Promise<PlanningTargets> {
+  const defaults: PlanningTargets = { revenueTarget: 150000, revenueCaptadaTarget: 0, roasTarget: 7, roasFaturadoTarget: 0, marginTarget: 25, adsTarget: 0, approvalRate: 0 };
+  try {
+    const now = new Date();
+    const rows = await prisma.planningEntry.findMany({
+      where: { tenantId, year: now.getFullYear(), month: now.getMonth() + 1, planType: "target" },
+    });
+    if (rows.length === 0) return defaults;
+
+    const inputs: Record<string, number> = {};
+    for (const r of rows) inputs[r.metric] = r.value;
+    const calc = computeTargetMonth(inputs);
+    const all = { ...inputs, ...calc };
+
+    return {
+      revenueTarget: all.receita_faturada ?? defaults.revenueTarget,
+      revenueCaptadaTarget: all.receita_captada ?? 0,
+      roasTarget: all.roas_captado ?? defaults.roasTarget,
+      roasFaturadoTarget: all.roas_faturado ?? 0,
+      marginTarget: defaults.marginTarget,
+      adsTarget: all.investimento_total ?? 0,
+      approvalRate: all.pct_aprovacao_receita ?? 0,
+    };
+  } catch {
+    return defaults;
+  }
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const period = searchParams.get("period") ?? "7d";
   const startDate = searchParams.get("startDate") ?? undefined;
   const endDate = searchParams.get("endDate") ?? undefined;
+
+  const tenantId = extractTenantId(request);
+  const targets = await getPlanningTargets(tenantId);
 
   /* ---- DADOS REAIS (Google Ads) ---- */
   if (isConfigured()) {
@@ -153,13 +197,17 @@ export async function GET(request: NextRequest) {
           revenue: Math.round(totalRevenue * 100) / 100,
         },
         meta: {
-          revenueTarget: 150000,
+          revenueTarget: targets.revenueTarget,
+          revenueCaptadaTarget: targets.revenueCaptadaTarget,
           revenueActual: Math.round(accountTotals.revenue * 100) / 100,
+          adsTarget: targets.adsTarget,
           adsActual: accountTotals.costBRL,
-          roasTarget: 7,
+          roasTarget: targets.roasTarget,
+          roasFaturadoTarget: targets.roasFaturadoTarget,
           roasActual: acctRoas,
-          marginTarget: 25,
+          marginTarget: targets.marginTarget,
           marginActual,
+          approvalRate: targets.approvalRate,
         },
         skus,
       });
@@ -169,10 +217,10 @@ export async function GET(request: NextRequest) {
   }
 
   /* ---- MOCK (fallback) ---- */
-  return NextResponse.json(buildMockOverview(period));
+  return NextResponse.json(buildMockOverview(period, targets));
 }
 
-function buildMockOverview(period: string) {
+function buildMockOverview(period: string, targets: { revenueTarget: number; roasTarget: number; marginTarget: number }) {
   const m = periodMultiplier[period] ?? 1;
 
   let totalRevenue = 0;
@@ -226,11 +274,11 @@ function buildMockOverview(period: string) {
     updatedAt: new Date().toISOString(),
     totalSkus: skuCount,
     meta: {
-      revenueTarget: 150000,
+      revenueTarget: targets.revenueTarget,
       revenueActual: totalRevenue,
-      roasTarget: 7,
+      roasTarget: targets.roasTarget,
       roasActual,
-      marginTarget: 25,
+      marginTarget: targets.marginTarget,
       marginActual,
     },
     skus,

@@ -14,26 +14,39 @@ export function isConfigured(): boolean {
   );
 }
 
-let _client: GoogleAdsApi | null = null;
+// Multi-tenant: Map de clients por tenantId
+const _clients = new Map<string, GoogleAdsApi>();
+const _customers = new Map<string, Customer>();
 
-function getClient(): GoogleAdsApi {
-  if (!_client) {
-    _client = new GoogleAdsApi({
+function getClient(tenantId?: string): GoogleAdsApi {
+  const key = tenantId ?? "default";
+  let client = _clients.get(key);
+  if (!client) {
+    // V1: todos os tenants usam as mesmas credenciais do .env
+    // V1.5: buscar credenciais do tenant via getTenantConfig(tenantId)
+    client = new GoogleAdsApi({
       client_id: process.env.GOOGLE_ADS_CLIENT_ID!,
       client_secret: process.env.GOOGLE_ADS_CLIENT_SECRET!,
       developer_token: process.env.GOOGLE_ADS_DEVELOPER_TOKEN!,
     });
+    _clients.set(key, client);
   }
-  return _client;
+  return client;
 }
 
-export function getCustomer(): Customer {
-  const client = getClient();
-  return client.Customer({
-    customer_id: process.env.GOOGLE_ADS_CUSTOMER_ID!,
-    login_customer_id: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID,
-    refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN!,
-  });
+export function getCustomer(tenantId?: string): Customer {
+  const key = tenantId ?? "default";
+  let customer = _customers.get(key);
+  if (!customer) {
+    const client = getClient(tenantId);
+    customer = client.Customer({
+      customer_id: process.env.GOOGLE_ADS_CUSTOMER_ID!,
+      login_customer_id: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID,
+      refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN!,
+    });
+    _customers.set(key, customer);
+  }
+  return customer;
 }
 
 /* =========================
@@ -111,16 +124,18 @@ const TTL = 2 * 60 * 1000; // 2 minutos
 
 const cache = new Map<string, { data: unknown; ts: number }>();
 
-export function getCached<T>(key: string): T | null {
-  const entry = cache.get(key);
+export function getCached<T>(key: string, tenantId?: string): T | null {
+  const fullKey = tenantId ? `${tenantId}:${key}` : key;
+  const entry = cache.get(fullKey);
   if (!entry) return null;
   if (Date.now() - entry.ts > TTL) {
-    cache.delete(key);
+    cache.delete(fullKey);
     return null;
   }
   return entry.data as T;
 }
 
-export function setCache(key: string, data: unknown): void {
-  cache.set(key, { data, ts: Date.now() });
+export function setCache(key: string, data: unknown, tenantId?: string): void {
+  const fullKey = tenantId ? `${tenantId}:${key}` : key;
+  cache.set(fullKey, { data, ts: Date.now() });
 }

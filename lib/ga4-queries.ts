@@ -16,6 +16,8 @@ export type FunnelStep = {
 
 export type GA4Summary = {
   sessions: number;
+  engagedSessions: number;
+  bounceRate: number;
   users: number;
   newUsers: number;
   purchases: number;
@@ -171,6 +173,8 @@ export async function fetchGA4Summary(
       { name: "purchaseRevenue" },
       { name: "addToCarts" },
       { name: "checkouts" },
+      { name: "engagedSessions" },
+      { name: "bounceRate" },
     ],
   });
 
@@ -184,6 +188,8 @@ export async function fetchGA4Summary(
   const purchaseRevenue = Math.round((vals[4] ?? 0) * 100) / 100;
   const addToCarts = vals[5] ?? 0;
   const checkouts = vals[6] ?? 0;
+  const engagedSessions = Math.round(vals[7] ?? 0);
+  const bounceRate = Math.round((vals[8] ?? 0) * 100) / 100;
 
   const avgOrderValue = purchases > 0 ? Math.round((purchaseRevenue / purchases) * 100) / 100 : 0;
   const cartAbandonmentRate = addToCarts > 0 ? Math.round(((addToCarts - purchases) / addToCarts) * 10000) / 100 : 0;
@@ -191,6 +197,8 @@ export async function fetchGA4Summary(
 
   const result: GA4Summary = {
     sessions,
+    engagedSessions,
+    bounceRate,
     users,
     newUsers,
     purchases,

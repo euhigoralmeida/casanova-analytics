@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model PlanningEntry {
+  id        String   @id @default(cuid())
+  tenantId  String   @default("default")
+  year      Int
+  month     Int
+  metric    String
+  value     Float
+  source    String   @default("manual") // "manual" | "sync"
+  planType  String   @default("actual") // "actual" | "target"
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+
+  @@unique([tenantId, year, month, metric, planType])
+  @@index([tenantId, year])
+  @@index([tenantId, year, planType])
+}
+
+model PlanningSyncLog {
+  id        String   @id @default(cuid())
+  tenantId  String   @default("default")
+  year      Int
+  syncedAt  DateTime @default(now())
+  metrics   Int      @default(0) // number of metrics synced
+
+  @@index([tenantId, year])
+}
+
+model Insight {
+  id              String   @id @default(cuid())
+  tenantId        String   @default("default")
+  periodStart     String   // "2026-02-01"
+  periodEnd       String   // "2026-02-15"
+  category        String   // "planning_gap" | "efficiency" | "opportunity" | "risk" | "composition"
+  severity        String   // "success" | "warning" | "danger"
+  title           String
+  description     String
+  metrics         Json     @default("{}")
+  recommendations Json     @default("[]")
+  source          String   @default("pattern") // "planning" | "alert" | "pattern"
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId, periodStart])
+  @@index([tenantId, createdAt])
+}
+
+model ActionLog {
+  id          String   @id @default(cuid())
+  tenantId    String   @default("default")
+  insightId   String?
+  actionType  String   // "followed" | "dismissed" | "noted"
+  description String
+  createdAt   DateTime @default(now())
+
+  @@index([tenantId, createdAt])
+}
