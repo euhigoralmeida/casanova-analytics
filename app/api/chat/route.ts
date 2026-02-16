@@ -7,12 +7,15 @@ import { executeTool } from "@/lib/ai/tool-executor";
 import { buildContextSummary, buildPeriodContext } from "@/lib/ai/context-builder";
 import { chatSystemPrompt } from "@/lib/ai/prompts";
 import { checkChatLimit } from "@/lib/ai/rate-limiter";
+import { fetchCognitiveDirectly } from "@/lib/ai/fetch-cognitive";
 import type Anthropic from "@anthropic-ai/sdk";
 
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
 };
+
+export const maxDuration = 60; // Vercel function timeout
 
 export async function POST(req: NextRequest) {
   const session = getSession(req);
@@ -51,16 +54,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Fetch cognitive context for the system prompt
-    const baseUrl = req.nextUrl.origin;
-    const intelligenceRes = await fetch(
-      `${baseUrl}/api/intelligence?period=custom&startDate=${context.startDate}&endDate=${context.endDate}`,
-      { headers: { cookie: req.headers.get("cookie") ?? "" } },
-    );
-
+    // Fetch cognitive context directly (no HTTP round-trip)
     let contextSummary = "Dados de análise não disponíveis no momento.";
-    if (intelligenceRes.ok) {
-      const cognitiveData = await intelligenceRes.json();
+    const cognitiveData = await fetchCognitiveDirectly(session.tenantId, context.startDate, context.endDate);
+    if (cognitiveData) {
       contextSummary = buildContextSummary(cognitiveData);
     }
 

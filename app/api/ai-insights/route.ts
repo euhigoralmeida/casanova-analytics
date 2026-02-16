@@ -6,6 +6,7 @@ import { buildContextSummary, buildPeriodContext } from "@/lib/ai/context-builde
 import { insightsSystemPrompt, insightsUserPrompt } from "@/lib/ai/prompts";
 import { cacheGet, cacheSet, insightsCacheKey } from "@/lib/ai/cache";
 import { checkInsightsLimit } from "@/lib/ai/rate-limiter";
+import { fetchCognitiveDirectly } from "@/lib/ai/fetch-cognitive";
 
 type InsightsResponse = {
   analysis: string;
@@ -13,6 +14,8 @@ type InsightsResponse = {
   generatedAt: string;
   cached: boolean;
 };
+
+export const maxDuration = 60; // Vercel function timeout
 
 export async function POST(req: NextRequest) {
   const session = getSession(req);
@@ -42,18 +45,12 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Fetch cognitive analysis for context
-    const baseUrl = req.nextUrl.origin;
-    const intelligenceRes = await fetch(
-      `${baseUrl}/api/intelligence?period=custom&startDate=${startDate}&endDate=${endDate}`,
-      { headers: { cookie: req.headers.get("cookie") ?? "" } },
-    );
-
-    if (!intelligenceRes.ok) {
+    // Fetch cognitive analysis directly (no HTTP round-trip)
+    const cognitiveData = await fetchCognitiveDirectly(session.tenantId, startDate, endDate);
+    if (!cognitiveData) {
       return NextResponse.json({ error: "Erro ao buscar dados de análise" }, { status: 500 });
     }
 
-    const cognitiveData = await intelligenceRes.json();
     const contextSummary = buildContextSummary(cognitiveData);
     const periodContext = buildPeriodContext(startDate, endDate);
 
@@ -76,7 +73,6 @@ export async function POST(req: NextRequest) {
     let highlights: string[] = [];
 
     try {
-      // Try to extract JSON from the response (may be wrapped in markdown code block)
       const jsonMatch = rawText.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
@@ -86,7 +82,6 @@ export async function POST(req: NextRequest) {
         analysis = rawText;
       }
     } catch {
-      // If JSON parsing fails, use raw text as analysis
       analysis = rawText;
     }
 
@@ -97,7 +92,6 @@ export async function POST(req: NextRequest) {
       cached: false,
     };
 
-    // Cache result
     cacheSet(cacheKey, result, AI_CONFIG.cache.insightsTtlMs);
 
     return NextResponse.json(result);
