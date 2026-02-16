@@ -140,7 +140,8 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("Chat API error:", err);
-    return new Response(JSON.stringify({ error: "Erro ao processar pergunta" }), {
+    const detail = err instanceof Error ? err.message : String(err);
+    return new Response(JSON.stringify({ error: "Erro ao processar pergunta", detail }), {
       status: 500,
       headers: { "Content-Type": "application/json" },
     });

@@ -83,7 +83,7 @@ export default function AskAnalytics({ dateRange }: AskAnalyticsProps) {
 
       if (!res.ok) {
         const data = await res.json();
-        setError(data.error ?? "Erro ao processar pergunta");
+        setError(data.detail ? `${data.error}: ${data.detail}` : (data.error ?? "Erro ao processar pergunta"));
         return;
       }
 
