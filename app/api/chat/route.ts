@@ -15,7 +15,8 @@ type ChatMessage = {
   content: string;
 };
 
-export const maxDuration = 60; // Vercel function timeout
+export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
   const session = getSession(req);
