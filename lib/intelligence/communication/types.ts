@@ -11,6 +11,7 @@ import type {
 } from "../cognitive/types";
 import type { BudgetPlan } from "../strategy/budget-optimizer";
 import type { TrendData } from "../data-layer/trend-analyzer";
+import type { DeviceSlice, DemographicSlice, GeographicSlice } from "../data-layer/types";
 import type { IntelligenceInsight, IntelligenceSummary } from "../types";
 
 /** Dados estruturados para o Executive Summary */
@@ -31,6 +32,11 @@ export type CognitiveResponse = {
   executiveSummary: ExecutiveSummaryData;
   budgetPlan: BudgetPlan | null;
   accountTrend?: TrendData;
+  segmentation?: {
+    devices: DeviceSlice[];
+    demographics: DemographicSlice[];
+    geographic: GeographicSlice[];
+  };
 
   // Campos legacy para backward compatibility
   insights: IntelligenceInsight[];

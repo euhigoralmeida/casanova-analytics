@@ -230,6 +230,11 @@ export async function analyzeCognitive(ctx: AnalysisContext): Promise<CognitiveR
     executiveSummary,
     budgetPlan,
     accountTrend: cube.trends?.account,
+    segmentation: (cube.devices || cube.demographics || cube.geographic) ? {
+      devices: cube.devices ?? [],
+      demographics: cube.demographics ?? [],
+      geographic: cube.geographic ?? [],
+    } : undefined,
     // Legacy
     insights: legacyInsights,
     summary,

@@ -31,6 +31,7 @@ const navItems: NavItem[] = [
     children: [
       { label: "Google Ads", href: "/acquisition/google" },
       { label: "Meta Ads", href: "/acquisition/meta" },
+      { label: "Segmentação", href: "/acquisition/segments" },
     ],
   },
   { label: "Retenção", href: "/retention", icon: Heart },

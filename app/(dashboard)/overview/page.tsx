@@ -15,6 +15,7 @@ import { ExecutiveSummary } from "@/components/intelligence/executive-summary";
 import { InsightsGrid } from "@/components/intelligence/insights-grid";
 import { RecommendationsPanel } from "@/components/intelligence/recommendations-panel";
 import { BudgetPlanCard } from "@/components/intelligence/budget-plan-card";
+import { SegmentationSummary } from "@/components/intelligence/segmentation-summary";
 
 /* ─── KPI Mini Card ─── */
 function KpiCard({ label, value, sublabel, color }: { label: string; value: string; sublabel?: string; color?: string }) {
@@ -270,6 +271,11 @@ export default function VisaoGeralPage() {
             onFollowAction={handleFollowAction}
           />
         </div>
+      )}
+
+      {/* ─── SEGMENTAÇÃO ─── */}
+      {intelligence?.segmentation && !loading && (
+        <SegmentationSummary segmentation={intelligence.segmentation} />
       )}
 
       {/* ─── BUDGET OPTIMIZATION ─── */}
