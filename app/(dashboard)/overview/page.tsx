@@ -16,6 +16,7 @@ import { InsightsGrid } from "@/components/intelligence/insights-grid";
 import { RecommendationsPanel } from "@/components/intelligence/recommendations-panel";
 import { BudgetPlanCard } from "@/components/intelligence/budget-plan-card";
 import { SegmentationSummary } from "@/components/intelligence/segmentation-summary";
+import AiInsights from "@/components/intelligence/ai-insights";
 
 /* ─── KPI Mini Card ─── */
 function KpiCard({ label, value, sublabel, color }: { label: string; value: string; sublabel?: string; color?: string }) {
@@ -271,6 +272,11 @@ export default function VisaoGeralPage() {
             onFollowAction={handleFollowAction}
           />
         </div>
+      )}
+
+      {/* ─── AI INSIGHTS ─── */}
+      {!loading && (
+        <AiInsights startDate={dateRange.startDate} endDate={dateRange.endDate} />
       )}
 
       {/* ─── SEGMENTAÇÃO ─── */}

@@ -1,15 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/ui/sidebar";
 import Header from "@/components/ui/header";
+import AskAnalytics from "@/components/intelligence/ask-analytics";
+import { defaultRange } from "@/lib/constants";
 
 const pageTitles: Record<string, string> = {
   "/overview": "Visão Geral",
   "/planning": "Planejamento",
   "/acquisition/google": "Google Ads",
   "/acquisition/meta": "Meta Ads",
+  "/acquisition/segments": "Segmentação",
   "/retention": "Retenção",
   "/funnel": "Funil E-commerce",
   "/alerts": "Alertas",
@@ -31,6 +34,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [tenantName] = useState(readTenantName);
+  const dateRange = useMemo(() => defaultRange(), []);
 
   const title = pageTitles[pathname] ?? "Dashboard";
 
@@ -64,6 +68,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
         />
         <main className="flex-1 overflow-auto">
+          <div className="px-6 pt-4">
+            <AskAnalytics dateRange={dateRange} />
+          </div>
           {children}
         </main>
       </div>
