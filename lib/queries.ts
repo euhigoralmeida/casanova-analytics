@@ -33,7 +33,15 @@ export async function fetchSkuMetrics(
 
   const dateClause = buildDateClause(period, startDate, endDate);
 
-  // Duas queries paralelas: dados completos + check se SKU está em campanha ativa
+  // Janela recente (últimos 7 dias) para status atual do produto
+  const now = new Date();
+  const statusEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const sevenAgo = new Date(now);
+  sevenAgo.setDate(sevenAgo.getDate() - 7);
+  const statusStart = `${sevenAgo.getFullYear()}-${String(sevenAgo.getMonth() + 1).padStart(2, "0")}-${String(sevenAgo.getDate()).padStart(2, "0")}`;
+  const recentDateClause = `segments.date BETWEEN '${statusStart}' AND '${statusEnd}'`;
+
+  // Duas queries paralelas: dados completos + check recente se SKU está ativo
   const [rows, enabledRows] = await Promise.all([
     customer.query(`
       SELECT
@@ -53,7 +61,7 @@ export async function fetchSkuMetrics(
       SELECT
         segments.product_item_id
       FROM shopping_performance_view
-      WHERE ${dateClause}
+      WHERE ${recentDateClause}
         AND segments.product_item_id = '${sku}'
         AND campaign.status = 'ENABLED'
     `),
@@ -105,7 +113,17 @@ export async function fetchAllSkuMetrics(
 
   const dateClause = buildDateClause(period, startDate, endDate);
 
-  // Duas queries paralelas: dados completos + set de SKUs em campanhas ativas
+  // Janela recente (últimos 7 dias) para determinar status ATUAL do produto
+  const now = new Date();
+  const statusEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const sevenAgo = new Date(now);
+  sevenAgo.setDate(sevenAgo.getDate() - 7);
+  const statusStart = `${sevenAgo.getFullYear()}-${String(sevenAgo.getMonth() + 1).padStart(2, "0")}-${String(sevenAgo.getDate()).padStart(2, "0")}`;
+  const recentDateClause = `segments.date BETWEEN '${statusStart}' AND '${statusEnd}'`;
+
+  // Duas queries paralelas:
+  // 1) Dados completos do período selecionado (todas campanhas não-removidas)
+  // 2) SKU IDs com impressões recentes (7 dias) em campanhas ativas → status atual
   const [rows, enabledRows] = await Promise.all([
     customer.query(`
       SELECT
@@ -125,7 +143,7 @@ export async function fetchAllSkuMetrics(
       SELECT
         segments.product_item_id
       FROM shopping_performance_view
-      WHERE ${dateClause}
+      WHERE ${recentDateClause}
         AND campaign.status = 'ENABLED'
     `),
   ]);
