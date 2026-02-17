@@ -70,13 +70,16 @@ export function SegmentationSummary({ segmentation, compact }: SegmentationSumma
   const bestDevice = sortedDevices[0];
   const totalDeviceRevenue = devices.reduce((s, d) => s + d.revenue, 0);
 
-  // Demographics
+  // Demographics — sort by ROAS when available, otherwise by revenue
   const ageSlices = demographics.filter((d) => d.type === "age" && d.segment !== "AGE_RANGE_UNDETERMINED");
   const genderSlices = demographics.filter((d) => d.type === "gender" && d.segment !== "UNDETERMINED");
-  const bestAge = [...ageSlices].sort((a, b) => b.roas - a.roas)[0];
-  const bestGender = [...genderSlices].sort((a, b) => b.roas - a.roas)[0];
+  const demoHasCost = demographics.some((d) => d.costBRL > 0);
+  const demoSorter = demoHasCost ? (a: DemographicSlice, b: DemographicSlice) => b.roas - a.roas : (a: DemographicSlice, b: DemographicSlice) => b.revenue - a.revenue;
+  const bestAge = [...ageSlices].sort(demoSorter)[0];
+  const bestGender = [...genderSlices].sort(demoSorter)[0];
 
-  // Geographic
+  // Geographic — check if cost data available
+  const geoHasCost = geographic.some((d) => d.costBRL > 0);
   const topRegions = geographic.slice(0, 3);
   const topConcentration = geographic[0]?.revenueShare ?? 0;
 
@@ -155,12 +158,19 @@ export function SegmentationSummary({ segmentation, compact }: SegmentationSumma
                     <span className="text-sm font-semibold text-zinc-900">
                       {AGE_LABELS[bestAge.segment] ?? bestAge.segment}
                     </span>
-                    <span className={`text-sm font-bold ${roasColor(bestAge.roas)}`}>
-                      ROAS {bestAge.roas.toFixed(1)}
-                    </span>
+                    {demoHasCost ? (
+                      <span className={`text-sm font-bold ${roasColor(bestAge.roas)}`}>
+                        ROAS {bestAge.roas.toFixed(1)}
+                      </span>
+                    ) : (
+                      <span className="text-sm font-bold text-blue-600">
+                        {formatBRL(bestAge.revenue)}
+                      </span>
+                    )}
                   </div>
                   <p className="text-[10px] text-zinc-400">
-                    {formatBRL(bestAge.revenue)} ({bestAge.revenueShare.toFixed(0)}% receita)
+                    {bestAge.revenueShare.toFixed(0)}% receita
+                    {demoHasCost && ` • ${formatBRL(bestAge.revenue)}`}
                   </p>
                 </div>
               )}
@@ -171,9 +181,15 @@ export function SegmentationSummary({ segmentation, compact }: SegmentationSumma
                     <span className="text-sm font-semibold text-zinc-900">
                       {GENDER_LABELS[bestGender.segment] ?? bestGender.segment}
                     </span>
-                    <span className={`text-sm font-bold ${roasColor(bestGender.roas)}`}>
-                      ROAS {bestGender.roas.toFixed(1)}
-                    </span>
+                    {demoHasCost ? (
+                      <span className={`text-sm font-bold ${roasColor(bestGender.roas)}`}>
+                        ROAS {bestGender.roas.toFixed(1)}
+                      </span>
+                    ) : (
+                      <span className="text-sm font-bold text-blue-600">
+                        {formatBRL(bestGender.revenue)}
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
@@ -203,9 +219,15 @@ export function SegmentationSummary({ segmentation, compact }: SegmentationSumma
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-[10px] text-zinc-400">{r.revenueShare.toFixed(0)}%</span>
-                    <span className={`text-[10px] font-semibold ${roasColor(r.roas)}`}>
-                      {r.roas.toFixed(1)}
-                    </span>
+                    {geoHasCost ? (
+                      <span className={`text-[10px] font-semibold ${roasColor(r.roas)}`}>
+                        {r.roas.toFixed(1)}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-semibold text-blue-600">
+                        {formatBRL(r.revenue)}
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}
