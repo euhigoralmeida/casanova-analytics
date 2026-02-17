@@ -31,7 +31,6 @@ export type MetaAdsResponse = {
   campaigns: MetaAdsCampaign[];
 };
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function fetchMetaAdsCampaigns(_startDate: string, _endDate: string): Promise<MetaAdsResponse> {
   if (!isMetaAdsConfigured()) {
     return { source: "not_configured", campaigns: [] };

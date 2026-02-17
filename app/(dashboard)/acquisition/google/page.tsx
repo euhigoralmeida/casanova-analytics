@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DateRange, ApiResponse, OverviewResponse, CampaignsResponse, TimeSeriesResponse, GA4DataResponse } from "@/types/api";
+import { useDateRange } from "@/hooks/use-date-range";
 import { defaultRange, alertColors, channelColors, channelLabels } from "@/lib/constants";
 import { formatBRL, formatPct, fmtConv, fmtDate, roasStatus, cpaStatus, marginStatus } from "@/lib/format";
 import DateRangePicker from "@/components/ui/date-range-picker";
@@ -12,9 +13,11 @@ import CampaignStatusBadge from "@/components/ui/campaign-status-badge";
 import SortableHeader from "@/components/ui/sortable-header";
 import ChartsSection from "@/components/charts/charts-section";
 import { TableSkeleton, KpiSkeleton, ChartSkeleton } from "@/components/ui/skeleton";
+import { exportToCSV } from "@/lib/export-csv";
+import { Download, RefreshCw } from "lucide-react";
 
 export default function AquisicaoPage() {
-  const [dateRange, setDateRange] = useState<DateRange>(defaultRange);
+  const { dateRange, setDateRange, buildParams } = useDateRange();
   const [sku, setSku] = useState("");
   const [data, setData] = useState<ApiResponse | null>(null);
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
@@ -33,15 +36,6 @@ export default function AquisicaoPage() {
   const [sortField, setSortField] = useState("");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const SKUS_PER_PAGE = 20;
-
-  const buildParams = useCallback((range: DateRange, extra?: Record<string, string>) => {
-    const params = new URLSearchParams();
-    params.set("period", range.preset ?? "custom");
-    params.set("startDate", range.startDate);
-    params.set("endDate", range.endDate);
-    if (extra) for (const [k, v] of Object.entries(extra)) params.set(k, v);
-    return params.toString();
-  }, []);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   function sortArray<T extends Record<string, any>>(arr: T[], field: string, dir: "asc" | "desc"): T[] {
@@ -208,9 +202,18 @@ export default function AquisicaoPage() {
               onChange={(e) => setSku(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && loadData(dateRange, sku)}
               placeholder="Buscar SKU..."
+              aria-label="Buscar SKU"
               className="w-40 rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
             />
           </div>
+          <button
+            onClick={() => loadData(dateRange, sku)}
+            disabled={loading}
+            className="p-2 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-700 disabled:opacity-30 transition-colors"
+            title="Atualizar dados"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
           <DateRangePicker value={dateRange} onChange={applyDateRange} loading={loading} />
         </div>
       </div>
@@ -306,16 +309,31 @@ export default function AquisicaoPage() {
                   {filteredSkus.length !== overview.skus.length ? `${filteredSkus.length} de ${overview.skus.length}` : `${overview.skus.length} SKUs`}
                 </span>
               </h2>
-              {totalPages > 1 && (
-                <div className="flex items-center gap-2 text-sm">
-                  <button onClick={() => setSkuPage((p) => Math.max(0, p - 1))} disabled={skuPage === 0} className="px-2.5 py-1 rounded-lg border text-xs hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed">Anterior</button>
-                  <span className="text-xs text-zinc-500">{skuPage + 1} / {totalPages}</span>
-                  <button onClick={() => setSkuPage((p) => Math.min(totalPages - 1, p + 1))} disabled={skuPage >= totalPages - 1} className="px-2.5 py-1 rounded-lg border text-xs hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed">Próximo</button>
-                </div>
-              )}
+              <div className="flex items-center gap-2 text-sm">
+                <button
+                  onClick={() => exportToCSV(filteredSkus, [
+                    { key: "sku", label: "SKU" }, { key: "nome", label: "Nome" },
+                    { key: "revenue", label: "Receita" }, { key: "ads", label: "Ads" },
+                    { key: "roas", label: "ROAS" }, { key: "conversions", label: "Conv" },
+                    { key: "cpa", label: "CPA" }, { key: "ctr", label: "CTR" },
+                    { key: "status", label: "Ação" },
+                  ], "skus-ranking.csv")}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs text-zinc-600 hover:bg-white"
+                  title="Exportar CSV"
+                >
+                  <Download size={12} /> CSV
+                </button>
+                {totalPages > 1 && (
+                  <>
+                    <button onClick={() => setSkuPage((p) => Math.max(0, p - 1))} disabled={skuPage === 0} className="px-2.5 py-1 rounded-lg border text-xs hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed">Anterior</button>
+                    <span className="text-xs text-zinc-500">{skuPage + 1} / {totalPages}</span>
+                    <button onClick={() => setSkuPage((p) => Math.min(totalPages - 1, p + 1))} disabled={skuPage >= totalPages - 1} className="px-2.5 py-1 rounded-lg border text-xs hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed">Próximo</button>
+                  </>
+                )}
+              </div>
             </div>
             <div className="px-5 py-3 flex flex-wrap items-center gap-2 border-b border-zinc-50">
-              <input type="text" placeholder="Buscar SKU ou nome..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setSkuPage(0); }} className="w-full sm:w-56 px-3 py-1.5 text-sm border rounded-lg bg-zinc-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
+              <input type="text" placeholder="Buscar SKU ou nome..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setSkuPage(0); }} aria-label="Filtrar SKUs por nome" className="w-full sm:w-56 px-3 py-1.5 text-sm border rounded-lg bg-zinc-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
               <div className="flex gap-1">
                 {[
                   { value: "all", label: "Todos", bg: "bg-zinc-200 text-zinc-700" },
@@ -423,16 +441,31 @@ export default function AquisicaoPage() {
                   <button onClick={switchToAccountTimeSeries} className="ml-3 text-xs font-normal text-blue-600 hover:text-blue-800">Ver total da conta</button>
                 )}
               </h2>
-              {totalPages > 1 && (
-                <div className="flex items-center gap-2 text-sm">
-                  <button onClick={() => setSkuPage((p) => Math.max(0, p - 1))} disabled={skuPage === 0} className="px-2.5 py-1 rounded-lg border text-xs hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed">Anterior</button>
-                  <span className="text-xs text-zinc-500">{skuPage + 1} / {totalPages}</span>
-                  <button onClick={() => setSkuPage((p) => Math.min(totalPages - 1, p + 1))} disabled={skuPage >= totalPages - 1} className="px-2.5 py-1 rounded-lg border text-xs hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed">Próximo</button>
-                </div>
-              )}
+              <div className="flex items-center gap-2 text-sm">
+                <button
+                  onClick={() => exportToCSV(filteredCampaigns, [
+                    { key: "campaignName", label: "Campanha" }, { key: "channelType", label: "Tipo" },
+                    { key: "status", label: "Status" }, { key: "costBRL", label: "Gasto" },
+                    { key: "conversions", label: "Conv" }, { key: "revenue", label: "Receita" },
+                    { key: "cpa", label: "CPA" }, { key: "roas", label: "ROAS" },
+                    { key: "impressions", label: "Impressões" }, { key: "clicks", label: "Cliques" },
+                  ], "campanhas.csv")}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs text-zinc-600 hover:bg-white"
+                  title="Exportar CSV"
+                >
+                  <Download size={12} /> CSV
+                </button>
+                {totalPages > 1 && (
+                  <>
+                    <button onClick={() => setSkuPage((p) => Math.max(0, p - 1))} disabled={skuPage === 0} className="px-2.5 py-1 rounded-lg border text-xs hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed">Anterior</button>
+                    <span className="text-xs text-zinc-500">{skuPage + 1} / {totalPages}</span>
+                    <button onClick={() => setSkuPage((p) => Math.min(totalPages - 1, p + 1))} disabled={skuPage >= totalPages - 1} className="px-2.5 py-1 rounded-lg border text-xs hover:bg-white disabled:opacity-30 disabled:cursor-not-allowed">Próximo</button>
+                  </>
+                )}
+              </div>
             </div>
             <div className="px-5 py-3 flex flex-wrap items-center gap-2 border-b border-zinc-50">
-              <input type="text" placeholder="Buscar campanha..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setSkuPage(0); }} className="w-full sm:w-56 px-3 py-1.5 text-sm border rounded-lg bg-zinc-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
+              <input type="text" placeholder="Buscar campanha..." value={searchQuery} onChange={(e) => { setSearchQuery(e.target.value); setSkuPage(0); }} aria-label="Filtrar campanhas" className="w-full sm:w-56 px-3 py-1.5 text-sm border rounded-lg bg-zinc-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400" />
               <div className="flex gap-1 flex-wrap">
                 <button onClick={() => { setFilterChannel("all"); setSkuPage(0); }} className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${filterChannel === "all" ? "bg-zinc-200 text-zinc-700" : "bg-zinc-100 text-zinc-400 hover:text-zinc-600"}`}>Todos</button>
                 {channelTypes.map((ct) => (

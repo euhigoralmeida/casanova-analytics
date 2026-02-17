@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DateRange, OverviewResponse, SmartAlertsResponse, TimeSeriesResponse, GA4DataResponse } from "@/types/api";
+import { useDateRange } from "@/hooks/use-date-range";
 import type { IntelligenceResponse } from "@/lib/intelligence/types";
 import type { CognitiveResponse } from "@/lib/intelligence/communication/types";
 import { defaultRange, smartAlertStyles, categoryLabels } from "@/lib/constants";
@@ -10,6 +11,7 @@ import { generateInsights } from "@/lib/insights-engine";
 import DateRangePicker from "@/components/ui/date-range-picker";
 import ProgressBar from "@/components/ui/progress-bar";
 import ChartsSection from "@/components/charts/charts-section";
+import Kpi from "@/components/ui/kpi-card";
 import { KpiSkeleton, AlertsSkeleton, ChartSkeleton } from "@/components/ui/skeleton";
 import { ExecutiveSummary } from "@/components/intelligence/executive-summary";
 import { InsightsGrid } from "@/components/intelligence/insights-grid";
@@ -17,20 +19,10 @@ import { RecommendationsPanel } from "@/components/intelligence/recommendations-
 import { BudgetPlanCard } from "@/components/intelligence/budget-plan-card";
 import { SegmentationSummary } from "@/components/intelligence/segmentation-summary";
 import AiInsights from "@/components/intelligence/ai-insights";
-
-/* ─── KPI Mini Card ─── */
-function KpiCard({ label, value, sublabel, color }: { label: string; value: string; sublabel?: string; color?: string }) {
-  return (
-    <div className="rounded-2xl border border-zinc-200 bg-white p-4">
-      <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wide">{label}</p>
-      <p className={`text-2xl font-bold mt-1 ${color ?? "text-zinc-900"}`}>{value}</p>
-      {sublabel && <p className="text-[11px] text-zinc-400 mt-0.5">{sublabel}</p>}
-    </div>
-  );
-}
+import { RefreshCw } from "lucide-react";
 
 export default function VisaoGeralPage() {
-  const [dateRange, setDateRange] = useState<DateRange>(defaultRange);
+  const { dateRange, setDateRange, buildParams } = useDateRange();
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
   const [smartAlerts, setSmartAlerts] = useState<SmartAlertsResponse | null>(null);
   const [timeseries, setTimeseries] = useState<TimeSeriesResponse | null>(null);
@@ -40,26 +32,16 @@ export default function VisaoGeralPage() {
   const [error, setError] = useState<string | null>(null);
   const [alertsCollapsed, setAlertsCollapsed] = useState(false);
 
-  const buildParams = useCallback((range: DateRange) => {
-    const params = new URLSearchParams();
-    params.set("period", range.preset ?? "custom");
-    params.set("startDate", range.startDate);
-    params.set("endDate", range.endDate);
-    return params.toString();
-  }, []);
-
   const loadData = useCallback(async (range: DateRange) => {
     setLoading(true);
     setError(null);
     try {
       const base = buildParams(range);
-      const tsParams = new URLSearchParams(base);
-      tsParams.set("scope", "account");
 
       const [overviewRes, alertsRes, tsRes, ga4Res, intelRes] = await Promise.all([
         fetch(`/api/overview?${base}`),
         fetch(`/api/alerts?${base}`).catch(() => null),
-        fetch(`/api/timeseries?${tsParams.toString()}`).catch(() => null),
+        fetch(`/api/timeseries?${buildParams(range, { scope: "account" })}`).catch(() => null),
         fetch(`/api/ga4?startDate=${range.startDate}&endDate=${range.endDate}`).catch(() => null),
         fetch(`/api/intelligence?${base}`).catch(() => null),
       ]);
@@ -131,7 +113,17 @@ export default function VisaoGeralPage() {
             )}
           </p>
         </div>
-        <DateRangePicker value={dateRange} onChange={applyDateRange} loading={loading} />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => loadData(dateRange)}
+            disabled={loading}
+            className="p-2 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-700 disabled:opacity-30 transition-colors"
+            title="Atualizar dados"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
+          <DateRangePicker value={dateRange} onChange={applyDateRange} loading={loading} />
+        </div>
       </div>
 
       {/* ─── ERRO ─── */}
@@ -161,31 +153,31 @@ export default function VisaoGeralPage() {
       {/* ─── KPIs (Google Ads) ─── */}
       {overview && acct && !loading && (
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
-          <KpiCard
-            label="Receita"
+          <Kpi
+            title="Receita"
             value={formatBRL(acct.revenue)}
-            sublabel={`${(Math.round(acct.conversions * 100) / 100).toLocaleString("pt-BR")} conversões`}
+            subtitle={`${(Math.round(acct.conversions * 100) / 100).toLocaleString("pt-BR")} conversões`}
           />
-          <KpiCard
-            label="Investimento"
+          <Kpi
+            title="Investimento"
             value={formatBRL(acct.ads)}
-            sublabel={`${acct.clicks.toLocaleString("pt-BR")} cliques`}
+            subtitle={`${acct.clicks.toLocaleString("pt-BR")} cliques`}
           />
-          <KpiCard
-            label="ROAS"
+          <Kpi
+            title="ROAS"
             value={overview.meta.roasActual.toFixed(1)}
-            sublabel={`Meta: ${overview.meta.roasTarget.toFixed(1)}`}
+            subtitle={`Meta: ${overview.meta.roasTarget.toFixed(1)}`}
             color={roasColor}
           />
-          <KpiCard
-            label="Impressões"
+          <Kpi
+            title="Impressões"
             value={acct.impressions.toLocaleString("pt-BR")}
-            sublabel={`CTR: ${acct.impressions > 0 ? ((acct.clicks / acct.impressions) * 100).toFixed(2) : 0}%`}
+            subtitle={`CTR: ${acct.impressions > 0 ? ((acct.clicks / acct.impressions) * 100).toFixed(2) : 0}%`}
           />
-          <KpiCard
-            label="Margem"
+          <Kpi
+            title="Margem"
             value={`${overview.meta.marginActual}%`}
-            sublabel={`Meta: ${overview.meta.marginTarget}%`}
+            subtitle={`Meta: ${overview.meta.marginTarget}%`}
             color={overview.meta.marginActual >= overview.meta.marginTarget ? "text-emerald-600" : "text-amber-600"}
           />
         </div>

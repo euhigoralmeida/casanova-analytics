@@ -110,6 +110,8 @@ export default function Sidebar({ tenantName, onClose }: { tenantName?: string; 
                 {/* Parent item (toggle) */}
                 <button
                   onClick={() => toggleMenu(item.label)}
+                  aria-expanded={expanded}
+                  aria-controls={`submenu-${item.label}`}
                   className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors w-full ${
                     parentActive
                       ? "text-emerald-700"
@@ -126,7 +128,7 @@ export default function Sidebar({ tenantName, onClose }: { tenantName?: string; 
 
                 {/* Children */}
                 {expanded && (
-                  <div className="ml-4 pl-4 border-l border-zinc-100 space-y-0.5 mt-0.5">
+                  <div id={`submenu-${item.label}`} className="ml-4 pl-4 border-l border-zinc-100 space-y-0.5 mt-0.5">
                     {item.children!.map((child) => {
                       if (child.comingSoon) {
                         return (

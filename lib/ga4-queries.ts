@@ -6,7 +6,7 @@ import { getCached, setCache } from "./google-ads";
    Types
 ========================= */
 
-export type FunnelStep = {
+export type GA4FunnelStep = {
   step: string;
   eventName: string;
   count: number;
@@ -14,7 +14,7 @@ export type FunnelStep = {
   dropoff: number;
 };
 
-export type GA4Summary = {
+export type GA4SummaryData = {
   sessions: number;
   engagedSessions: number;
   bounceRate: number;
@@ -49,12 +49,12 @@ export type ChannelAcquisition = {
   revenue: number;
 };
 
-export type GA4Response = {
+export type GA4DataResponse = {
   source: "ga4" | "not_configured";
   updatedAt?: string;
-  funnel?: FunnelStep[];
+  funnel?: GA4FunnelStep[];
   overallConversionRate?: number;
-  summary?: GA4Summary;
+  summary?: GA4SummaryData;
   dailySeries?: GA4DailyPoint[];
   channelAcquisition?: ChannelAcquisition[];
 };
@@ -90,9 +90,9 @@ export async function fetchEcommerceFunnel(
   client: BetaAnalyticsDataClient,
   startDate: string,
   endDate: string,
-): Promise<{ funnel: FunnelStep[]; overallConversionRate: number }> {
+): Promise<{ funnel: GA4FunnelStep[]; overallConversionRate: number }> {
   const cacheKey = `funnel:${startDate}:${endDate}`;
-  const cached = getGA4Cached<{ funnel: FunnelStep[]; overallConversionRate: number }>(cacheKey);
+  const cached = getGA4Cached<{ funnel: GA4FunnelStep[]; overallConversionRate: number }>(cacheKey);
   if (cached) return cached;
 
   const [response] = await client.runReport({
@@ -117,7 +117,7 @@ export async function fetchEcommerceFunnel(
     eventCounts[eventName] = count;
   }
 
-  const funnel: FunnelStep[] = FUNNEL_EVENTS.map((eventName, i) => {
+  const funnel: GA4FunnelStep[] = FUNNEL_EVENTS.map((eventName, i) => {
     const count = eventCounts[eventName] ?? 0;
     const prevCount = i > 0 ? (eventCounts[FUNNEL_EVENTS[i - 1]] ?? 0) : count;
     const rate = prevCount > 0 ? Math.round((count / prevCount) * 10000) / 100 : 0;
@@ -149,9 +149,9 @@ export async function fetchGA4Summary(
   client: BetaAnalyticsDataClient,
   startDate: string,
   endDate: string,
-): Promise<GA4Summary> {
+): Promise<GA4SummaryData> {
   const cacheKey = `summary:${startDate}:${endDate}`;
-  const cached = getGA4Cached<GA4Summary>(cacheKey);
+  const cached = getGA4Cached<GA4SummaryData>(cacheKey);
   if (cached) return cached;
 
   const [response] = await client.runReport({
@@ -187,7 +187,7 @@ export async function fetchGA4Summary(
   const cartAbandonmentRate = addToCarts > 0 ? Math.round(((addToCarts - purchases) / addToCarts) * 10000) / 100 : 0;
   const checkoutAbandonmentRate = checkouts > 0 ? Math.round(((checkouts - purchases) / checkouts) * 10000) / 100 : 0;
 
-  const result: GA4Summary = {
+  const result: GA4SummaryData = {
     sessions,
     engagedSessions,
     bounceRate,

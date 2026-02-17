@@ -8,10 +8,11 @@ import type { DeviceSlice, DemographicSlice, GeographicSlice } from "@/lib/intel
 import { defaultRange } from "@/lib/constants";
 import { formatBRL } from "@/lib/format";
 import DateRangePicker from "@/components/ui/date-range-picker";
+import Kpi from "@/components/ui/kpi-card";
 import DeviceChart from "@/components/charts/device-chart";
 import DemographicChart from "@/components/charts/demographic-chart";
 import GeographicChart from "@/components/charts/geographic-chart";
-import { Monitor, Users, MapPin } from "lucide-react";
+import { Monitor, Users, MapPin, RefreshCw } from "lucide-react";
 
 type Tab = "device" | "demographic" | "geographic";
 
@@ -39,16 +40,6 @@ const DEVICE_LABELS: Record<string, string> = {
   OTHER: "Outro",
 };
 
-function KpiCard({ label, value, sublabel, color }: { label: string; value: string; sublabel?: string; color?: string }) {
-  return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-3">
-      <p className="text-[10px] font-medium text-zinc-400 uppercase tracking-wide">{label}</p>
-      <p className={`text-lg font-bold mt-0.5 ${color ?? "text-zinc-900"}`}>{value}</p>
-      {sublabel && <p className="text-[10px] text-zinc-400 mt-0.5">{sublabel}</p>}
-    </div>
-  );
-}
-
 function roasColor(roas: number): string {
   if (roas >= 7) return "text-emerald-600";
   if (roas >= 5) return "text-amber-600";
@@ -58,6 +49,7 @@ function roasColor(roas: number): string {
 export default function SegmentsPage() {
   const [dateRange, setDateRange] = useState<DateRange>(defaultRange);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [devices, setDevices] = useState<DeviceSlice[]>([]);
   const [demographics, setDemographics] = useState<DemographicSlice[]>([]);
   const [geographic, setGeographic] = useState<GeographicSlice[]>([]);
@@ -66,6 +58,7 @@ export default function SegmentsPage() {
 
   const loadData = useCallback(async (range: DateRange) => {
     setLoading(true);
+    setError(null);
     try {
       const params = new URLSearchParams();
       params.set("period", range.preset ?? "custom");
@@ -73,14 +66,16 @@ export default function SegmentsPage() {
       params.set("endDate", range.endDate);
 
       const res = await fetch(`/api/intelligence?${params.toString()}`);
-      if (res.ok) {
-        const data: IntelligenceResponse & Partial<CognitiveResponse> = await res.json();
-        setDevices(data.segmentation?.devices ?? []);
-        setDemographics(data.segmentation?.demographics ?? []);
-        setGeographic(data.segmentation?.geographic ?? []);
-      }
-    } catch { /* silent */ }
-    finally { setLoading(false); }
+      if (!res.ok) throw new Error("Erro ao carregar dados");
+      const data: IntelligenceResponse & Partial<CognitiveResponse> = await res.json();
+      setDevices(data.segmentation?.devices ?? []);
+      setDemographics(data.segmentation?.demographics ?? []);
+      setGeographic(data.segmentation?.geographic ?? []);
+    } catch {
+      setError("Não foi possível carregar os dados de segmentação.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -122,7 +117,17 @@ export default function SegmentsPage() {
             Análise por dispositivo, demografia e geografia
           </p>
         </div>
-        <DateRangePicker value={dateRange} onChange={applyDateRange} loading={loading} />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => loadData(dateRange)}
+            disabled={loading}
+            className="p-2 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-700 disabled:opacity-30 transition-colors"
+            title="Atualizar dados"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
+          <DateRangePicker value={dateRange} onChange={applyDateRange} loading={loading} />
+        </div>
       </div>
 
       {/* Tabs */}
@@ -143,8 +148,33 @@ export default function SegmentsPage() {
         ))}
       </div>
 
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex items-center justify-between">
+          <p className="text-sm text-red-700">{error}</p>
+          <button
+            onClick={() => loadData(dateRange)}
+            className="px-3 py-1.5 text-sm bg-red-100 text-red-800 rounded-lg hover:bg-red-200 font-medium flex-shrink-0"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      )}
+
       {loading && (
-        <div className="text-sm text-zinc-400 py-8 text-center">Carregando dados de segmentação...</div>
+        <div className="space-y-4 animate-pulse">
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="rounded-xl border border-zinc-200 bg-white p-3">
+                <div className="h-3 w-16 bg-zinc-200 rounded" />
+                <div className="h-6 w-24 bg-zinc-100 rounded mt-2" />
+              </div>
+            ))}
+          </div>
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+            <div className="h-4 w-48 bg-zinc-200 rounded" />
+            <div className="h-72 bg-zinc-100 rounded mt-3" />
+          </div>
+        </div>
       )}
 
       {/* Device Tab */}
@@ -157,15 +187,15 @@ export default function SegmentsPage() {
           ) : (
             <>
               <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-                <KpiCard label="Receita Total" value={formatBRL(totalDeviceRevenue)} />
-                <KpiCard label="Investimento Total" value={formatBRL(totalDeviceSpend)} />
-                <KpiCard
-                  label="Melhor Dispositivo"
+                <Kpi title="Receita Total" value={formatBRL(totalDeviceRevenue)} />
+                <Kpi title="Investimento Total" value={formatBRL(totalDeviceSpend)} />
+                <Kpi
+                  title="Melhor Dispositivo"
                   value={DEVICE_LABELS[bestDevice?.device] ?? "—"}
-                  sublabel={bestDevice ? `ROAS ${bestDevice.roas.toFixed(1)}` : undefined}
+                  subtitle={bestDevice ? `ROAS ${bestDevice.roas.toFixed(1)}` : undefined}
                   color={bestDevice ? roasColor(bestDevice.roas) : undefined}
                 />
-                <KpiCard label="Dispositivos" value={String(devices.length)} sublabel="com dados" />
+                <Kpi title="Dispositivos" value={String(devices.length)} subtitle="com dados" />
               </div>
 
               <div className="rounded-2xl border border-zinc-200 bg-white p-5">
@@ -247,35 +277,35 @@ export default function SegmentsPage() {
               <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
                 {demoSubTab === "age" ? (
                   <>
-                    <KpiCard label="Faixas Etárias" value={String(ageSlices.length)} sublabel="com dados" />
-                    <KpiCard
-                      label="Maior Receita"
+                    <Kpi title="Faixas Etárias" value={String(ageSlices.length)} subtitle="com dados" />
+                    <Kpi
+                      title="Maior Receita"
                       value={AGE_LABELS[[...ageSlices].sort((a, b) => b.revenue - a.revenue)[0]?.segment] ?? "—"}
-                      sublabel={ageSlices[0] ? formatBRL([...ageSlices].sort((a, b) => b.revenue - a.revenue)[0]?.revenue) : undefined}
+                      subtitle={ageSlices[0] ? formatBRL([...ageSlices].sort((a, b) => b.revenue - a.revenue)[0]?.revenue) : undefined}
                     />
-                    <KpiCard
-                      label="Receita Total"
+                    <Kpi
+                      title="Receita Total"
                       value={formatBRL(ageSlices.reduce((s, a) => s + a.revenue, 0))}
                     />
-                    <KpiCard
-                      label="Sessões Total"
+                    <Kpi
+                      title="Sessões Total"
                       value={String(ageSlices.reduce((s, a) => s + (a.sessions ?? 0), 0).toLocaleString("pt-BR"))}
                     />
                   </>
                 ) : (
                   <>
-                    <KpiCard label="Gêneros" value={String(genderSlices.length)} sublabel="com dados" />
-                    <KpiCard
-                      label="Maior Receita"
+                    <Kpi title="Gêneros" value={String(genderSlices.length)} subtitle="com dados" />
+                    <Kpi
+                      title="Maior Receita"
                       value={GENDER_LABELS[[...genderSlices].sort((a, b) => b.revenue - a.revenue)[0]?.segment] ?? "—"}
-                      sublabel={genderSlices[0] ? formatBRL([...genderSlices].sort((a, b) => b.revenue - a.revenue)[0]?.revenue) : undefined}
+                      subtitle={genderSlices[0] ? formatBRL([...genderSlices].sort((a, b) => b.revenue - a.revenue)[0]?.revenue) : undefined}
                     />
-                    <KpiCard
-                      label="Receita Total"
+                    <Kpi
+                      title="Receita Total"
                       value={formatBRL(genderSlices.reduce((s, a) => s + a.revenue, 0))}
                     />
-                    <KpiCard
-                      label="Sessões Total"
+                    <Kpi
+                      title="Sessões Total"
                       value={String(genderSlices.reduce((s, a) => s + (a.sessions ?? 0), 0).toLocaleString("pt-BR"))}
                     />
                   </>
@@ -347,15 +377,15 @@ export default function SegmentsPage() {
           ) : (
             <>
               <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-                <KpiCard label="Receita Total" value={formatBRL(totalGeoRevenue)} />
-                <KpiCard label="Regiões" value={String(geographic.length)} sublabel="com dados" />
-                <KpiCard
-                  label="Top Região"
+                <Kpi title="Receita Total" value={formatBRL(totalGeoRevenue)} />
+                <Kpi title="Regiões" value={String(geographic.length)} subtitle="com dados" />
+                <Kpi
+                  title="Top Região"
                   value={topRegion?.region ?? "—"}
-                  sublabel={topRegion ? `${topRegion.revenueShare.toFixed(0)}% da receita` : undefined}
+                  subtitle={topRegion ? `${topRegion.revenueShare.toFixed(0)}% da receita` : undefined}
                 />
-                <KpiCard
-                  label="Sessões Top Região"
+                <Kpi
+                  title="Sessões Top Região"
                   value={String((topRegion?.sessions ?? 0).toLocaleString("pt-BR"))}
                 />
               </div>

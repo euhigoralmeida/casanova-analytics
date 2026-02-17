@@ -83,30 +83,7 @@ export type OverviewResponse = {
   }[];
 };
 
-export type SmartAlertItem = {
-  id: string;
-  category: "account" | "campaign" | "sku" | "trend";
-  severity: "danger" | "warn" | "info" | "success";
-  title: string;
-  description: string;
-  metric: string;
-  currentValue: number;
-  previousValue: number;
-  deltaPct: number;
-  entityName?: string;
-  entityId?: string;
-  recommendation?: string;
-};
-
-export type SmartAlertsResponse = {
-  period: string;
-  source: "google-ads" | "mock";
-  updatedAt: string;
-  currentPeriod: { start: string; end: string };
-  previousPeriod: { start: string; end: string };
-  alerts: SmartAlertItem[];
-  summary: { total: number; danger: number; warn: number; info: number; success: number };
-};
+export type { SmartAlert, SmartAlertsResponse, AlertSeverity, AlertCategory } from "@/lib/alert-types";
 
 export type CampaignData = {
   campaignId: string;
@@ -151,56 +128,7 @@ export type TimeSeriesResponse = {
   series: TimeSeriesPoint[];
 };
 
-export type GA4FunnelStep = {
-  step: string;
-  eventName: string;
-  count: number;
-  rate: number;
-  dropoff: number;
-};
-
-export type GA4SummaryData = {
-  sessions: number;
-  users: number;
-  newUsers: number;
-  purchases: number;
-  purchaseRevenue: number;
-  avgOrderValue: number;
-  cartAbandonmentRate: number;
-  checkoutAbandonmentRate: number;
-};
-
-export type GA4DailyPoint = {
-  date: string;
-  sessions: number;
-  pageViews: number;
-  viewItems: number;
-  addToCarts: number;
-  checkouts: number;
-  shippingInfos: number;
-  paymentInfos: number;
-  purchases: number;
-  purchaseRevenue: number;
-};
-
-export type ChannelAcquisition = {
-  channel: string;
-  users: number;
-  newUsers: number;
-  sessions: number;
-  conversions: number;
-  revenue: number;
-};
-
-export type GA4DataResponse = {
-  source: "ga4" | "not_configured";
-  updatedAt?: string;
-  funnel?: GA4FunnelStep[];
-  overallConversionRate?: number;
-  summary?: GA4SummaryData;
-  dailySeries?: GA4DailyPoint[];
-  channelAcquisition?: ChannelAcquisition[];
-};
+export type { GA4FunnelStep, GA4SummaryData, GA4DailyPoint, ChannelAcquisition, GA4DataResponse } from "@/lib/ga4-queries";
 
 export type KpiStatus = "ok" | "warn" | "danger" | undefined;
 

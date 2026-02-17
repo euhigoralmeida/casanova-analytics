@@ -6,7 +6,8 @@ import type { SmartAlert, SmartAlertsResponse } from "@/lib/alert-types";
 import { defaultRange, smartAlertStyles, categoryLabels } from "@/lib/constants";
 import { formatBRL } from "@/lib/format";
 import DateRangePicker from "@/components/ui/date-range-picker";
-import { AlertTriangle, TrendingDown, TrendingUp, ShieldAlert, Filter, Search } from "lucide-react";
+import { AlertTriangle, TrendingDown, TrendingUp, ShieldAlert, Filter, Search, Download, RefreshCw } from "lucide-react";
+import { exportToCSV } from "@/lib/export-csv";
 
 type SeverityFilter = "all" | "danger" | "warn" | "info" | "success";
 type CategoryFilter = "all" | "account" | "campaign" | "sku" | "trend";
@@ -126,7 +127,32 @@ export default function AlertsPage() {
             Monitoramento inteligente de desempenho — comparação com período anterior
           </p>
         </div>
-        <DateRangePicker value={dateRange} onChange={applyDateRange} loading={loading} />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => loadAlerts(dateRange)}
+            disabled={loading}
+            className="p-2 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-700 disabled:opacity-30 transition-colors"
+            title="Atualizar dados"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
+          {filtered.length > 0 && (
+            <button
+              onClick={() => exportToCSV(filtered, [
+                { key: "severity", label: "Severidade" }, { key: "category", label: "Categoria" },
+                { key: "title", label: "Título" }, { key: "description", label: "Descrição" },
+                { key: "metric", label: "Métrica" }, { key: "currentValue", label: "Valor Atual" },
+                { key: "previousValue", label: "Valor Anterior" }, { key: "deltaPct", label: "Δ%" },
+                { key: "entityName", label: "Entidade" }, { key: "recommendation", label: "Recomendação" },
+              ], "alertas.csv")}
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs text-zinc-600 hover:bg-white"
+              title="Exportar CSV"
+            >
+              <Download size={12} /> CSV
+            </button>
+          )}
+          <DateRangePicker value={dateRange} onChange={applyDateRange} loading={loading} />
+        </div>
       </div>
 
       {/* Summary KPIs */}
@@ -170,6 +196,7 @@ export default function AlertsPage() {
             placeholder="Buscar alerta..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            aria-label="Buscar alerta"
             className="w-full pl-9 pr-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
           />
         </div>
@@ -229,8 +256,14 @@ export default function AlertsPage() {
 
       {/* Error */}
       {error && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          {error}
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex items-center justify-between">
+          <p className="text-sm text-red-700">{error}</p>
+          <button
+            onClick={() => loadAlerts(dateRange)}
+            className="px-3 py-1.5 text-sm bg-red-100 text-red-800 rounded-lg hover:bg-red-200 font-medium flex-shrink-0"
+          >
+            Tentar novamente
+          </button>
         </div>
       )}
 
