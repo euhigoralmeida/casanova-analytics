@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -14,7 +15,7 @@ import {
 } from "recharts";
 import type { GA4DailyPoint } from "@/types/api";
 
-export default function GA4FunnelChart({ data }: { data: GA4DailyPoint[] }) {
+const GA4FunnelChart = React.memo(function GA4FunnelChart({ data }: { data: GA4DailyPoint[] }) {
   const chartData = data.map((p) => ({
     ...p,
     label: `${p.date.slice(8, 10)}/${p.date.slice(5, 7)}`,
@@ -81,4 +82,5 @@ export default function GA4FunnelChart({ data }: { data: GA4DailyPoint[] }) {
       </ResponsiveContainer>
     </div>
   );
-}
+});
+export default GA4FunnelChart;

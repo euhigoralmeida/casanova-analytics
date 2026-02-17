@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { Sparkles, Send, X, Loader2 } from "lucide-react";
 import ChatMessage from "./chat-message";
 import AskSuggestions from "./ask-suggestions";
@@ -57,6 +57,11 @@ export default function AskAnalytics({ dateRange }: AskAnalyticsProps) {
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, loading]);
 
   const suggestions = SUGGESTIONS_BY_PATH[pathname] ?? DEFAULT_SUGGESTIONS;
 
@@ -190,6 +195,7 @@ export default function AskAnalytics({ dateRange }: AskAnalyticsProps) {
                 {error}
               </div>
             )}
+            <div ref={messagesEndRef} />
           </div>
         </div>
       )}

@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -12,7 +13,7 @@ import {
 } from "recharts";
 import type { ChartPoint } from "./chart-types";
 
-export default function RoasChart({ data }: { data: ChartPoint[] }) {
+const RoasChart = React.memo(function RoasChart({ data }: { data: ChartPoint[] }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <LineChart data={data}>
@@ -56,4 +57,5 @@ export default function RoasChart({ data }: { data: ChartPoint[] }) {
       </LineChart>
     </ResponsiveContainer>
   );
-}
+});
+export default RoasChart;

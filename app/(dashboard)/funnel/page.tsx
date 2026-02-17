@@ -6,6 +6,7 @@ import { defaultRange } from "@/lib/constants";
 import { formatBRL, fmtDate } from "@/lib/format";
 import DateRangePicker from "@/components/ui/date-range-picker";
 import GA4FunnelChart from "@/components/charts/ga4-funnel-chart";
+import { RefreshCw } from "lucide-react";
 
 export default function FunilPage() {
   const [dateRange, setDateRange] = useState<DateRange>(defaultRange);
@@ -60,7 +61,17 @@ export default function FunilPage() {
             {loading && <span className="ml-2 text-zinc-400">Atualizando...</span>}
           </p>
         </div>
-        <DateRangePicker value={dateRange} onChange={applyDateRange} loading={loading} />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => loadData(dateRange)}
+            disabled={loading}
+            className="p-2 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-white hover:text-zinc-700 disabled:opacity-30 transition-colors"
+            title="Atualizar dados"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+          </button>
+          <DateRangePicker value={dateRange} onChange={applyDateRange} loading={loading} />
+        </div>
       </div>
 
       {/* ─── ERRO ─── */}

@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -13,7 +14,7 @@ import {
 } from "recharts";
 import type { ChartPoint } from "./chart-types";
 
-export default function ConversionsChart({ data }: { data: ChartPoint[] }) {
+const ConversionsChart = React.memo(function ConversionsChart({ data }: { data: ChartPoint[] }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <ComposedChart data={data}>
@@ -41,4 +42,5 @@ export default function ConversionsChart({ data }: { data: ChartPoint[] }) {
       </ComposedChart>
     </ResponsiveContainer>
   );
-}
+});
+export default ConversionsChart;

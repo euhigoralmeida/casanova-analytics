@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isConfigured, getCustomer } from "@/lib/google-ads";
 import { fetchSkuTimeSeries, fetchAllTimeSeries, fetchAccountTimeSeries, fetchCampaignTimeSeries, DailyMetrics } from "@/lib/queries";
+import { fmtDate } from "@/lib/format";
 
 /* =========================
    Mock data (fallback)
@@ -25,7 +26,7 @@ function generateMockTimeSeries(days: number, sku?: string): DailyMetrics[] {
     const factor = weekdayFactor * noise;
 
     data.push({
-      date: d.toISOString().slice(0, 10),
+      date: fmtDate(d),
       impressions: Math.round(baseImpressions * factor),
       clicks: Math.round(baseClicks * factor),
       costBRL: Math.round(baseCost * factor * 100) / 100,

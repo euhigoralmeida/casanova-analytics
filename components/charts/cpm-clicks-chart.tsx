@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -13,7 +14,7 @@ import {
 } from "recharts";
 import type { ChartPoint } from "./chart-types";
 
-export default function CpmClicksChart({ data }: { data: ChartPoint[] }) {
+const CpmClicksChart = React.memo(function CpmClicksChart({ data }: { data: ChartPoint[] }) {
   return (
     <ResponsiveContainer width="100%" height="100%">
       <ComposedChart data={data}>
@@ -55,4 +56,5 @@ export default function CpmClicksChart({ data }: { data: ChartPoint[] }) {
       </ComposedChart>
     </ResponsiveContainer>
   );
-}
+});
+export default CpmClicksChart;

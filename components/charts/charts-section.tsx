@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { TimeSeriesResponse, GA4DataResponse } from "@/types/api";
 import type { ChartTab } from "./chart-types";
 import { chartTabs } from "./chart-types";
@@ -16,11 +16,11 @@ export default function ChartsSection({ data, ga4Data }: { data: TimeSeriesRespo
   const [tab, setTab] = useState<ChartTab>("receita");
 
   // Formatar datas para exibição (dd/mm)
-  const chartData = data.series.map((p) => ({
+  const chartData = useMemo(() => data.series.map((p) => ({
     ...p,
     label: `${p.date.slice(8, 10)}/${p.date.slice(5, 7)}`,
     cpm: p.impressions > 0 ? Math.round((p.cost / p.impressions) * 1000 * 100) / 100 : 0,
-  }));
+  })), [data]);
 
   return (
     <section className="rounded-xl border bg-white p-4">

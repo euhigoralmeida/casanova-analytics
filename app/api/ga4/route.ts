@@ -47,6 +47,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (err) {
     console.error("GA4 API error:", err);
-    return NextResponse.json({ source: "error", error: String(err) }, { status: 500 });
+    return NextResponse.json({ source: "error", error: "Erro interno ao buscar dados GA4" }, { status: 500 });
   }
 }

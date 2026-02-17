@@ -1,14 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifySessionToken, SESSION_COOKIE } from "@/lib/auth";
+import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { PLANNING_INPUT_METRICS, PLANNING_TARGET_INPUT_METRICS } from "@/types/api";
 import type { PlanningYearData } from "@/types/api";
-
-function getSession(req: NextRequest) {
-  const token = req.cookies.get(SESSION_COOKIE)?.value;
-  if (!token) return null;
-  return verifySessionToken(token);
-}
 
 /** Build response from DB rows, including source info */
 function buildResponse(rows: { month: number; metric: string; value: number; source: string }[]) {

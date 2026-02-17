@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -25,7 +26,7 @@ interface DeviceChartProps {
   data: DeviceSlice[];
 }
 
-export default function DeviceChart({ data }: DeviceChartProps) {
+const DeviceChart = React.memo(function DeviceChart({ data }: DeviceChartProps) {
   const chartData = data
     .filter((d) => d.revenue > 0 || d.costBRL > 0)
     .map((d) => ({
@@ -62,4 +63,5 @@ export default function DeviceChart({ data }: DeviceChartProps) {
       </BarChart>
     </ResponsiveContainer>
   );
-}
+});
+export default DeviceChart;

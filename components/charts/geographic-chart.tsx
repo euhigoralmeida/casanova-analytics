@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -17,7 +18,7 @@ interface GeographicChartProps {
   maxRegions?: number;
 }
 
-export default function GeographicChart({ data, maxRegions = 10 }: GeographicChartProps) {
+const GeographicChart = React.memo(function GeographicChart({ data, maxRegions = 10 }: GeographicChartProps) {
   const chartData = data
     .filter((d) => d.revenue > 0 || (d.sessions ?? 0) > 0)
     .slice(0, maxRegions)
@@ -56,4 +57,5 @@ export default function GeographicChart({ data, maxRegions = 10 }: GeographicCha
       </BarChart>
     </ResponsiveContainer>
   );
-}
+});
+export default GeographicChart;

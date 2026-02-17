@@ -1,5 +1,6 @@
 "use client";
 
+import React from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -33,7 +34,7 @@ interface DemographicChartProps {
   view: "age" | "gender";
 }
 
-export default function DemographicChart({ data, view }: DemographicChartProps) {
+const DemographicChart = React.memo(function DemographicChart({ data, view }: DemographicChartProps) {
   const filtered = data
     .filter((d) => d.type === view && d.segment !== "AGE_RANGE_UNDETERMINED" && d.segment !== "UNDETERMINED")
     .filter((d) => (d.sessions ?? 0) > 0 || d.revenue > 0);
@@ -65,4 +66,5 @@ export default function DemographicChart({ data, view }: DemographicChartProps) 
       </BarChart>
     </ResponsiveContainer>
   );
-}
+});
+export default DemographicChart;

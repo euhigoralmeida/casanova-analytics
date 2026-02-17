@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { Save, Plus, Trash2, Package, RefreshCw } from "lucide-react";
+import { Save, Plus, Trash2, Package, RefreshCw, Download } from "lucide-react";
+import { exportToCSV } from "@/lib/export-csv";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 
 type SkuRow = {
   sku: string;
@@ -19,6 +21,7 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [removeConfirm, setRemoveConfirm] = useState<{ index: number; sku: string } | null>(null);
 
   const loadSkus = useCallback(async () => {
     setLoading(true);
@@ -60,14 +63,20 @@ export default function SettingsPage() {
     if (sku.isNew) {
       setSkus((prev) => prev.filter((_, i) => i !== index));
     } else {
-      if (!confirm(`Remover SKU "${sku.sku}"?`)) return;
-      fetch(`/api/settings/sku-master?sku=${encodeURIComponent(sku.sku)}`, { method: "DELETE" })
-        .then(() => {
-          setSkus((prev) => prev.filter((_, i) => i !== index));
-          setMessage({ type: "success", text: `SKU "${sku.sku}" removido` });
-        })
-        .catch(() => setMessage({ type: "error", text: "Erro ao remover" }));
+      setRemoveConfirm({ index, sku: sku.sku });
     }
+  }
+
+  function confirmRemoveSku() {
+    if (!removeConfirm) return;
+    const { index, sku } = removeConfirm;
+    fetch(`/api/settings/sku-master?sku=${encodeURIComponent(sku)}`, { method: "DELETE" })
+      .then(() => {
+        setSkus((prev) => prev.filter((_, i) => i !== index));
+        setMessage({ type: "success", text: `SKU "${sku}" removido` });
+      })
+      .catch(() => setMessage({ type: "error", text: "Erro ao remover" }));
+    setRemoveConfirm(null);
   }
 
   async function saveAll() {
@@ -151,17 +160,43 @@ export default function SettingsPage() {
               {skus.length} SKU{skus.length !== 1 ? "s" : ""}
             </span>
           </div>
-          <button
-            onClick={addSku}
-            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            Adicionar SKU
-          </button>
+          <div className="flex items-center gap-2">
+            {skus.length > 0 && (
+              <button
+                onClick={() => exportToCSV(skus, [
+                  { key: "sku", label: "SKU" }, { key: "nome", label: "Nome" },
+                  { key: "marginPct", label: "Margem %" }, { key: "stock", label: "Estoque" },
+                  { key: "costOfGoods", label: "Custo Unitário" }, { key: "category", label: "Categoria" },
+                ], "sku-master.csv")}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs text-zinc-600 hover:bg-white"
+                title="Exportar CSV"
+              >
+                <Download size={12} /> CSV
+              </button>
+            )}
+            <button
+              onClick={addSku}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-700 bg-blue-50 rounded-lg hover:bg-blue-100"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Adicionar SKU
+            </button>
+          </div>
         </div>
 
         {loading ? (
-          <div className="p-8 text-center text-sm text-zinc-400">Carregando...</div>
+          <div className="p-5 space-y-3 animate-pulse">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="flex gap-3">
+                <div className="h-8 w-32 bg-zinc-100 rounded" />
+                <div className="h-8 flex-1 bg-zinc-100 rounded" />
+                <div className="h-8 w-16 bg-zinc-100 rounded" />
+                <div className="h-8 w-16 bg-zinc-100 rounded" />
+                <div className="h-8 w-20 bg-zinc-100 rounded" />
+                <div className="h-8 w-24 bg-zinc-100 rounded" />
+              </div>
+            ))}
+          </div>
         ) : skus.length === 0 ? (
           <div className="p-8 text-center">
             <p className="text-sm text-zinc-500 mb-3">Nenhum SKU cadastrado</p>
@@ -276,6 +311,16 @@ export default function SettingsPage() {
           <li>O status de cada SKU (Escalar/Manter/Pausar) é calculado automaticamente com base em ROAS, CPA, margem e estoque.</li>
         </ul>
       </div>
+
+      <ConfirmDialog
+        open={removeConfirm !== null}
+        title="Remover SKU"
+        message={`Tem certeza que deseja remover o SKU "${removeConfirm?.sku}"? Esta ação não pode ser desfeita.`}
+        confirmLabel="Remover"
+        cancelLabel="Cancelar"
+        onConfirm={confirmRemoveSku}
+        onCancel={() => setRemoveConfirm(null)}
+      />
     </div>
   );
 }
