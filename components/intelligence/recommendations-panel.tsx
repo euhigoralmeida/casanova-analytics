@@ -5,6 +5,7 @@ import { Check, X } from "lucide-react";
 
 interface RecommendationsPanelProps {
   insights: IntelligenceInsight[];
+  quickWins?: IntelligenceInsight[];
   onFollow?: (insightId: string, action: string) => void;
   onDismiss?: (insightId: string, action: string) => void;
 }
@@ -33,24 +34,44 @@ const EFFORT_LABEL: Record<string, string> = {
   high: "Complexo",
 };
 
-export function RecommendationsPanel({ insights, onFollow, onDismiss }: RecommendationsPanelProps) {
+export function RecommendationsPanel({ insights, quickWins, onFollow, onDismiss }: RecommendationsPanelProps) {
   const allRecs: FlatRec[] = [];
+  const seenActions = new Set<string>();
+
+  // Merge quickWins first (they are quick / high priority)
+  if (quickWins) {
+    for (const qw of quickWins) {
+      for (const rec of qw.recommendations) {
+        const key = rec.action.toLowerCase().trim();
+        if (!seenActions.has(key)) {
+          seenActions.add(key);
+          allRecs.push({ insightId: qw.id, severity: qw.severity, rec });
+        }
+      }
+    }
+  }
+
+  // Then insight recommendations
   for (const insight of insights) {
     for (const rec of insight.recommendations) {
-      allRecs.push({ insightId: insight.id, severity: insight.severity, rec });
+      const key = rec.action.toLowerCase().trim();
+      if (!seenActions.has(key)) {
+        seenActions.add(key);
+        allRecs.push({ insightId: insight.id, severity: insight.severity, rec });
+      }
     }
   }
 
   // Sort: high impact + low effort first
-  const impactOrder = { high: 0, medium: 1, low: 2 };
-  const effortOrder = { low: 0, medium: 1, high: 2 };
+  const impactOrder: Record<string, number> = { high: 0, medium: 1, low: 2 };
+  const effortOrder: Record<string, number> = { low: 0, medium: 1, high: 2 };
   allRecs.sort((a, b) => {
     const aScore = (impactOrder[a.rec.impact] ?? 1) + (effortOrder[a.rec.effort] ?? 1);
     const bScore = (impactOrder[b.rec.impact] ?? 1) + (effortOrder[b.rec.effort] ?? 1);
     return aScore - bScore;
   });
 
-  const topRecs = allRecs.slice(0, 6);
+  const topRecs = allRecs.slice(0, 5);
   if (topRecs.length === 0) return null;
 
   return (

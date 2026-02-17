@@ -11,6 +11,7 @@ interface SegmentationSummaryProps {
     demographics: DemographicSlice[];
     geographic: GeographicSlice[];
   };
+  compact?: boolean;
 }
 
 const DEVICE_ICONS: Record<string, React.ReactNode> = {
@@ -55,7 +56,7 @@ function roasColor(roas: number): string {
   return "text-red-600";
 }
 
-export function SegmentationSummary({ segmentation }: SegmentationSummaryProps) {
+export function SegmentationSummary({ segmentation, compact }: SegmentationSummaryProps) {
   const { devices, demographics, geographic } = segmentation;
   const hasDevices = devices.length > 0;
   const hasDemographics = demographics.length > 0;
@@ -90,7 +91,7 @@ export function SegmentationSummary({ segmentation }: SegmentationSummaryProps) 
         </Link>
       </div>
 
-      <div className="grid gap-3 grid-cols-1 md:grid-cols-3">
+      <div className={`grid gap-3 ${compact ? "grid-cols-1" : "grid-cols-1 md:grid-cols-3"}`}>
         {/* Device Card */}
         {hasDevices && (
           <div className="rounded-2xl border border-zinc-200 bg-white p-4">

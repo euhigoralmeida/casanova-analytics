@@ -1,25 +1,22 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { DateRange, OverviewResponse, SmartAlertsResponse, TimeSeriesResponse, GA4DataResponse } from "@/types/api";
 import { useDateRange } from "@/hooks/use-date-range";
 import type { IntelligenceResponse } from "@/lib/intelligence/types";
 import type { CognitiveResponse } from "@/lib/intelligence/communication/types";
-import { defaultRange, smartAlertStyles, categoryLabels } from "@/lib/constants";
+import { defaultRange, smartAlertStyles } from "@/lib/constants";
 import { formatBRL, fmtDate } from "@/lib/format";
-import { generateInsights } from "@/lib/insights-engine";
 import DateRangePicker from "@/components/ui/date-range-picker";
-import ProgressBar from "@/components/ui/progress-bar";
 import ChartsSection from "@/components/charts/charts-section";
 import Kpi from "@/components/ui/kpi-card";
 import { KpiSkeleton, AlertsSkeleton, ChartSkeleton } from "@/components/ui/skeleton";
 import { ExecutiveSummary } from "@/components/intelligence/executive-summary";
-import { InsightsGrid } from "@/components/intelligence/insights-grid";
 import { RecommendationsPanel } from "@/components/intelligence/recommendations-panel";
 import { BudgetPlanCard } from "@/components/intelligence/budget-plan-card";
 import { SegmentationSummary } from "@/components/intelligence/segmentation-summary";
-import AiInsights from "@/components/intelligence/ai-insights";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, ChevronRight } from "lucide-react";
+import Link from "next/link";
 
 export default function VisaoGeralPage() {
   const { dateRange, setDateRange, buildParams } = useDateRange();
@@ -30,7 +27,6 @@ export default function VisaoGeralPage() {
   const [intelligence, setIntelligence] = useState<IntelligenceResponse & Partial<CognitiveResponse> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [alertsCollapsed, setAlertsCollapsed] = useState(false);
 
   const loadData = useCallback(async (range: DateRange) => {
     setLoading(true);
@@ -69,11 +65,6 @@ export default function VisaoGeralPage() {
     loadData(range);
   }
 
-  const insights = useMemo(
-    () => generateInsights(overview, smartAlerts, ga4Data),
-    [overview, smartAlerts, ga4Data]
-  );
-
   const handleFollowAction = useCallback(async (insightId: string, action: string) => {
     try {
       await fetch("/api/intelligence", {
@@ -95,12 +86,20 @@ export default function VisaoGeralPage() {
   }, []);
 
   const acct = overview?.accountTotals;
-  const roasColor = overview ? (overview.meta.roasActual >= overview.meta.roasTarget ? "text-emerald-600" : overview.meta.roasActual >= overview.meta.roasTarget * 0.7 ? "text-amber-600" : "text-red-600") : undefined;
+  const roasColor = overview
+    ? (overview.meta.roasActual >= overview.meta.roasTarget ? "text-emerald-600" : overview.meta.roasActual >= overview.meta.roasTarget * 0.7 ? "text-amber-600" : "text-red-600")
+    : undefined;
+
+  // Top 5 alerts sorted by severity
+  const severityOrder: Record<string, number> = { danger: 0, warn: 1, info: 2, success: 3 };
+  const topAlerts = smartAlerts
+    ? [...smartAlerts.alerts].sort((a, b) => (severityOrder[a.severity] ?? 2) - (severityOrder[b.severity] ?? 2)).slice(0, 5)
+    : [];
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6 space-y-6">
 
-      {/* ─── TOP BAR: Período + Status ─── */}
+      {/* ─── ROW 1: Header — título + date picker + refresh ─── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-zinc-900">Visão Geral</h1>
@@ -150,28 +149,41 @@ export default function VisaoGeralPage() {
         </>
       )}
 
-      {/* ─── KPIs (Google Ads) ─── */}
+      {/* ─── ROW 2: 5 KPI Cards com progress bar embutido ─── */}
       {overview && acct && !loading && (
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
           <Kpi
             title="Receita"
             value={formatBRL(acct.revenue)}
             subtitle={`${(Math.round(acct.conversions * 100) / 100).toLocaleString("pt-BR")} conversões`}
+            progress={
+              overview.meta.revenueCaptadaTarget
+                ? { actual: acct.revenue, target: overview.meta.revenueCaptadaTarget, format: (v) => formatBRL(v) }
+                : overview.meta.revenueTarget > 0
+                  ? { actual: acct.revenue, target: overview.meta.revenueTarget, format: (v) => formatBRL(v) }
+                  : undefined
+            }
           />
           <Kpi
             title="Investimento"
             value={formatBRL(acct.ads)}
             subtitle={`${acct.clicks.toLocaleString("pt-BR")} cliques`}
+            progress={
+              overview.meta.adsTarget
+                ? { actual: overview.meta.adsActual ?? acct.ads, target: overview.meta.adsTarget, format: (v) => formatBRL(v) }
+                : undefined
+            }
           />
           <Kpi
             title="ROAS"
             value={overview.meta.roasActual.toFixed(1)}
             subtitle={`Meta: ${overview.meta.roasTarget.toFixed(1)}`}
             color={roasColor}
+            progress={{ actual: overview.meta.roasActual, target: overview.meta.roasTarget, format: (v) => v.toFixed(1) }}
           />
           <Kpi
-            title="Impressões"
-            value={acct.impressions.toLocaleString("pt-BR")}
+            title="Conversões"
+            value={(Math.round(acct.conversions * 100) / 100).toLocaleString("pt-BR")}
             subtitle={`CTR: ${acct.impressions > 0 ? ((acct.clicks / acct.impressions) * 100).toFixed(2) : 0}%`}
           />
           <Kpi
@@ -179,11 +191,12 @@ export default function VisaoGeralPage() {
             value={`${overview.meta.marginActual}%`}
             subtitle={`Meta: ${overview.meta.marginTarget}%`}
             color={overview.meta.marginActual >= overview.meta.marginTarget ? "text-emerald-600" : "text-amber-600"}
+            progress={{ actual: overview.meta.marginActual, target: overview.meta.marginTarget, format: (v) => `${v}%` }}
           />
         </div>
       )}
 
-      {/* ─── INTELIGÊNCIA: Executive Summary ─── */}
+      {/* ─── ROW 3: Executive Summary consolidado ─── */}
       {intelligence && !loading && (
         <ExecutiveSummary
           summary={intelligence.summary}
@@ -195,51 +208,26 @@ export default function VisaoGeralPage() {
         />
       )}
 
-      {/* ─── PROGRESSO vs PLANEJAMENTO + RECOMENDAÇÕES ─── */}
+      {/* Legacy fallback when no intelligence */}
+      {!intelligence && overview && !loading && (
+        <div className="rounded-2xl border border-zinc-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-5">
+          <h2 className="font-semibold text-sm text-indigo-900 mb-2">Resumo</h2>
+          <p className="text-sm text-zinc-600">
+            {overview.meta.roasActual >= overview.meta.roasTarget
+              ? `ROAS ${overview.meta.roasActual.toFixed(1)} acima da meta (${overview.meta.roasTarget.toFixed(1)}). Operação saudável.`
+              : `ROAS ${overview.meta.roasActual.toFixed(1)} abaixo da meta (${overview.meta.roasTarget.toFixed(1)}). Atenção necessária.`}
+          </p>
+        </div>
+      )}
+
+      {/* ─── ROW 4: Recomendações (7fr) + Alertas top 5 (5fr) ─── */}
       {overview && !loading && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_1fr]">
-          {/* Progress Bars */}
-          <div className="rounded-2xl border border-zinc-200 bg-white p-5 space-y-5">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-zinc-800">Progresso vs Planejamento 2026</h2>
-              <span className="text-[10px] text-zinc-400 px-2 py-0.5 rounded-full bg-zinc-100">Mensal</span>
-            </div>
-
-            {overview.meta.revenueCaptadaTarget ? (
-              <>
-                <ProgressBar
-                  label="Receita Captada"
-                  actual={overview.meta.revenueActual}
-                  target={overview.meta.revenueCaptadaTarget}
-                  format={(v) => formatBRL(v)}
-                />
-                {overview.meta.approvalRate ? (
-                  <ProgressBar
-                    label="Receita Faturada"
-                    sublabel={`est. ${(overview.meta.approvalRate * 100).toFixed(0)}% aprov.`}
-                    actual={Math.round(overview.meta.revenueActual * overview.meta.approvalRate * 100) / 100}
-                    target={overview.meta.revenueTarget}
-                    format={(v) => formatBRL(v)}
-                  />
-                ) : (
-                  <ProgressBar label="Receita Faturada" actual={overview.meta.revenueActual} target={overview.meta.revenueTarget} format={(v) => formatBRL(v)} />
-                )}
-              </>
-            ) : (
-              <ProgressBar label="Faturamento" actual={overview.meta.revenueActual} target={overview.meta.revenueTarget} format={(v) => formatBRL(v)} />
-            )}
-
-            {overview.meta.adsTarget ? (
-              <ProgressBar label="Investimento Ads" actual={overview.meta.adsActual ?? 0} target={overview.meta.adsTarget} format={(v) => formatBRL(v)} />
-            ) : null}
-            <ProgressBar label="ROAS Captado" actual={overview.meta.roasActual} target={overview.meta.roasTarget} format={(v) => v.toFixed(1)} />
-            <ProgressBar label="Margem Média" actual={overview.meta.marginActual} target={overview.meta.marginTarget} format={(v) => `${v}%`} />
-          </div>
-
+        <div className="grid gap-6 lg:grid-cols-[7fr_5fr]">
           {/* Recommendations */}
           {intelligence ? (
             <RecommendationsPanel
               insights={intelligence.insights}
+              quickWins={intelligence.summary.quickWins}
               onFollow={handleFollowAction}
               onDismiss={handleDismissAction}
             />
@@ -249,123 +237,67 @@ export default function VisaoGeralPage() {
               <p className="text-sm text-zinc-400">Carregando análise inteligente...</p>
             </div>
           )}
-        </div>
-      )}
 
-      {/* ─── INSIGHTS DETALHADOS ─── */}
-      {intelligence && intelligence.insights.length > 0 && !loading && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-zinc-800">
-            Insights Detalhados
-            <span className="ml-2 text-zinc-400 font-normal">({intelligence.insights.length})</span>
-          </h2>
-          <InsightsGrid
-            insights={intelligence.insights}
-            onFollowAction={handleFollowAction}
-          />
-        </div>
-      )}
-
-      {/* ─── AI INSIGHTS ─── */}
-      {!loading && (
-        <AiInsights startDate={dateRange.startDate} endDate={dateRange.endDate} />
-      )}
-
-      {/* ─── SEGMENTAÇÃO ─── */}
-      {intelligence?.segmentation && !loading && (
-        <SegmentationSummary segmentation={intelligence.segmentation} />
-      )}
-
-      {/* ─── BUDGET OPTIMIZATION ─── */}
-      {intelligence?.budgetPlan && !loading && (
-        <BudgetPlanCard plan={intelligence.budgetPlan} />
-      )}
-
-      {/* ─── RESUMO EXECUTIVO LEGADO ─── */}
-      {!intelligence && insights.length > 0 && !loading && (
-        <div className="rounded-2xl border bg-gradient-to-r from-blue-50 to-indigo-50 p-5">
-          <h2 className="font-semibold text-sm text-indigo-900 mb-3">Resumo Executivo</h2>
-          <div className="space-y-2">
-            {insights.map((insight, i) => (
-              <p key={i} className="text-sm text-zinc-700 flex items-start gap-2">
-                <span className="mt-0.5 flex-shrink-0">
-                  {insight.type === "positive" ? "✅" : insight.type === "negative" ? "⚠️" : "ℹ️"}
-                </span>
-                {insight.text}
-              </p>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ─── ALERTAS INTELIGENTES ─── */}
-      {smartAlerts && smartAlerts.alerts.length > 0 && !loading && (
-        <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden">
-          <div className="flex items-center justify-between px-5 py-3 bg-zinc-50 border-b border-zinc-100">
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h2 className="text-sm font-semibold text-zinc-800">Alertas</h2>
-              {smartAlerts.summary.danger > 0 && (
+          {/* Compact Alerts — top 5 */}
+          <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden">
+            <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-100 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-zinc-800">Alertas</h3>
+              {smartAlerts && smartAlerts.summary.danger > 0 && (
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
                   {smartAlerts.summary.danger} crítico{smartAlerts.summary.danger > 1 ? "s" : ""}
                 </span>
               )}
-              {smartAlerts.summary.warn > 0 && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-semibold">
-                  {smartAlerts.summary.warn} aviso{smartAlerts.summary.warn > 1 ? "s" : ""}
-                </span>
-              )}
-              {smartAlerts.summary.success > 0 && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-semibold">
-                  {smartAlerts.summary.success} positivo{smartAlerts.summary.success > 1 ? "s" : ""}
-                </span>
-              )}
             </div>
-            <div className="flex items-center gap-3 text-xs">
-              <span className="text-zinc-400">vs {smartAlerts.previousPeriod.start.split("-").reverse().join("/")} — {smartAlerts.previousPeriod.end.split("-").reverse().join("/")}</span>
-              <button onClick={() => setAlertsCollapsed((c) => !c)} className="text-zinc-500 hover:text-zinc-700 font-medium">
-                {alertsCollapsed ? "Expandir" : "Recolher"}
-              </button>
-            </div>
-          </div>
-          {!alertsCollapsed && (
-            <div className="divide-y divide-zinc-50">
-              {smartAlerts.alerts.map((alert) => {
-                const sc = smartAlertStyles[alert.severity];
-                return (
-                  <div key={alert.id} className={`px-5 py-3 ${sc.bg}`}>
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="flex items-start gap-2.5 min-w-0">
-                        <span className="mt-0.5 flex-shrink-0">{sc.icon}</span>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`font-medium text-sm ${sc.text}`}>{alert.title}</span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-zinc-100 text-zinc-500 font-medium">
-                              {categoryLabels[alert.category]}
-                            </span>
-                          </div>
-                          <p className="text-xs text-zinc-500 mt-0.5">{alert.description}</p>
-                          {alert.recommendation && (
-                            <p className="text-xs mt-1 font-medium text-zinc-600">Recomendação: {alert.recommendation}</p>
-                          )}
-                        </div>
-                      </div>
+            {topAlerts.length > 0 ? (
+              <div className="divide-y divide-zinc-50">
+                {topAlerts.map((alert) => {
+                  const sc = smartAlertStyles[alert.severity];
+                  return (
+                    <div key={alert.id} className="flex items-center gap-2.5 px-5 py-2.5">
+                      <span className="flex-shrink-0 text-sm">{sc.icon}</span>
+                      <span className={`text-sm font-medium truncate flex-1 ${sc.text}`}>
+                        {alert.title}
+                      </span>
                       {alert.deltaPct !== 0 && (
-                        <span className={`flex-shrink-0 text-xs font-mono px-2.5 py-1 rounded-lg ${alert.deltaPct < 0 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
+                        <span className={`flex-shrink-0 text-[11px] font-mono px-2 py-0.5 rounded-md ${alert.deltaPct < 0 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
                           {alert.deltaPct < 0 ? "↓" : "↑"} {Math.abs(alert.deltaPct)}%
                         </span>
                       )}
                     </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="px-5 py-4">
+                <p className="text-sm text-zinc-400">Nenhum alerta no período</p>
+              </div>
+            )}
+            {smartAlerts && smartAlerts.alerts.length > 5 && (
+              <div className="px-5 py-2.5 border-t border-zinc-100">
+                <Link href="/alerts" className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-0.5">
+                  Ver todos os {smartAlerts.alerts.length} alertas <ChevronRight className="h-3 w-3" />
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
-      {/* ─── GRÁFICOS ─── */}
+      {/* ─── ROW 5: Gráficos (7 abas) ─── */}
       {timeseries && timeseries.series.length > 1 && !loading && (
         <ChartsSection data={timeseries} ga4Data={ga4Data} />
+      )}
+
+      {/* ─── ROW 6: Segmentação + Budget lado a lado ─── */}
+      {(intelligence?.segmentation || intelligence?.budgetPlan) && !loading && (
+        <div className="grid gap-6 lg:grid-cols-2">
+          {intelligence.segmentation && (
+            <SegmentationSummary segmentation={intelligence.segmentation} compact />
+          )}
+          {intelligence.budgetPlan && (
+            <BudgetPlanCard plan={intelligence.budgetPlan} />
+          )}
+        </div>
       )}
     </div>
   );
