@@ -554,6 +554,46 @@ function resolveDevice(raw: unknown): string {
 }
 
 /* =========================
+   Enum maps: gender
+========================= */
+
+const GENDER_MAP: Record<number, string> = {
+  0: "UNSPECIFIED",
+  1: "UNKNOWN",
+  10: "MALE",
+  11: "FEMALE",
+  20: "UNDETERMINED",
+};
+
+function resolveGender(raw: unknown): string {
+  if (typeof raw === "number") return GENDER_MAP[raw] ?? "UNDETERMINED";
+  if (typeof raw === "string") return raw;
+  return "UNDETERMINED";
+}
+
+/* =========================
+   Enum maps: age range
+========================= */
+
+const AGE_RANGE_MAP: Record<number, string> = {
+  0: "UNSPECIFIED",
+  1: "UNKNOWN",
+  503001: "AGE_RANGE_18_24",
+  503002: "AGE_RANGE_25_34",
+  503003: "AGE_RANGE_35_44",
+  503004: "AGE_RANGE_45_54",
+  503005: "AGE_RANGE_55_64",
+  503006: "AGE_RANGE_65_UP",
+  503999: "AGE_RANGE_UNDETERMINED",
+};
+
+function resolveAgeRange(raw: unknown): string {
+  if (typeof raw === "number") return AGE_RANGE_MAP[raw] ?? "AGE_RANGE_UNDETERMINED";
+  if (typeof raw === "string") return raw;
+  return "AGE_RANGE_UNDETERMINED";
+}
+
+/* =========================
    Query: métricas por dispositivo
 ========================= */
 
@@ -657,7 +697,7 @@ export async function fetchDemographicMetrics(
   const ageMap = new Map<string, DemographicMetrics>();
   for (const row of ageRows) {
     const r = row as Record<string, Record<string, Record<string, unknown>>>;
-    const segment = String(r.ad_group_criterion?.age_range?.type ?? "UNKNOWN");
+    const segment = resolveAgeRange(r.ad_group_criterion?.age_range?.type);
     const existing = ageMap.get(segment) ?? {
       segment,
       type: "age" as const,
@@ -676,7 +716,7 @@ export async function fetchDemographicMetrics(
   const genderMap = new Map<string, DemographicMetrics>();
   for (const row of genderRows) {
     const r = row as Record<string, Record<string, Record<string, unknown>>>;
-    const segment = String(r.ad_group_criterion?.gender?.type ?? "UNKNOWN");
+    const segment = resolveGender(r.ad_group_criterion?.gender?.type);
     const existing = genderMap.get(segment) ?? {
       segment,
       type: "gender" as const,
