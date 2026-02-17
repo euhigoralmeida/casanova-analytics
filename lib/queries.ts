@@ -567,7 +567,12 @@ const GENDER_MAP: Record<number, string> = {
 
 function resolveGender(raw: unknown): string {
   if (typeof raw === "number") return GENDER_MAP[raw] ?? "UNDETERMINED";
-  if (typeof raw === "string") return raw;
+  if (typeof raw === "string") {
+    if (raw === "MALE" || raw === "FEMALE" || raw === "UNDETERMINED") return raw;
+    const n = parseInt(raw, 10);
+    if (!isNaN(n) && GENDER_MAP[n]) return GENDER_MAP[n];
+    return raw;
+  }
   return "UNDETERMINED";
 }
 
@@ -576,8 +581,8 @@ function resolveGender(raw: unknown): string {
 ========================= */
 
 const AGE_RANGE_MAP: Record<number, string> = {
-  0: "UNSPECIFIED",
-  1: "UNKNOWN",
+  0: "AGE_RANGE_UNDETERMINED",
+  1: "AGE_RANGE_UNDETERMINED",
   503001: "AGE_RANGE_18_24",
   503002: "AGE_RANGE_25_34",
   503003: "AGE_RANGE_35_44",
@@ -585,11 +590,25 @@ const AGE_RANGE_MAP: Record<number, string> = {
   503005: "AGE_RANGE_55_64",
   503006: "AGE_RANGE_65_UP",
   503999: "AGE_RANGE_UNDETERMINED",
+  // Alternative enum values (v14+)
+  2: "AGE_RANGE_18_24",
+  3: "AGE_RANGE_25_34",
+  4: "AGE_RANGE_35_44",
+  5: "AGE_RANGE_45_54",
+  6: "AGE_RANGE_55_64",
+  7: "AGE_RANGE_65_UP",
 };
 
 function resolveAgeRange(raw: unknown): string {
   if (typeof raw === "number") return AGE_RANGE_MAP[raw] ?? "AGE_RANGE_UNDETERMINED";
-  if (typeof raw === "string") return raw;
+  if (typeof raw === "string") {
+    // Already a valid string enum
+    if (raw.startsWith("AGE_RANGE_")) return raw;
+    // Try parsing as number
+    const n = parseInt(raw, 10);
+    if (!isNaN(n) && AGE_RANGE_MAP[n]) return AGE_RANGE_MAP[n];
+    return raw;
+  }
   return "AGE_RANGE_UNDETERMINED";
 }
 
@@ -754,6 +773,8 @@ export async function fetchGeographicMetrics(
   const rows = await customer.query(`
     SELECT
       segments.geo_target_region,
+      geo_target_constant.name,
+      geo_target_constant.canonical_name,
       metrics.impressions,
       metrics.clicks,
       metrics.cost_micros,
@@ -767,8 +788,12 @@ export async function fetchGeographicMetrics(
   const map = new Map<string, GeographicMetrics>();
 
   for (const row of rows) {
-    const r = row as Record<string, Record<string, unknown>>;
-    const region = String(r.segments?.geo_target_region ?? "Desconhecido");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const r = row as any;
+    // Prefer geo_target_constant.name, fall back to canonical_name, then resource name
+    const rawRegion = String(r.segments?.geo_target_region ?? "Desconhecido");
+    const geoName = r.geo_target_constant?.name ?? r.geo_target_constant?.canonical_name ?? null;
+    const region = geoName ? String(geoName) : rawRegion.replace(/^geoTargetConstants\//, "Região ");
     const existing = map.get(region) ?? {
       region,
       impressions: 0,
