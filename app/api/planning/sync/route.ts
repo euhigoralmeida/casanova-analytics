@@ -6,17 +6,6 @@ import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
 import { fetchAccountTotals } from "@/lib/queries";
 import { fetchGA4Summary, fetchChannelAcquisition } from "@/lib/ga4-queries";
 
-/** Metrics we auto-sync from platforms (gray rows) */
-const SYNC_METRICS = [
-  "google_ads",
-  "usuarios_visitantes",
-  "sessoes_totais",
-  "sessoes_midia",
-  "sessoes_organicas",
-  "sessoes_engajadas",
-  "taxa_rejeicao",
-] as const;
-
 function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
 }

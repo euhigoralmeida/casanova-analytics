@@ -13,23 +13,6 @@ function safeDiv(num: number | undefined, den: number | undefined): number | nul
   return num / den;
 }
 
-function safeSum(...vals: (number | undefined)[]): number | null {
-  let hasAny = false;
-  let total = 0;
-  for (const v of vals) {
-    if (v != null) {
-      hasAny = true;
-      total += v;
-    }
-  }
-  return hasAny ? total : null;
-}
-
-function safeSub(a: number | undefined, b: number | undefined): number | null {
-  if (a == null) return null;
-  return a - (b ?? 0);
-}
-
 /* =========================
    Row definitions — exact order from the spreadsheet
 ========================= */

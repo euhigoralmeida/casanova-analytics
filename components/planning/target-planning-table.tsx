@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import { PLANNING_TARGET_ROWS, computeTargetFullYear } from "@/lib/planning-target-calc";
 import type { PlanningYearData, MonthlyValues } from "@/types/api";
 import { EditableCell } from "./editable-cell";
-import { CalculatedCell } from "./calculated-cell";
 
 const MONTHS = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 

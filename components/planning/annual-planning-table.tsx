@@ -46,7 +46,7 @@ function formatTotalDisplay(
   }
 }
 
-export function AnnualPlanningTable({ data, sources, onCellChange }: AnnualPlanningTableProps) {
+export function AnnualPlanningTable({ data, sources: _sources, onCellChange }: AnnualPlanningTableProps) {
   const { months, totals } = useMemo(() => computeFullYear(data), [data]);
 
   return (

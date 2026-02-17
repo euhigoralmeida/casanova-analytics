@@ -4,7 +4,7 @@
    e identifica qual constraint tem maior impacto marginal.
 ========================= */
 
-import type { Bottleneck, FinancialImpact } from "../cognitive/types";
+import type { Bottleneck } from "../cognitive/types";
 import type { DataCube } from "../data-layer/types";
 import { formatBRL } from "@/lib/format";
 

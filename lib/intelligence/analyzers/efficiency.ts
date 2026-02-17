@@ -67,7 +67,6 @@ export function analyzeEfficiency(ctx: AnalysisContext, _cube?: DataCube): Cogni
   const highCpaSKUs = skus.filter((s) => s.cpa > 80 && s.ads > 300);
   if (highCpaSKUs.length > 0) {
     const worst = highCpaSKUs.sort((a, b) => b.cpa - a.cpa)[0];
-    const totalHighCpaSpend = highCpaSKUs.reduce((s, sk) => s + sk.ads, 0);
     // Economia se CPA caísse para R$80
     const saving = highCpaSKUs.reduce((s, sk) => s + (sk.cpa - 80) * sk.conversions, 0);
 

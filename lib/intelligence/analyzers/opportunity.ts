@@ -2,7 +2,7 @@ import type { AnalysisContext } from "../types";
 import type { CognitiveFinding } from "../cognitive/types";
 import type { DataCube } from "../data-layer/types";
 import { formatBRL } from "@/lib/format";
-import { quantifyUnderinvestment, ZERO_IMPACT } from "../cognitive/financial-impact";
+import { quantifyUnderinvestment } from "../cognitive/financial-impact";
 
 /**
  * Detecta oportunidades perdidas: SKUs subinvestidos, canais subutilizados.
