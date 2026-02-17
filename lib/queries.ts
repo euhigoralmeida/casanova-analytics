@@ -44,6 +44,7 @@ export async function fetchSkuMetrics(
     FROM shopping_performance_view
     WHERE ${dateClause}
       AND segments.product_item_id = '${sku}'
+      AND campaign.status = 'ENABLED'
   `);
 
   if (!rows.length) return null;
@@ -100,6 +101,7 @@ export async function fetchAllSkuMetrics(
       metrics.conversions_value
     FROM shopping_performance_view
     WHERE ${dateClause}
+      AND campaign.status = 'ENABLED'
     ORDER BY metrics.conversions_value DESC
   `);
 
@@ -167,7 +169,7 @@ export async function fetchAccountTotals(
       metrics.conversions_value
     FROM campaign
     WHERE ${dateClause}
-      AND campaign.status != 'REMOVED'
+      AND campaign.status = 'ENABLED'
   `);
 
   const result: AccountTotals = {
