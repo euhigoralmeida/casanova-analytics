@@ -51,6 +51,7 @@ const DEVICE_COLORS: Record<string, string> = {
 };
 
 function roasColor(roas: number): string {
+  if (roas === 0) return "text-zinc-400";
   if (roas >= 7) return "text-emerald-600";
   if (roas >= 5) return "text-amber-600";
   return "text-red-600";
