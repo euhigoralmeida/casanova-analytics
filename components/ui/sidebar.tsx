@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   LayoutDashboard,
   CalendarDays,
@@ -15,11 +16,14 @@ import {
 } from "lucide-react";
 import Image from "next/image";
 
+type ChildItem = { label: string; href: string; comingSoon?: boolean };
+
 type NavItem = {
   label: string;
   href?: string;
   icon: React.ElementType;
-  children?: { label: string; href: string }[];
+  comingSoon?: boolean;
+  children?: ChildItem[];
 };
 
 const navItems: NavItem[] = [
@@ -30,21 +34,28 @@ const navItems: NavItem[] = [
     icon: Megaphone,
     children: [
       { label: "Google Ads", href: "/acquisition/google" },
-      { label: "Meta Ads", href: "/acquisition/meta" },
+      { label: "Meta Ads", href: "/acquisition/meta", comingSoon: true },
       { label: "Segmentação", href: "/acquisition/segments" },
     ],
   },
-  { label: "Retenção", href: "/retention", icon: Heart },
+  { label: "Retenção", href: "/retention", icon: Heart, comingSoon: true },
   { label: "Funil", href: "/funnel", icon: Filter },
   { label: "Alertas", href: "/alerts", icon: Bell },
   { label: "Configurações", href: "/settings", icon: Settings },
 ];
 
+function ComingSoonBadge() {
+  return (
+    <span className="text-[10px] bg-zinc-200 text-zinc-500 px-1.5 py-0.5 rounded-full leading-none">
+      Em breve
+    </span>
+  );
+}
+
 export default function Sidebar({ tenantName, onClose }: { tenantName?: string; onClose?: () => void }) {
   const pathname = usePathname();
   const router = useRouter();
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>(() => {
-    // Auto-expand parent if current route is a child
     const initial: Record<string, boolean> = {};
     for (const item of navItems) {
       if (item.children?.some((child) => pathname.startsWith(child.href))) {
@@ -56,11 +67,6 @@ export default function Sidebar({ tenantName, onClose }: { tenantName?: string; 
 
   function toggleMenu(label: string) {
     setExpandedMenus((prev) => ({ ...prev, [label]: !prev[label] }));
-  }
-
-  function navigate(href: string) {
-    router.push(href);
-    onClose?.();
   }
 
   async function handleLogout() {
@@ -122,15 +128,23 @@ export default function Sidebar({ tenantName, onClose }: { tenantName?: string; 
                 {expanded && (
                   <div className="ml-4 pl-4 border-l border-zinc-100 space-y-0.5 mt-0.5">
                     {item.children!.map((child) => {
+                      if (child.comingSoon) {
+                        return (
+                          <span
+                            key={child.href}
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-zinc-400 cursor-default"
+                          >
+                            {child.label}
+                            <ComingSoonBadge />
+                          </span>
+                        );
+                      }
                       const childActive = isActive(child.href);
                       return (
-                        <a
+                        <Link
                           key={child.href}
                           href={child.href}
-                          onClick={(e) => {
-                            e.preventDefault();
-                            navigate(child.href);
-                          }}
+                          onClick={() => onClose?.()}
                           className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
                             childActive
                               ? "bg-emerald-50 text-emerald-700 font-medium"
@@ -138,7 +152,7 @@ export default function Sidebar({ tenantName, onClose }: { tenantName?: string; 
                           }`}
                         >
                           {child.label}
-                        </a>
+                        </Link>
                       );
                     })}
                   </div>
@@ -148,15 +162,25 @@ export default function Sidebar({ tenantName, onClose }: { tenantName?: string; 
           }
 
           // Simple item (no children)
+          if (item.comingSoon) {
+            return (
+              <span
+                key={item.href}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-400 cursor-default"
+              >
+                <Icon size={18} strokeWidth={1.8} />
+                {item.label}
+                <ComingSoonBadge />
+              </span>
+            );
+          }
+
           const active = isActive(item.href!);
           return (
-            <a
+            <Link
               key={item.href}
               href={item.href!}
-              onClick={(e) => {
-                e.preventDefault();
-                navigate(item.href!);
-              }}
+              onClick={() => onClose?.()}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                 active
                   ? "bg-emerald-50 text-emerald-700"
@@ -165,7 +189,7 @@ export default function Sidebar({ tenantName, onClose }: { tenantName?: string; 
             >
               <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
               {item.label}
-            </a>
+            </Link>
           );
         })}
       </nav>

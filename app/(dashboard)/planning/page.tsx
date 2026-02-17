@@ -5,6 +5,7 @@ import { Save, Loader2, CheckCircle2, AlertCircle, RefreshCw } from "lucide-reac
 import { YearSelector } from "@/components/planning/year-selector";
 import { AnnualPlanningTable } from "@/components/planning/annual-planning-table";
 import { TargetPlanningTable } from "@/components/planning/target-planning-table";
+import ConfirmDialog from "@/components/ui/confirm-dialog";
 import type { PlanningYearData } from "@/types/api";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
@@ -35,6 +36,7 @@ export default function PlanningPage() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
   const [syncedCount, setSyncedCount] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [showSyncConfirm, setShowSyncConfirm] = useState(false);
 
   // Derived
   const isActual = activeTab === "actual";
@@ -163,14 +165,16 @@ export default function PlanningPage() {
   );
 
   // Sync from platforms (only for actual tab)
-  const handleSync = useCallback(async () => {
+  function requestSync() {
     if (actualDirty) {
-      const confirmed = window.confirm(
-        "Você tem alterações não salvas. A sincronização pode sobrescrever valores sincronizados anteriormente. Deseja continuar?"
-      );
-      if (!confirmed) return;
+      setShowSyncConfirm(true);
+      return;
     }
+    executeSync();
+  }
 
+  const executeSync = useCallback(async () => {
+    setShowSyncConfirm(false);
     setSyncStatus("syncing");
     try {
       const res = await fetch("/api/planning/sync", {
@@ -198,7 +202,7 @@ export default function PlanningPage() {
       setSyncStatus("error");
       setTimeout(() => setSyncStatus("idle"), 5000);
     }
-  }, [year, actualDirty]);
+  }, [year]);
 
   // Save changes
   const handleSave = useCallback(async () => {
@@ -279,7 +283,7 @@ export default function PlanningPage() {
           {/* Sync button (only actual tab) */}
           {isActual && (
             <button
-              onClick={handleSync}
+              onClick={requestSync}
               disabled={syncStatus === "syncing"}
               className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
               title="Puxa dados do Google Ads e GA4 para os meses disponíveis"
@@ -398,6 +402,15 @@ export default function PlanningPage() {
           onCellChange={handleActualCellChange}
         />
       )}
+      <ConfirmDialog
+        open={showSyncConfirm}
+        title="Sincronizar dados"
+        message="Você tem alterações não salvas. A sincronização pode sobrescrever valores sincronizados anteriormente. Deseja continuar?"
+        confirmLabel="Sincronizar"
+        cancelLabel="Cancelar"
+        onConfirm={executeSync}
+        onCancel={() => setShowSyncConfirm(false)}
+      />
     </div>
   );
 }

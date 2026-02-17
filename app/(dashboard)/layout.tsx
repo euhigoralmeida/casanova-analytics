@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/ui/sidebar";
 import Header from "@/components/ui/header";
+import ErrorBoundary from "@/components/ui/error-boundary";
 import AskAnalytics from "@/components/intelligence/ask-analytics";
 import { defaultRange } from "@/lib/constants";
 
@@ -71,7 +72,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <div className="px-6 pt-4">
             <AskAnalytics dateRange={dateRange} />
           </div>
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </main>
       </div>
     </div>

@@ -1,36 +1,87 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Casanova Analytics
 
-## Getting Started
+Dashboard de analytics para e-commerce com dados do Google Ads, GA4 e insights por IA. Interface em portugues brasileiro.
 
-First, run the development server:
+## Tech Stack
+
+- **Next.js 16** (App Router) + **React 19** + **TypeScript**
+- **Tailwind CSS v4**
+- **Google Ads API** (`google-ads-api` / Opteo)
+- **GA4** (`@google-analytics/data`)
+- **Google Gemini** (insights e chat por IA)
+- **Prisma** (planejamento anual)
+- **Vercel** (deploy)
+
+## Setup
 
 ```bash
+# 1. Clonar e instalar
+git clone https://github.com/euhigoralmeida/casanova-analytics.git
+cd casanova-analytics
+npm install
+
+# 2. Configurar variáveis de ambiente
+cp .env.example .env.local
+# Preencher os valores no .env.local
+
+# 3. Rodar em dev
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Acesse [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Login
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| Campo | Valor |
+|-------|-------|
+| Email | `admin@casanova.com` |
+| Senha | `casanova2024` |
 
-## Learn More
+## Scripts
 
-To learn more about Next.js, take a look at the following resources:
+| Comando | Descricao |
+|---------|-----------|
+| `npm run dev` | Servidor de desenvolvimento |
+| `npm run build` | Build de producao |
+| `npm run lint` | ESLint |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Estrutura
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+app/
+  (dashboard)/
+    overview/         # Visao Geral — KPIs, alertas, insights IA
+    planning/         # Planejamento anual (metas vs realizado)
+    acquisition/
+      google/         # Google Ads — SKUs, campanhas, charts
+      meta/           # Meta Ads (em breve)
+      segments/       # Segmentacao (device, demografico, geografico)
+    funnel/           # Funil e-commerce (GA4)
+    alerts/           # Alertas inteligentes
+    retention/        # Retencao (em breve)
+    settings/         # SKU master data
+  api/                # Endpoints REST
+components/
+  ui/                 # Componentes compartilhados
+  charts/             # Graficos (Recharts)
+  intelligence/       # Chat IA e insights
+  planning/           # Tabelas de planejamento
+lib/                  # Google Ads, GA4, auth, alertas, IA
+```
 
-## Deploy on Vercel
+## Variaveis de Ambiente
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Veja `.env.example` para a lista completa. As principais:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `AUTH_SECRET` — Obrigatorio. Secret HMAC para cookies de sessao.
+- `GOOGLE_ADS_*` — Credenciais Google Ads (6 vars).
+- `GA4_*` — Credenciais GA4 service account.
+- `DATABASE_URL` — Postgres (Prisma).
+- `GEMINI_API_KEY` — Google Gemini para insights IA.
+
+## Deploy (Vercel)
+
+1. Importar o repositorio no Vercel
+2. Configurar todas as env vars (ver `.env.example`)
+3. Para GA4: usar `GA4_PRIVATE_KEY_BASE64` (base64 da chave privada) em vez de `GA4_PRIVATE_KEY`
+4. Deploy automatico no push para `main`
