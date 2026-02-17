@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 const SESSION_COOKIE = "ca_session";
 
 // Rotas públicas que não precisam de autenticação
-const publicPaths = ["/login", "/api/auth/login", "/api/auth/logout", "/api/ai-status"];
+const publicPaths = ["/login", "/api/auth/login", "/api/auth/logout"];
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
