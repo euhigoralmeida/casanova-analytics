@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { requireAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 import { isConfigured, getCustomer } from "@/lib/google-ads";
 import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
@@ -28,10 +28,9 @@ function daysInMonth(year: number, month: number): number {
 ========================= */
 export async function GET(req: NextRequest) {
   try {
-  const session = getSession(req);
-  if (!session) {
-    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  }
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
+  const { session } = auth;
 
   const { searchParams } = req.nextUrl;
   const period = searchParams.get("period") ?? "30d";
@@ -292,10 +291,9 @@ export async function GET(req: NextRequest) {
    Body: { insightId, actionType, description }
 ========================= */
 export async function POST(req: NextRequest) {
-  const session = getSession(req);
-  if (!session) {
-    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  }
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
+  const { session } = auth;
 
   const body = await req.json();
   const { insightId, actionType, description } = body as {

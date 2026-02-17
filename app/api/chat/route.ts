@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getSession } from "@/lib/auth";
+import { requireAuth } from "@/lib/api-helpers";
 import { AI_CONFIG } from "@/lib/ai/config";
 import { createGeminiClient, withRetry } from "@/lib/ai/client";
 import { GEMINI_TOOLS } from "@/lib/ai/tools";
@@ -27,13 +27,9 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const session = getSession(req);
-  if (!session) {
-    return new Response(JSON.stringify({ error: "Não autenticado" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
+  const { session } = auth;
 
   if (!AI_CONFIG.enabled) {
     return new Response(JSON.stringify({ error: "IA desabilitada" }), {

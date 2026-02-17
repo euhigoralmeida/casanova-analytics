@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { requireAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 import { PLANNING_INPUT_METRICS, PLANNING_TARGET_INPUT_METRICS } from "@/types/api";
 import type { PlanningYearData } from "@/types/api";
@@ -31,10 +31,9 @@ function getValidMetrics(planType: "actual" | "target"): Set<string> {
    GET /api/planning?year=2026&planType=actual|target
 ========================= */
 export async function GET(req: NextRequest) {
-  const session = getSession(req);
-  if (!session) {
-    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  }
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
+  const { session } = auth;
 
   const year = parseInt(req.nextUrl.searchParams.get("year") ?? String(new Date().getFullYear()));
   if (isNaN(year) || year < 2020 || year > 2040) {
@@ -73,10 +72,9 @@ export async function GET(req: NextRequest) {
    Body: { year, planType?, entries: [{ metric, month, value }] }
 ========================= */
 export async function PUT(req: NextRequest) {
-  const session = getSession(req);
-  if (!session) {
-    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  }
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
+  const { session } = auth;
 
   const body = await req.json();
   const { year, entries, planType: rawPlanType } = body as {

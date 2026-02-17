@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { requireAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 import { isConfigured, getCustomer } from "@/lib/google-ads";
 import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
@@ -102,10 +102,9 @@ async function fetchMonthDataRange(
    Body: { year }
 ========================= */
 export async function POST(req: NextRequest) {
-  const session = getSession(req);
-  if (!session) {
-    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  }
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
+  const { session } = auth;
 
   const body = await req.json();
   const year = body.year as number;

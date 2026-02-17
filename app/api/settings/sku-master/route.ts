@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { requireAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 
 /* =========================
@@ -7,10 +7,9 @@ import { prisma } from "@/lib/db";
    Lista todos os SKUs cadastrados do tenant
 ========================= */
 export async function GET(req: NextRequest) {
-  const session = getSession(req);
-  if (!session) {
-    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  }
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
+  const { session } = auth;
 
   const skus = await prisma.skuMaster.findMany({
     where: { tenantId: session.tenantId },
@@ -26,10 +25,9 @@ export async function GET(req: NextRequest) {
    Body: { skus: [{ sku, nome, marginPct, stock, costOfGoods?, category? }] }
 ========================= */
 export async function PUT(req: NextRequest) {
-  const session = getSession(req);
-  if (!session) {
-    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  }
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
+  const { session } = auth;
 
   const body = await req.json();
   const skuList = body.skus as {
@@ -78,10 +76,9 @@ export async function PUT(req: NextRequest) {
    Remove um SKU
 ========================= */
 export async function DELETE(req: NextRequest) {
-  const session = getSession(req);
-  if (!session) {
-    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  }
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
+  const { session } = auth;
 
   const sku = req.nextUrl.searchParams.get("sku");
   if (!sku) {

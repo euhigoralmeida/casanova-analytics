@@ -32,7 +32,7 @@ export default function SettingsPage() {
         setSkus(data.skus);
       }
     } catch {
-      /* silent */
+      setMessage({ type: "error", text: "Erro ao carregar dados. Tente novamente ou aguarde alguns minutos." });
     } finally {
       setLoading(false);
     }

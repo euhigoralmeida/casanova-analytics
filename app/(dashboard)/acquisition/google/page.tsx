@@ -127,7 +127,7 @@ export default function AquisicaoPage() {
     fetch(`/api/timeseries?${tsParams}`)
       .then((r) => r.json())
       .then((tsJson: TimeSeriesResponse) => setTimeseries(tsJson))
-      .catch(() => {});
+      .catch((err) => console.error("selectCampaign: timeseries fetch error:", err));
   }
 
   function switchToAccountTimeSeries() {
@@ -136,7 +136,7 @@ export default function AquisicaoPage() {
     fetch(`/api/timeseries?${tsParams}`)
       .then((r) => r.json())
       .then((tsJson: TimeSeriesResponse) => setTimeseries(tsJson))
-      .catch(() => {});
+      .catch((err) => console.error("switchToAccountTimeSeries: timeseries fetch error:", err));
   }
 
   function applyDateRange(range: DateRange) {

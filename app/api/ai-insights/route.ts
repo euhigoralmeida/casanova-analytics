@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getSession } from "@/lib/auth";
+import { requireAuth } from "@/lib/api-helpers";
 import { AI_CONFIG } from "@/lib/ai/config";
 import { createGeminiClient, withRetry } from "@/lib/ai/client";
 import { buildContextSummary, buildPeriodContext } from "@/lib/ai/context-builder";
@@ -24,10 +24,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "IA não disponível" }, { status: 503 });
   }
 
-  const session = getSession(req);
-  if (!session) {
-    return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
-  }
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
+  const { session } = auth;
 
   if (!AI_CONFIG.enabled) {
     return NextResponse.json({ error: "IA desabilitada" }, { status: 503 });

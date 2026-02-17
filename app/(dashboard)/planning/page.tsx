@@ -265,6 +265,7 @@ export default function PlanningPage() {
       setTimeout(() => setSaveStatus("idle"), 3000);
     } catch {
       setSaveStatus("error");
+      setTimeout(() => setSaveStatus("idle"), 5000);
     }
   }, [year, isActual]);
 
