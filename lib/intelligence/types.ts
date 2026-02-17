@@ -166,6 +166,8 @@ export type DemographicData = {
   costBRL: number;
   conversions: number;
   revenue: number;
+  sessions?: number;
+  users?: number;
 };
 
 export type GeographicData = {
@@ -175,6 +177,8 @@ export type GeographicData = {
   costBRL: number;
   conversions: number;
   revenue: number;
+  sessions?: number;
+  users?: number;
 };
 
 export type AnalysisContext = {

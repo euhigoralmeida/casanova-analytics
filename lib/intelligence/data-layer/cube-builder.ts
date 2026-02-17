@@ -150,6 +150,8 @@ export function buildDataCube(params: {
     cpa: d.conversions > 0 ? Math.round((d.costBRL / d.conversions) * 100) / 100 : 0,
     ctr: d.impressions > 0 ? Math.round((d.clicks / d.impressions) * 10000) / 100 : 0,
     revenueShare: totalDemoRevenue > 0 ? Math.round((d.revenue / totalDemoRevenue) * 10000) / 100 : 0,
+    sessions: d.sessions,
+    users: d.users,
   }));
 
   // Geographic slices with derived fields
@@ -165,6 +167,8 @@ export function buildDataCube(params: {
     cpa: d.conversions > 0 ? Math.round((d.costBRL / d.conversions) * 100) / 100 : 0,
     ctr: d.impressions > 0 ? Math.round((d.clicks / d.impressions) * 10000) / 100 : 0,
     revenueShare: totalGeoRevenue > 0 ? Math.round((d.revenue / totalGeoRevenue) * 10000) / 100 : 0,
+    sessions: d.sessions,
+    users: d.users,
   }));
 
   return {

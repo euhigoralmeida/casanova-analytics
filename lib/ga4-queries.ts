@@ -309,6 +309,156 @@ export async function fetchGA4FunnelTimeSeries(
    Channel Acquisition Query
 ========================= */
 
+/* =========================
+   Demographics: Age + Gender
+========================= */
+
+export type GA4DemographicRow = {
+  segment: string;
+  type: "age" | "gender";
+  users: number;
+  sessions: number;
+  conversions: number;
+  revenue: number;
+};
+
+const GA4_GENDER_LABELS: Record<string, string> = {
+  male: "MALE",
+  female: "FEMALE",
+  unknown: "UNDETERMINED",
+};
+
+const GA4_AGE_LABELS: Record<string, string> = {
+  "18-24": "AGE_RANGE_18_24",
+  "25-34": "AGE_RANGE_25_34",
+  "35-44": "AGE_RANGE_35_44",
+  "45-54": "AGE_RANGE_45_54",
+  "55-64": "AGE_RANGE_55_64",
+  "65+": "AGE_RANGE_65_UP",
+  unknown: "AGE_RANGE_UNDETERMINED",
+};
+
+export async function fetchGA4Demographics(
+  client: BetaAnalyticsDataClient,
+  startDate: string,
+  endDate: string,
+): Promise<GA4DemographicRow[]> {
+  const cacheKey = `ga4demo:${startDate}:${endDate}`;
+  const cached = getGA4Cached<GA4DemographicRow[]>(cacheKey);
+  if (cached) return cached;
+
+  const [ageRes, genderRes] = await Promise.all([
+    client.runReport({
+      property: getPropertyId(),
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [{ name: "userAgeBracket" }],
+      metrics: [
+        { name: "totalUsers" },
+        { name: "sessions" },
+        { name: "ecommercePurchases" },
+        { name: "purchaseRevenue" },
+      ],
+    }),
+    client.runReport({
+      property: getPropertyId(),
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [{ name: "userGender" }],
+      metrics: [
+        { name: "totalUsers" },
+        { name: "sessions" },
+        { name: "ecommercePurchases" },
+        { name: "purchaseRevenue" },
+      ],
+    }),
+  ]);
+
+  const result: GA4DemographicRow[] = [];
+
+  for (const row of ageRes[0].rows ?? []) {
+    const rawAge = row.dimensionValues?.[0]?.value ?? "unknown";
+    const vals = (row.metricValues ?? []).map((v) => parseFloat(v.value ?? "0"));
+    result.push({
+      segment: GA4_AGE_LABELS[rawAge] ?? rawAge,
+      type: "age",
+      users: Math.round(vals[0] ?? 0),
+      sessions: Math.round(vals[1] ?? 0),
+      conversions: Math.round(vals[2] ?? 0),
+      revenue: Math.round((vals[3] ?? 0) * 100) / 100,
+    });
+  }
+
+  for (const row of genderRes[0].rows ?? []) {
+    const rawGender = row.dimensionValues?.[0]?.value ?? "unknown";
+    const vals = (row.metricValues ?? []).map((v) => parseFloat(v.value ?? "0"));
+    result.push({
+      segment: GA4_GENDER_LABELS[rawGender] ?? rawGender,
+      type: "gender",
+      users: Math.round(vals[0] ?? 0),
+      sessions: Math.round(vals[1] ?? 0),
+      conversions: Math.round(vals[2] ?? 0),
+      revenue: Math.round((vals[3] ?? 0) * 100) / 100,
+    });
+  }
+
+  setGA4Cache(cacheKey, result);
+  return result;
+}
+
+/* =========================
+   Geographic: Region
+========================= */
+
+export type GA4GeographicRow = {
+  region: string;
+  users: number;
+  sessions: number;
+  conversions: number;
+  revenue: number;
+};
+
+export async function fetchGA4Geographic(
+  client: BetaAnalyticsDataClient,
+  startDate: string,
+  endDate: string,
+): Promise<GA4GeographicRow[]> {
+  const cacheKey = `ga4geo:${startDate}:${endDate}`;
+  const cached = getGA4Cached<GA4GeographicRow[]>(cacheKey);
+  if (cached) return cached;
+
+  const [response] = await client.runReport({
+    property: getPropertyId(),
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: "region" }],
+    metrics: [
+      { name: "totalUsers" },
+      { name: "sessions" },
+      { name: "ecommercePurchases" },
+      { name: "purchaseRevenue" },
+    ],
+    orderBys: [{ metric: { metricName: "purchaseRevenue" }, desc: true }],
+    limit: 20,
+  });
+
+  const rows: GA4GeographicRow[] = (response.rows ?? []).map((row) => {
+    const region = row.dimensionValues?.[0]?.value ?? "(desconhecido)";
+    const vals = (row.metricValues ?? []).map((v) => parseFloat(v.value ?? "0"));
+    return {
+      region: region === "(not set)" ? "Não definido" : region,
+      users: Math.round(vals[0] ?? 0),
+      sessions: Math.round(vals[1] ?? 0),
+      conversions: Math.round(vals[2] ?? 0),
+      revenue: Math.round((vals[3] ?? 0) * 100) / 100,
+    };
+  });
+
+  setGA4Cache(cacheKey, rows);
+  return rows;
+}
+
+/* =========================
+   Channel Acquisition Query
+========================= */
+
 export async function fetchChannelAcquisition(
   client: BetaAnalyticsDataClient,
   startDate: string,

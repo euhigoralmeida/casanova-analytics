@@ -129,6 +129,8 @@ export type DemographicSlice = {
   cpa: number;
   ctr: number;
   revenueShare: number;
+  sessions?: number;
+  users?: number;
 };
 
 export type GeographicSlice = {
@@ -142,6 +144,8 @@ export type GeographicSlice = {
   cpa: number;
   ctr: number;
   revenueShare: number;
+  sessions?: number;
+  users?: number;
 };
 
 /**

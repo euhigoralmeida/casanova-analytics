@@ -249,34 +249,34 @@ export default function SegmentsPage() {
                   <>
                     <KpiCard label="Faixas Etárias" value={String(ageSlices.length)} sublabel="com dados" />
                     <KpiCard
-                      label="Melhor Faixa"
-                      value={AGE_LABELS[ageSlices.sort((a, b) => b.roas - a.roas)[0]?.segment] ?? "—"}
-                      sublabel={ageSlices[0] ? `ROAS ${[...ageSlices].sort((a, b) => b.roas - a.roas)[0]?.roas.toFixed(1)}` : undefined}
+                      label="Maior Receita"
+                      value={AGE_LABELS[[...ageSlices].sort((a, b) => b.revenue - a.revenue)[0]?.segment] ?? "—"}
+                      sublabel={ageSlices[0] ? formatBRL([...ageSlices].sort((a, b) => b.revenue - a.revenue)[0]?.revenue) : undefined}
                     />
                     <KpiCard
                       label="Receita Total"
                       value={formatBRL(ageSlices.reduce((s, a) => s + a.revenue, 0))}
                     />
                     <KpiCard
-                      label="Investimento Total"
-                      value={formatBRL(ageSlices.reduce((s, a) => s + a.costBRL, 0))}
+                      label="Sessões Total"
+                      value={String(ageSlices.reduce((s, a) => s + (a.sessions ?? 0), 0).toLocaleString("pt-BR"))}
                     />
                   </>
                 ) : (
                   <>
                     <KpiCard label="Gêneros" value={String(genderSlices.length)} sublabel="com dados" />
                     <KpiCard
-                      label="Melhor Gênero"
-                      value={GENDER_LABELS[genderSlices.sort((a, b) => b.roas - a.roas)[0]?.segment] ?? "—"}
-                      sublabel={genderSlices[0] ? `ROAS ${[...genderSlices].sort((a, b) => b.roas - a.roas)[0]?.roas.toFixed(1)}` : undefined}
+                      label="Maior Receita"
+                      value={GENDER_LABELS[[...genderSlices].sort((a, b) => b.revenue - a.revenue)[0]?.segment] ?? "—"}
+                      sublabel={genderSlices[0] ? formatBRL([...genderSlices].sort((a, b) => b.revenue - a.revenue)[0]?.revenue) : undefined}
                     />
                     <KpiCard
                       label="Receita Total"
                       value={formatBRL(genderSlices.reduce((s, a) => s + a.revenue, 0))}
                     />
                     <KpiCard
-                      label="Investimento Total"
-                      value={formatBRL(genderSlices.reduce((s, a) => s + a.costBRL, 0))}
+                      label="Sessões Total"
+                      value={String(genderSlices.reduce((s, a) => s + (a.sessions ?? 0), 0).toLocaleString("pt-BR"))}
                     />
                   </>
                 )}
@@ -284,7 +284,7 @@ export default function SegmentsPage() {
 
               <div className="rounded-2xl border border-zinc-200 bg-white p-5">
                 <h3 className="text-sm font-semibold text-zinc-800 mb-4">
-                  ROAS por {demoSubTab === "age" ? "Faixa Etária" : "Gênero"}
+                  Receita por {demoSubTab === "age" ? "Faixa Etária" : "Gênero"}
                 </h3>
                 <div className="h-72">
                   <DemographicChart data={demographics} view={demoSubTab} />
@@ -302,11 +302,11 @@ export default function SegmentsPage() {
                     <thead>
                       <tr className="border-b border-zinc-100">
                         <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-400">Segmento</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">Usuários</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">Sessões</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">Conversões</th>
                         <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">Receita</th>
-                        <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">Investimento</th>
-                        <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">ROAS</th>
-                        <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">CPA</th>
-                        <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">CTR</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">Conv Rate</th>
                         <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">Share</th>
                       </tr>
                     </thead>
@@ -315,14 +315,15 @@ export default function SegmentsPage() {
                         const lbl = demoSubTab === "age"
                           ? (AGE_LABELS[d.segment] ?? d.segment)
                           : (GENDER_LABELS[d.segment] ?? d.segment);
+                        const convRate = (d.sessions ?? 0) > 0 ? (d.conversions / (d.sessions ?? 1)) * 100 : 0;
                         return (
                           <tr key={d.segment} className="border-b border-zinc-50 hover:bg-zinc-50/50">
                             <td className="px-4 py-2.5 font-medium text-zinc-700">{lbl}</td>
+                            <td className="px-4 py-2.5 text-right text-zinc-600">{(d.users ?? 0).toLocaleString("pt-BR")}</td>
+                            <td className="px-4 py-2.5 text-right text-zinc-600">{(d.sessions ?? 0).toLocaleString("pt-BR")}</td>
+                            <td className="px-4 py-2.5 text-right text-zinc-600">{d.conversions.toLocaleString("pt-BR")}</td>
                             <td className="px-4 py-2.5 text-right text-zinc-600">{formatBRL(d.revenue)}</td>
-                            <td className="px-4 py-2.5 text-right text-zinc-600">{formatBRL(d.costBRL)}</td>
-                            <td className={`px-4 py-2.5 text-right font-semibold ${roasColor(d.roas)}`}>{d.roas.toFixed(1)}</td>
-                            <td className="px-4 py-2.5 text-right text-zinc-600">{formatBRL(d.cpa)}</td>
-                            <td className="px-4 py-2.5 text-right text-zinc-600">{d.ctr.toFixed(2)}%</td>
+                            <td className="px-4 py-2.5 text-right text-zinc-600">{convRate.toFixed(2)}%</td>
                             <td className="px-4 py-2.5 text-right text-zinc-500">{d.revenueShare.toFixed(1)}%</td>
                           </tr>
                         );
@@ -354,9 +355,8 @@ export default function SegmentsPage() {
                   sublabel={topRegion ? `${topRegion.revenueShare.toFixed(0)}% da receita` : undefined}
                 />
                 <KpiCard
-                  label="ROAS Top Região"
-                  value={topRegion?.roas.toFixed(1) ?? "—"}
-                  color={topRegion ? roasColor(topRegion.roas) : undefined}
+                  label="Sessões Top Região"
+                  value={String((topRegion?.sessions ?? 0).toLocaleString("pt-BR"))}
                 />
               </div>
 
@@ -376,26 +376,29 @@ export default function SegmentsPage() {
                     <thead>
                       <tr className="border-b border-zinc-100">
                         <th className="text-left px-4 py-2.5 text-xs font-medium text-zinc-400">Região</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">Usuários</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">Sessões</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">Conversões</th>
                         <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">Receita</th>
-                        <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">Investimento</th>
-                        <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">ROAS</th>
-                        <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">CPA</th>
-                        <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">CTR</th>
+                        <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">Conv Rate</th>
                         <th className="text-right px-4 py-2.5 text-xs font-medium text-zinc-400">Share</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {geographic.map((d) => (
-                        <tr key={d.region} className="border-b border-zinc-50 hover:bg-zinc-50/50">
-                          <td className="px-4 py-2.5 font-medium text-zinc-700">{d.region}</td>
-                          <td className="px-4 py-2.5 text-right text-zinc-600">{formatBRL(d.revenue)}</td>
-                          <td className="px-4 py-2.5 text-right text-zinc-600">{formatBRL(d.costBRL)}</td>
-                          <td className={`px-4 py-2.5 text-right font-semibold ${roasColor(d.roas)}`}>{d.roas.toFixed(1)}</td>
-                          <td className="px-4 py-2.5 text-right text-zinc-600">{formatBRL(d.cpa)}</td>
-                          <td className="px-4 py-2.5 text-right text-zinc-600">{d.ctr.toFixed(2)}%</td>
-                          <td className="px-4 py-2.5 text-right text-zinc-500">{d.revenueShare.toFixed(1)}%</td>
-                        </tr>
-                      ))}
+                      {geographic.map((d) => {
+                        const convRate = (d.sessions ?? 0) > 0 ? (d.conversions / (d.sessions ?? 1)) * 100 : 0;
+                        return (
+                          <tr key={d.region} className="border-b border-zinc-50 hover:bg-zinc-50/50">
+                            <td className="px-4 py-2.5 font-medium text-zinc-700">{d.region}</td>
+                            <td className="px-4 py-2.5 text-right text-zinc-600">{(d.users ?? 0).toLocaleString("pt-BR")}</td>
+                            <td className="px-4 py-2.5 text-right text-zinc-600">{(d.sessions ?? 0).toLocaleString("pt-BR")}</td>
+                            <td className="px-4 py-2.5 text-right text-zinc-600">{d.conversions.toLocaleString("pt-BR")}</td>
+                            <td className="px-4 py-2.5 text-right text-zinc-600">{formatBRL(d.revenue)}</td>
+                            <td className="px-4 py-2.5 text-right text-zinc-600">{convRate.toFixed(2)}%</td>
+                            <td className="px-4 py-2.5 text-right text-zinc-500">{d.revenueShare.toFixed(1)}%</td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

@@ -3,8 +3,8 @@ import { getSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isConfigured, getCustomer } from "@/lib/google-ads";
 import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
-import { fetchAllSkuMetrics, fetchAccountTotals, fetchAllCampaignMetrics, fetchDeviceMetrics, fetchDemographicMetrics, fetchGeographicMetrics } from "@/lib/queries";
-import { fetchGA4Summary, fetchChannelAcquisition } from "@/lib/ga4-queries";
+import { fetchAllSkuMetrics, fetchAccountTotals, fetchAllCampaignMetrics, fetchDeviceMetrics } from "@/lib/queries";
+import { fetchGA4Summary, fetchChannelAcquisition, fetchGA4Demographics, fetchGA4Geographic } from "@/lib/ga4-queries";
 import { computeTargetMonth } from "@/lib/planning-target-calc";
 import { analyzeCognitive } from "@/lib/intelligence/cognitive-engine";
 import { loadSkuExtras } from "@/lib/sku-master";
@@ -95,13 +95,11 @@ export async function GET(req: NextRequest) {
   if (isConfigured()) {
     try {
       const customer = getCustomer();
-      const [acctData, allSkuData, campData, deviceData, demoData, geoData] = await Promise.all([
+      const [acctData, allSkuData, campData, deviceData] = await Promise.all([
         fetchAccountTotals(customer, period, startDate, endDate),
         fetchAllSkuMetrics(customer, period, startDate, endDate),
         fetchAllCampaignMetrics(customer, period, startDate, endDate),
         fetchDeviceMetrics(customer, period, startDate, endDate).catch(() => []),
-        fetchDemographicMetrics(customer, period, startDate, endDate).catch(() => []),
-        fetchGeographicMetrics(customer, period, startDate, endDate).catch(() => []),
       ]);
 
       account = {
@@ -149,8 +147,6 @@ export async function GET(req: NextRequest) {
       }));
 
       devices = deviceData;
-      demographics = demoData;
-      geographic = geoData;
     } catch (err) {
       console.error("Intelligence: Google Ads error:", err);
     }
@@ -163,9 +159,11 @@ export async function GET(req: NextRequest) {
   if (isGA4Configured()) {
     try {
       const ga4Client = getGA4Client();
-      const [summary, channelData] = await Promise.all([
+      const [summary, channelData, ga4Demo, ga4Geo] = await Promise.all([
         fetchGA4Summary(ga4Client, startDate ?? "", endDate ?? ""),
         fetchChannelAcquisition(ga4Client, startDate ?? "", endDate ?? ""),
+        fetchGA4Demographics(ga4Client, startDate ?? "", endDate ?? "").catch(() => []),
+        fetchGA4Geographic(ga4Client, startDate ?? "", endDate ?? "").catch(() => []),
       ]);
 
       ga4 = {
@@ -185,6 +183,35 @@ export async function GET(req: NextRequest) {
         conversions: c.conversions,
         revenue: c.revenue,
       }));
+
+      // Demographics from GA4 (replaces Google Ads age_range_view/gender_view)
+      if (ga4Demo.length > 0) {
+        demographics = ga4Demo.map((d) => ({
+          segment: d.segment,
+          type: d.type,
+          impressions: 0,
+          clicks: 0,
+          costBRL: 0,
+          conversions: d.conversions,
+          revenue: d.revenue,
+          sessions: d.sessions,
+          users: d.users,
+        }));
+      }
+
+      // Geographic from GA4 (replaces Google Ads geographic_view)
+      if (ga4Geo.length > 0) {
+        geographic = ga4Geo.map((d) => ({
+          region: d.region,
+          impressions: 0,
+          clicks: 0,
+          costBRL: 0,
+          conversions: d.conversions,
+          revenue: d.revenue,
+          sessions: d.sessions,
+          users: d.users,
+        }));
+      }
     } catch (err) {
       console.error("Intelligence: GA4 error:", err);
     }
