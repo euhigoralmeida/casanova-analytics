@@ -289,16 +289,19 @@ export default function VisaoGeralPage() {
       )}
 
       {/* ─── ROW 6: Segmentação + Budget lado a lado ─── */}
-      {(intelligence?.segmentation || intelligence?.budgetPlan) && !loading && (
-        <div className="grid gap-6 lg:grid-cols-2">
-          {intelligence.segmentation && (
-            <SegmentationSummary segmentation={intelligence.segmentation} compact />
-          )}
-          {intelligence.budgetPlan && (
-            <BudgetPlanCard plan={intelligence.budgetPlan} />
-          )}
-        </div>
-      )}
+      {(intelligence?.segmentation || intelligence?.budgetPlan) && !loading && (() => {
+        const hasBothBottomPanels = !!intelligence?.segmentation && !!intelligence?.budgetPlan;
+        return (
+          <div className={`grid gap-6 ${hasBothBottomPanels ? "lg:grid-cols-2" : ""}`}>
+            {intelligence.segmentation && (
+              <SegmentationSummary segmentation={intelligence.segmentation} compact={hasBothBottomPanels} />
+            )}
+            {intelligence.budgetPlan && (
+              <BudgetPlanCard plan={intelligence.budgetPlan} />
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 }

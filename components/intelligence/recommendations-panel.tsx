@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { IntelligenceInsight, Recommendation } from "@/lib/intelligence/types";
 import { Check, X } from "lucide-react";
 
@@ -35,6 +36,8 @@ const EFFORT_LABEL: Record<string, string> = {
 };
 
 export function RecommendationsPanel({ insights, quickWins, onFollow, onDismiss }: RecommendationsPanelProps) {
+  const [actioned, setActioned] = useState<Map<number, "followed" | "dismissed">>(new Map());
+
   const allRecs: FlatRec[] = [];
   const seenActions = new Set<string>();
 
@@ -82,44 +85,75 @@ export function RecommendationsPanel({ insights, quickWins, onFollow, onDismiss 
         </h3>
       </div>
       <div className="divide-y divide-zinc-50">
-        {topRecs.map((item, i) => (
-          <div key={i} className="flex items-start gap-3 px-5 py-3 hover:bg-zinc-50/50 transition-colors">
-            <span className="mt-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold text-white shrink-0">
-              {i + 1}
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-zinc-800 leading-snug">{item.rec.action}</p>
-              <div className="flex items-center gap-2 mt-1.5">
-                <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${IMPACT_BADGE[item.rec.impact] ?? ""}`}>
-                  {IMPACT_LABEL[item.rec.impact]}
-                </span>
-                <span className="text-[10px] text-zinc-400">
-                  {EFFORT_LABEL[item.rec.effort]}
-                </span>
+        {topRecs.map((item, i) => {
+          const status = actioned.get(i);
+          const isDismissed = status === "dismissed";
+          const isFollowed = status === "followed";
+
+          return (
+            <div
+              key={i}
+              className={`flex items-start gap-3 px-5 py-3 transition-all ${isDismissed ? "opacity-30" : "hover:bg-zinc-50/50"}`}
+            >
+              <span className="mt-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-zinc-900 text-[10px] font-bold text-white shrink-0">
+                {i + 1}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className={`text-sm text-zinc-800 leading-snug ${isDismissed ? "line-through" : ""}`}>
+                  {item.rec.action}
+                </p>
+                <div className="flex items-center gap-2 mt-1.5">
+                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold ${IMPACT_BADGE[item.rec.impact] ?? ""}`}>
+                    {IMPACT_LABEL[item.rec.impact]}
+                  </span>
+                  <span className="text-[10px] text-zinc-400">
+                    {EFFORT_LABEL[item.rec.effort]}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-0.5 shrink-0">
+                {status ? (
+                  isFollowed ? (
+                    <span className="text-[11px] font-medium text-emerald-600 bg-emerald-50 rounded-full px-2.5 py-1">
+                      ✓ Seguindo
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-medium text-zinc-400">
+                      Descartado
+                    </span>
+                  )
+                ) : (
+                  <>
+                    {onFollow && (
+                      <button
+                        onClick={() => {
+                          setActioned(prev => new Map(prev).set(i, "followed"));
+                          onFollow(item.insightId, item.rec.action);
+                        }}
+                        className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50 transition-colors"
+                        title="Seguir recomendação"
+                      >
+                        <Check className="h-4 w-4" />
+                      </button>
+                    )}
+                    {onDismiss && (
+                      <button
+                        onClick={() => {
+                          setActioned(prev => new Map(prev).set(i, "dismissed"));
+                          onDismiss(item.insightId, item.rec.action);
+                        }}
+                        className="rounded-lg p-1.5 text-zinc-300 hover:text-zinc-500 hover:bg-zinc-50 transition-colors"
+                        title="Descartar"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    )}
+                  </>
+                )}
               </div>
             </div>
-            <div className="flex items-center gap-0.5 shrink-0">
-              {onFollow && (
-                <button
-                  onClick={() => onFollow(item.insightId, item.rec.action)}
-                  className="rounded-lg p-1.5 text-emerald-600 hover:bg-emerald-50 transition-colors"
-                  title="Seguir recomendação"
-                >
-                  <Check className="h-4 w-4" />
-                </button>
-              )}
-              {onDismiss && (
-                <button
-                  onClick={() => onDismiss(item.insightId, item.rec.action)}
-                  className="rounded-lg p-1.5 text-zinc-300 hover:text-zinc-500 hover:bg-zinc-50 transition-colors"
-                  title="Descartar"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
