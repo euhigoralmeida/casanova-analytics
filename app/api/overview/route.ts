@@ -259,6 +259,7 @@ function buildMockOverview(period: string, targets: { revenueTarget: number; roa
       ctr,
       conversions: purchases,
       status: deriveStatus(roas, cpa, data.marginPct, data.stock, purchases),
+      campaignStatus: "ENABLED" as const,
       ml: {
         price: data.mlPrice,
         ecomPrice: data.ecomPrice,
