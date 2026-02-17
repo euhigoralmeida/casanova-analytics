@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { AI_CONFIG } from "@/lib/ai/config";
-import { createAnthropicClient } from "@/lib/ai/client";
+import { createGeminiClient } from "@/lib/ai/client";
 import { buildContextSummary, buildPeriodContext } from "@/lib/ai/context-builder";
 import { insightsSystemPrompt, insightsUserPrompt } from "@/lib/ai/prompts";
 import { cacheGet, cacheSet, insightsCacheKey } from "@/lib/ai/cache";
@@ -19,8 +19,7 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
-  // Read API key directly in route handler
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     return NextResponse.json({ error: "IA não disponível" }, { status: 503 });
   }
@@ -60,19 +59,23 @@ export async function POST(req: NextRequest) {
     const contextSummary = buildContextSummary(cognitiveData);
     const periodContext = buildPeriodContext(startDate, endDate);
 
-    // Create client with API key read in this route handler
-    const client = createAnthropicClient(apiKey);
-    const response = await client.messages.create({
+    // Create Gemini model (no tools for insights)
+    const genAI = createGeminiClient(apiKey);
+    const model = genAI.getGenerativeModel({
       model: AI_CONFIG.insights.model,
-      max_tokens: AI_CONFIG.insights.maxTokens,
-      temperature: AI_CONFIG.insights.temperature,
-      system: insightsSystemPrompt(),
-      messages: [{ role: "user", content: insightsUserPrompt(contextSummary, periodContext) }],
+      systemInstruction: insightsSystemPrompt(),
+      generationConfig: {
+        maxOutputTokens: AI_CONFIG.insights.maxTokens,
+        temperature: AI_CONFIG.insights.temperature,
+      },
     });
 
-    const textBlock = response.content.find((b) => b.type === "text");
-    const rawText = textBlock && "text" in textBlock ? textBlock.text : "";
+    const result = await model.generateContent(
+      insightsUserPrompt(contextSummary, periodContext),
+    );
+    const rawText = result.response.text();
 
+    // Parse JSON from response
     let analysis = "";
     let highlights: string[] = [];
 
@@ -89,15 +92,15 @@ export async function POST(req: NextRequest) {
       analysis = rawText;
     }
 
-    const result: InsightsResponse = {
+    const responseData: InsightsResponse = {
       analysis,
       highlights,
       generatedAt: new Date().toISOString(),
       cached: false,
     };
 
-    cacheSet(cacheKey, result, AI_CONFIG.cache.insightsTtlMs);
-    return NextResponse.json(result);
+    cacheSet(cacheKey, responseData, AI_CONFIG.cache.insightsTtlMs);
+    return NextResponse.json(responseData);
   } catch (err) {
     console.error("AI Insights error:", err);
     return NextResponse.json({ error: "Erro ao gerar insights IA" }, { status: 500 });

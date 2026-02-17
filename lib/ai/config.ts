@@ -1,18 +1,18 @@
 // AI configuration + feature flags
-// Uses getter functions to read env vars lazily at runtime (not at import time)
+// Uses lazy proxy to read env vars at runtime (not at import time)
 
 export function getAIConfig() {
   return {
     enabled: process.env.AI_ENABLED !== "false",
 
     chat: {
-      model: process.env.AI_CHAT_MODEL || "claude-sonnet-4-5-20250929",
+      model: process.env.AI_CHAT_MODEL || "gemini-2.0-flash",
       maxTokens: 1024,
       temperature: 0.3,
     },
 
     insights: {
-      model: process.env.AI_INSIGHTS_MODEL || "claude-haiku-4-5-20251001",
+      model: process.env.AI_INSIGHTS_MODEL || "gemini-2.0-flash",
       maxTokens: 512,
       temperature: 0.2,
     },
@@ -28,7 +28,7 @@ export function getAIConfig() {
   };
 }
 
-// Backwards compat — lazy proxy
+// Lazy proxy — reads env vars on access, not at import time
 export const AI_CONFIG = new Proxy({} as ReturnType<typeof getAIConfig>, {
   get(_target, prop) {
     return getAIConfig()[prop as keyof ReturnType<typeof getAIConfig>];

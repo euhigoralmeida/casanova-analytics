@@ -1,9 +1,7 @@
-// Anthropic SDK client factory
-// API key must be passed explicitly because process.env is not
-// reliably available in imported modules on Vercel serverless.
+// Google Gemini client factory
 
-import Anthropic from "@anthropic-ai/sdk";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export function createAnthropicClient(apiKey: string): Anthropic {
-  return new Anthropic({ apiKey });
+export function createGeminiClient(apiKey: string) {
+  return new GoogleGenerativeAI(apiKey);
 }

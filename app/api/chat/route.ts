@@ -1,14 +1,14 @@
 import { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth";
 import { AI_CONFIG } from "@/lib/ai/config";
-import { createAnthropicClient } from "@/lib/ai/client";
-import { AI_TOOLS } from "@/lib/ai/tools";
+import { createGeminiClient } from "@/lib/ai/client";
+import { GEMINI_TOOLS } from "@/lib/ai/tools";
 import { executeTool } from "@/lib/ai/tool-executor";
 import { buildContextSummary, buildPeriodContext } from "@/lib/ai/context-builder";
 import { chatSystemPrompt } from "@/lib/ai/prompts";
 import { checkChatLimit } from "@/lib/ai/rate-limiter";
 import { fetchCognitiveDirectly } from "@/lib/ai/fetch-cognitive";
-import type Anthropic from "@anthropic-ai/sdk";
+import type { Content, Part } from "@google/generative-ai";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -19,10 +19,9 @@ export const runtime = "nodejs";
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
-  // Read API key directly in route handler (process.env works here on Vercel)
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: "ANTHROPIC_API_KEY não configurada no servidor" }), {
+    return new Response(JSON.stringify({ error: "GEMINI_API_KEY não configurada no servidor" }), {
       status: 503,
       headers: { "Content-Type": "application/json" },
     });
@@ -64,7 +63,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Fetch cognitive context directly (no HTTP round-trip)
+    // Fetch cognitive context
     let contextSummary = "Dados de análise não disponíveis no momento.";
     try {
       const cognitiveData = await fetchCognitiveDirectly(session.tenantId, context.startDate, context.endDate);
@@ -78,78 +77,65 @@ export async function POST(req: NextRequest) {
     const periodContext = buildPeriodContext(context.startDate, context.endDate);
     const systemPrompt = chatSystemPrompt(contextSummary, periodContext);
 
-    // Create client with API key read directly in this route handler
-    const client = createAnthropicClient(apiKey);
-
-    // Build messages for Claude API
-    const apiMessages: Anthropic.MessageParam[] = messages.map((m) => ({
-      role: m.role,
-      content: m.content,
-    }));
-
-    // Agentic loop: handle tool use
-    let currentMessages = apiMessages;
-    const maxToolRounds = 5;
-    let finalText = "";
-
-    for (let round = 0; round < maxToolRounds; round++) {
-      const response = await client.messages.create({
-        model: AI_CONFIG.chat.model,
-        max_tokens: AI_CONFIG.chat.maxTokens,
+    // Create Gemini model with tools
+    const genAI = createGeminiClient(apiKey);
+    const model = genAI.getGenerativeModel({
+      model: AI_CONFIG.chat.model,
+      systemInstruction: systemPrompt,
+      tools: [{ functionDeclarations: GEMINI_TOOLS }],
+      generationConfig: {
+        maxOutputTokens: AI_CONFIG.chat.maxTokens,
         temperature: AI_CONFIG.chat.temperature,
-        system: systemPrompt,
-        messages: currentMessages,
-        tools: AI_TOOLS,
+      },
+    });
+
+    // Convert messages to Gemini format
+    const geminiHistory: Content[] = [];
+    for (const msg of messages.slice(0, -1)) {
+      geminiHistory.push({
+        role: msg.role === "assistant" ? "model" : "user",
+        parts: [{ text: msg.content }],
       });
-
-      // Collect text blocks
-      let roundText = "";
-      const toolUseBlocks: Anthropic.ContentBlock[] = [];
-
-      for (const block of response.content) {
-        if (block.type === "text") {
-          roundText += block.text;
-        } else if (block.type === "tool_use") {
-          toolUseBlocks.push(block);
-        }
-      }
-
-      finalText += roundText;
-
-      // If no tool calls, we're done
-      if (toolUseBlocks.length === 0 || response.stop_reason === "end_turn") {
-        break;
-      }
-
-      // Execute tool calls
-      const toolResults: Anthropic.MessageParam = {
-        role: "user",
-        content: await Promise.all(
-          toolUseBlocks.map(async (block) => {
-            if (block.type !== "tool_use") return { type: "text" as const, text: "" };
-            const result = await executeTool(
-              block.name,
-              block.input as Record<string, unknown>,
-              session.tenantId,
-            );
-            return {
-              type: "tool_result" as const,
-              tool_use_id: block.id,
-              content: result,
-            };
-          }),
-        ),
-      };
-
-      // Continue conversation with tool results
-      currentMessages = [
-        ...currentMessages,
-        { role: "assistant" as const, content: response.content },
-        toolResults,
-      ];
     }
 
-    // Return the final text response
+    // Start chat with history
+    const chat = model.startChat({ history: geminiHistory });
+
+    // Send the last user message
+    const lastMessage = messages[messages.length - 1].content;
+    let result = await chat.sendMessage(lastMessage);
+    let response = result.response;
+
+    // Agentic loop: handle function calls
+    const maxToolRounds = 5;
+    for (let round = 0; round < maxToolRounds; round++) {
+      const functionCalls = response.functionCalls();
+      if (!functionCalls || functionCalls.length === 0) break;
+
+      // Execute all function calls
+      const functionResponses: Part[] = [];
+      for (const fc of functionCalls) {
+        const toolResult = await executeTool(
+          fc.name,
+          fc.args as Record<string, unknown>,
+          session.tenantId,
+        );
+        functionResponses.push({
+          functionResponse: {
+            name: fc.name,
+            response: JSON.parse(toolResult),
+          },
+        });
+      }
+
+      // Send function results back to the model
+      result = await chat.sendMessage(functionResponses);
+      response = result.response;
+    }
+
+    // Extract final text
+    const finalText = response.text();
+
     return new Response(JSON.stringify({ response: finalText }), {
       headers: { "Content-Type": "application/json" },
     });

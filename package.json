@@ -10,8 +10,8 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.74.0",
     "@google-analytics/data": "^5.2.1",
+    "@google/generative-ai": "^0.24.1",
     "@prisma/adapter-pg": "^7.4.0",
     "@prisma/client": "^7.4.0",
     "bcryptjs": "^3.0.3",

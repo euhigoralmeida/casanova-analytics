@@ -1,17 +1,17 @@
-// Tool definitions for Claude function calling
+// Tool definitions for Google Gemini function calling
 
-import type Anthropic from "@anthropic-ai/sdk";
+import { SchemaType, type FunctionDeclaration } from "@google/generative-ai";
 
-export const AI_TOOLS: Anthropic.Tool[] = [
+export const GEMINI_TOOLS: FunctionDeclaration[] = [
   {
     name: "get_account_metrics",
     description:
       "Métricas agregadas da conta Google Ads: receita, investimento (ads), ROAS, CPA, impressões, cliques, conversões, CTR.",
-    input_schema: {
-      type: "object" as const,
+    parameters: {
+      type: SchemaType.OBJECT,
       properties: {
-        startDate: { type: "string", description: "Data início yyyy-mm-dd" },
-        endDate: { type: "string", description: "Data fim yyyy-mm-dd" },
+        startDate: { type: SchemaType.STRING, description: "Data início yyyy-mm-dd" },
+        endDate: { type: SchemaType.STRING, description: "Data fim yyyy-mm-dd" },
       },
       required: ["startDate", "endDate"],
     },
@@ -20,12 +20,12 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     name: "get_sku_metrics",
     description:
       "Métricas de SKUs. Sem parâmetro sku retorna todos. Com sku retorna um específico. Inclui: receita, ads, ROAS, CPA, impressões, cliques, conversões.",
-    input_schema: {
-      type: "object" as const,
+    parameters: {
+      type: SchemaType.OBJECT,
       properties: {
-        sku: { type: "string", description: "ID do SKU (opcional — sem ele retorna todos)" },
-        startDate: { type: "string", description: "Data início yyyy-mm-dd" },
-        endDate: { type: "string", description: "Data fim yyyy-mm-dd" },
+        sku: { type: SchemaType.STRING, description: "ID do SKU (opcional — sem ele retorna todos)" },
+        startDate: { type: SchemaType.STRING, description: "Data início yyyy-mm-dd" },
+        endDate: { type: SchemaType.STRING, description: "Data fim yyyy-mm-dd" },
       },
       required: ["startDate", "endDate"],
     },
@@ -34,11 +34,11 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     name: "get_campaign_metrics",
     description:
       "Métricas por campanha Google Ads: nome, tipo, status, ROAS, CPA, receita, custo, impressões, cliques, conversões.",
-    input_schema: {
-      type: "object" as const,
+    parameters: {
+      type: SchemaType.OBJECT,
       properties: {
-        startDate: { type: "string", description: "Data início yyyy-mm-dd" },
-        endDate: { type: "string", description: "Data fim yyyy-mm-dd" },
+        startDate: { type: SchemaType.STRING, description: "Data início yyyy-mm-dd" },
+        endDate: { type: SchemaType.STRING, description: "Data fim yyyy-mm-dd" },
       },
       required: ["startDate", "endDate"],
     },
@@ -47,16 +47,15 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     name: "get_segmentation",
     description:
       "Métricas por segmento: dispositivo (desktop/mobile/tablet), faixa etária, gênero ou região geográfica. Inclui ROAS, CPA, receita, custo por segmento.",
-    input_schema: {
-      type: "object" as const,
+    parameters: {
+      type: SchemaType.OBJECT,
       properties: {
         segment: {
-          type: "string",
-          enum: ["device", "age", "gender", "geographic"],
-          description: "Tipo de segmentação",
+          type: SchemaType.STRING,
+          description: "Tipo de segmentação: device, age, gender ou geographic",
         },
-        startDate: { type: "string", description: "Data início yyyy-mm-dd" },
-        endDate: { type: "string", description: "Data fim yyyy-mm-dd" },
+        startDate: { type: SchemaType.STRING, description: "Data início yyyy-mm-dd" },
+        endDate: { type: SchemaType.STRING, description: "Data fim yyyy-mm-dd" },
       },
       required: ["segment", "startDate", "endDate"],
     },
@@ -65,11 +64,11 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     name: "get_ga4_funnel",
     description:
       "Funil e-commerce GA4: sessões, add to cart, checkout, purchase. Inclui taxa de abandono e taxa de conversão geral.",
-    input_schema: {
-      type: "object" as const,
+    parameters: {
+      type: SchemaType.OBJECT,
       properties: {
-        startDate: { type: "string", description: "Data início yyyy-mm-dd" },
-        endDate: { type: "string", description: "Data fim yyyy-mm-dd" },
+        startDate: { type: SchemaType.STRING, description: "Data início yyyy-mm-dd" },
+        endDate: { type: SchemaType.STRING, description: "Data fim yyyy-mm-dd" },
       },
       required: ["startDate", "endDate"],
     },
@@ -78,11 +77,11 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     name: "get_channel_acquisition",
     description:
       "Aquisição por canal GA4: orgânico, pago, direto, social, email, referral. Sessões, usuários, conversões, receita por canal.",
-    input_schema: {
-      type: "object" as const,
+    parameters: {
+      type: SchemaType.OBJECT,
       properties: {
-        startDate: { type: "string", description: "Data início yyyy-mm-dd" },
-        endDate: { type: "string", description: "Data fim yyyy-mm-dd" },
+        startDate: { type: SchemaType.STRING, description: "Data início yyyy-mm-dd" },
+        endDate: { type: SchemaType.STRING, description: "Data fim yyyy-mm-dd" },
       },
       required: ["startDate", "endDate"],
     },
@@ -90,12 +89,12 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_planning_targets",
     description:
-      "Metas do planejamento mensal: receita, ROAS, CPA, sessões, pedidos, ticket médio, etc. Retorna metas definidas no planejamento.",
-    input_schema: {
-      type: "object" as const,
+      "Metas do planejamento mensal: receita, ROAS, CPA, sessões, pedidos, ticket médio, etc.",
+    parameters: {
+      type: SchemaType.OBJECT,
       properties: {
-        year: { type: "number", description: "Ano (ex: 2026)" },
-        month: { type: "number", description: "Mês (1-12)" },
+        year: { type: SchemaType.NUMBER, description: "Ano (ex: 2026)" },
+        month: { type: SchemaType.NUMBER, description: "Mês (1-12)" },
       },
       required: ["year", "month"],
     },
@@ -104,13 +103,13 @@ export const AI_TOOLS: Anthropic.Tool[] = [
     name: "get_timeseries",
     description:
       "Série temporal diária: receita, custo, impressões, cliques, conversões. Escopo: account (toda a conta) ou sku (um SKU específico).",
-    input_schema: {
-      type: "object" as const,
+    parameters: {
+      type: SchemaType.OBJECT,
       properties: {
-        scope: { type: "string", enum: ["account", "sku"], description: "Escopo: conta inteira ou SKU" },
-        id: { type: "string", description: "ID do SKU (obrigatório se scope=sku)" },
-        startDate: { type: "string", description: "Data início yyyy-mm-dd" },
-        endDate: { type: "string", description: "Data fim yyyy-mm-dd" },
+        scope: { type: SchemaType.STRING, description: "Escopo: account ou sku" },
+        id: { type: SchemaType.STRING, description: "ID do SKU (obrigatório se scope=sku)" },
+        startDate: { type: SchemaType.STRING, description: "Data início yyyy-mm-dd" },
+        endDate: { type: SchemaType.STRING, description: "Data fim yyyy-mm-dd" },
       },
       required: ["scope", "startDate", "endDate"],
     },
@@ -118,12 +117,12 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   {
     name: "get_cognitive_analysis",
     description:
-      "Análise cognitiva completa do motor de regras: findings priorizados, modo estratégico, gargalo principal, pacing de metas, health score, executive summary.",
-    input_schema: {
-      type: "object" as const,
+      "Análise cognitiva completa: findings priorizados, modo estratégico, gargalo principal, pacing de metas, health score.",
+    parameters: {
+      type: SchemaType.OBJECT,
       properties: {
-        startDate: { type: "string", description: "Data início yyyy-mm-dd" },
-        endDate: { type: "string", description: "Data fim yyyy-mm-dd" },
+        startDate: { type: SchemaType.STRING, description: "Data início yyyy-mm-dd" },
+        endDate: { type: SchemaType.STRING, description: "Data fim yyyy-mm-dd" },
       },
       required: ["startDate", "endDate"],
     },
@@ -131,14 +130,14 @@ export const AI_TOOLS: Anthropic.Tool[] = [
   {
     name: "compare_periods",
     description:
-      "Compara métricas da conta entre dois períodos. Retorna métricas de ambos os períodos + variação percentual.",
-    input_schema: {
-      type: "object" as const,
+      "Compara métricas da conta entre dois períodos. Retorna métricas de ambos + variação percentual.",
+    parameters: {
+      type: SchemaType.OBJECT,
       properties: {
-        period1Start: { type: "string", description: "Início do período 1 yyyy-mm-dd" },
-        period1End: { type: "string", description: "Fim do período 1 yyyy-mm-dd" },
-        period2Start: { type: "string", description: "Início do período 2 yyyy-mm-dd" },
-        period2End: { type: "string", description: "Fim do período 2 yyyy-mm-dd" },
+        period1Start: { type: SchemaType.STRING, description: "Início do período 1 yyyy-mm-dd" },
+        period1End: { type: SchemaType.STRING, description: "Fim do período 1 yyyy-mm-dd" },
+        period2Start: { type: SchemaType.STRING, description: "Início do período 2 yyyy-mm-dd" },
+        period2End: { type: SchemaType.STRING, description: "Fim do período 2 yyyy-mm-dd" },
       },
       required: ["period1Start", "period1End", "period2Start", "period2End"],
     },
