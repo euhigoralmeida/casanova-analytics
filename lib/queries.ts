@@ -33,43 +33,42 @@ export async function fetchSkuMetrics(
 
   const dateClause = buildDateClause(period, startDate, endDate);
 
-  // Janela recente (últimos 7 dias) para status atual do produto
-  const now = new Date();
-  const statusEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  const sevenAgo = new Date(now);
-  sevenAgo.setDate(sevenAgo.getDate() - 7);
-  const statusStart = `${sevenAgo.getFullYear()}-${String(sevenAgo.getMonth() + 1).padStart(2, "0")}-${String(sevenAgo.getDate()).padStart(2, "0")}`;
-  const recentDateClause = `segments.date BETWEEN '${statusStart}' AND '${statusEnd}'`;
-
-  // Duas queries paralelas: dados completos + check recente se SKU está ativo
-  const [rows, enabledRows] = await Promise.all([
-    customer.query(`
-      SELECT
-        segments.product_item_id,
-        segments.product_title,
-        metrics.impressions,
-        metrics.clicks,
-        metrics.cost_micros,
-        metrics.conversions,
-        metrics.conversions_value
-      FROM shopping_performance_view
-      WHERE ${dateClause}
-        AND segments.product_item_id = '${sku}'
-        AND campaign.status != 'REMOVED'
-    `),
-    customer.query(`
-      SELECT
-        segments.product_item_id
-      FROM shopping_performance_view
-      WHERE ${recentDateClause}
-        AND segments.product_item_id = '${sku}'
-        AND campaign.status = 'ENABLED'
-    `),
-  ]);
+  // Query principal (original, sem filtro de campaign.status)
+  const rows = await customer.query(`
+    SELECT
+      segments.product_item_id,
+      segments.product_title,
+      metrics.impressions,
+      metrics.clicks,
+      metrics.cost_micros,
+      metrics.conversions,
+      metrics.conversions_value
+    FROM shopping_performance_view
+    WHERE ${dateClause}
+      AND segments.product_item_id = '${sku}'
+  `);
 
   if (!rows.length) return null;
 
-  const isEnabled = enabledRows.length > 0;
+  // Status check (não-bloqueante): últimos 7 dias em campanhas ativas
+  let isEnabled = true;
+  try {
+    const now = new Date();
+    const statusEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const sevenAgo = new Date(now);
+    sevenAgo.setDate(sevenAgo.getDate() - 7);
+    const statusStart = `${sevenAgo.getFullYear()}-${String(sevenAgo.getMonth() + 1).padStart(2, "0")}-${String(sevenAgo.getDate()).padStart(2, "0")}`;
+    const enabledRows = await customer.query(`
+      SELECT segments.product_item_id
+      FROM shopping_performance_view
+      WHERE segments.date BETWEEN '${statusStart}' AND '${statusEnd}'
+        AND segments.product_item_id = '${sku}'
+        AND campaign.status = 'ENABLED'
+    `);
+    isEnabled = enabledRows.length > 0;
+  } catch {
+    // Status query falhou — default para ENABLED
+  }
 
   // Agregar múltiplas linhas (pode haver mais de uma campanha por SKU)
   const result: SkuMetrics = {
@@ -113,46 +112,42 @@ export async function fetchAllSkuMetrics(
 
   const dateClause = buildDateClause(period, startDate, endDate);
 
-  // Janela recente (últimos 7 dias) para determinar status ATUAL do produto
-  const now = new Date();
-  const statusEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-  const sevenAgo = new Date(now);
-  sevenAgo.setDate(sevenAgo.getDate() - 7);
-  const statusStart = `${sevenAgo.getFullYear()}-${String(sevenAgo.getMonth() + 1).padStart(2, "0")}-${String(sevenAgo.getDate()).padStart(2, "0")}`;
-  const recentDateClause = `segments.date BETWEEN '${statusStart}' AND '${statusEnd}'`;
+  // Query principal (original, sem filtro de campaign.status)
+  const rows = await customer.query(`
+    SELECT
+      segments.product_item_id,
+      segments.product_title,
+      metrics.impressions,
+      metrics.clicks,
+      metrics.cost_micros,
+      metrics.conversions,
+      metrics.conversions_value
+    FROM shopping_performance_view
+    WHERE ${dateClause}
+    ORDER BY metrics.conversions_value DESC
+  `);
 
-  // Duas queries paralelas:
-  // 1) Dados completos do período selecionado (todas campanhas não-removidas)
-  // 2) SKU IDs com impressões recentes (7 dias) em campanhas ativas → status atual
-  const [rows, enabledRows] = await Promise.all([
-    customer.query(`
-      SELECT
-        segments.product_item_id,
-        segments.product_title,
-        metrics.impressions,
-        metrics.clicks,
-        metrics.cost_micros,
-        metrics.conversions,
-        metrics.conversions_value
+  // Status check (não-bloqueante): últimos 7 dias em campanhas ativas
+  let enabledSkuIds: Set<string> | null = null;
+  try {
+    const now = new Date();
+    const statusEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const sevenAgo = new Date(now);
+    sevenAgo.setDate(sevenAgo.getDate() - 7);
+    const statusStart = `${sevenAgo.getFullYear()}-${String(sevenAgo.getMonth() + 1).padStart(2, "0")}-${String(sevenAgo.getDate()).padStart(2, "0")}`;
+    const enabledRows = await customer.query(`
+      SELECT segments.product_item_id
       FROM shopping_performance_view
-      WHERE ${dateClause}
-        AND campaign.status != 'REMOVED'
-      ORDER BY metrics.conversions_value DESC
-    `),
-    customer.query(`
-      SELECT
-        segments.product_item_id
-      FROM shopping_performance_view
-      WHERE ${recentDateClause}
+      WHERE segments.date BETWEEN '${statusStart}' AND '${statusEnd}'
         AND campaign.status = 'ENABLED'
-    `),
-  ]);
-
-  // Set de SKUs que aparecem em campanhas ativas (WHERE confiável)
-  const enabledSkuIds = new Set<string>();
-  for (const row of enabledRows) {
-    const r = row as Record<string, Record<string, unknown>>;
-    enabledSkuIds.add((r.segments?.product_item_id as string) || "unknown");
+    `);
+    enabledSkuIds = new Set<string>();
+    for (const row of enabledRows) {
+      const r = row as Record<string, Record<string, unknown>>;
+      enabledSkuIds.add((r.segments?.product_item_id as string) || "unknown");
+    }
+  } catch {
+    // Status query falhou — todos ficam ENABLED por default
   }
 
   // Agrupar por SKU (product_item_id)
@@ -169,7 +164,7 @@ export async function fetchAllSkuMetrics(
       costBRL: 0,
       conversions: 0,
       revenue: 0,
-      campaignStatus: enabledSkuIds.has(skuId) ? "ENABLED" as const : "PAUSED" as const,
+      campaignStatus: !enabledSkuIds || enabledSkuIds.has(skuId) ? "ENABLED" as const : "PAUSED" as const,
     };
 
     existing.impressions += (r.metrics?.impressions as number) || 0;
