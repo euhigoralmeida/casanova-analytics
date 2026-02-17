@@ -13,7 +13,24 @@ import {
   Tooltip,
   Legend,
 } from "recharts";
-import type { GA4DailyPoint } from "@/types/api";
+import type { GA4DailyPoint, RechartsFormatter } from "@/types/api";
+
+const GA4_LABELS: Record<string, string> = {
+  sessions: "Sessões",
+  pageViews: "Page Views",
+  viewItems: "View Content",
+  addToCarts: "Add to Cart",
+  checkouts: "Initiate Checkout",
+  shippingInfos: "Shipping Info",
+  paymentInfos: "Payment Info",
+  purchases: "Purchase",
+};
+
+const fmtFunnel: RechartsFormatter = (value, name) => {
+  const v = Number(value ?? 0);
+  if (name === "revenueK") return [`R$ ${(v * 1000).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`, "Receita"];
+  return [v.toLocaleString("pt-BR"), GA4_LABELS[name as string] ?? String(name)];
+};
 
 const GA4FunnelChart = React.memo(function GA4FunnelChart({ data }: { data: GA4DailyPoint[] }) {
   const chartData = data.map((p) => ({
@@ -39,22 +56,7 @@ const GA4FunnelChart = React.memo(function GA4FunnelChart({ data }: { data: GA4D
             tickFormatter={(v: number) => `R$${v}k`}
           />
           <Tooltip
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            formatter={(value: any, name: any) => {
-              const v = Number(value ?? 0);
-              if (name === "revenueK") return [`R$ ${(v * 1000).toLocaleString("pt-BR", { maximumFractionDigits: 0 })}`, "Receita"];
-              const labels: Record<string, string> = {
-                sessions: "Sessões",
-                pageViews: "Page Views",
-                viewItems: "View Content",
-                addToCarts: "Add to Cart",
-                checkouts: "Initiate Checkout",
-                shippingInfos: "Shipping Info",
-                paymentInfos: "Payment Info",
-                purchases: "Purchase",
-              };
-              return [v.toLocaleString("pt-BR"), labels[name as string] ?? name];
-            }}
+            formatter={fmtFunnel}
             labelFormatter={(label: unknown) => `Dia ${label}`}
           />
           <Legend formatter={(value: unknown) => {

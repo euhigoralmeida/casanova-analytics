@@ -50,14 +50,6 @@ export function verifySessionToken(token: string): SessionPayload | null {
 export const SESSION_COOKIE = COOKIE_NAME;
 export const SESSION_MAX_AGE = MAX_AGE;
 
-/** Extract tenantId from request cookie. Returns "default" as fallback. */
-export function extractTenantId(req: { cookies: { get: (name: string) => { value: string } | undefined } }): string {
-  const cookie = req.cookies.get(COOKIE_NAME);
-  if (!cookie) return "default";
-  const session = verify(cookie.value);
-  return session?.tenantId ?? "default";
-}
-
 /** Get full session from request, or null if not authenticated */
 export function getSession(req: { cookies: { get: (name: string) => { value: string } | undefined } }): SessionPayload | null {
   const cookie = req.cookies.get(COOKIE_NAME);

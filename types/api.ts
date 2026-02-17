@@ -221,3 +221,16 @@ export const PLANNING_TARGET_INPUT_METRICS = [
 ] as const;
 
 export type PlanningTargetInputMetric = (typeof PLANNING_TARGET_INPUT_METRICS)[number];
+
+/* =========================
+   Recharts formatter types — lib uses `any` internally, safe to type as unknown
+========================= */
+
+/** Recharts Tooltip formatter callback */
+export type RechartsFormatter = (value: unknown, name: unknown) => [string, string];
+
+/** Recharts Tooltip labelFormatter callback */
+export type RechartsLabelFormatter = (label: unknown) => string;
+
+/** Recharts Legend formatter callback */
+export type RechartsLegendFormatter = (value: unknown) => string;

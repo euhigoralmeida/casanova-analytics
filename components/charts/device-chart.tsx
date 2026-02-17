@@ -12,6 +12,7 @@ import {
   Legend,
 } from "recharts";
 import type { DeviceSlice } from "@/lib/intelligence/data-layer/types";
+import type { RechartsFormatter } from "@/types/api";
 import { formatBRL } from "@/lib/format";
 
 const DEVICE_LABELS: Record<string, string> = {
@@ -21,6 +22,11 @@ const DEVICE_LABELS: Record<string, string> = {
   CONNECTED_TV: "TV",
   OTHER: "Outro",
 };
+
+const fmtDevice: RechartsFormatter = (value, name) => [
+  formatBRL(Number(value)),
+  name === "receita" ? "Receita" : "Investimento",
+];
 
 interface DeviceChartProps {
   data: DeviceSlice[];
@@ -43,20 +49,14 @@ const DeviceChart = React.memo(function DeviceChart({ data }: DeviceChartProps) 
         <XAxis dataKey="name" tick={{ fontSize: 11 }} />
         <YAxis tick={{ fontSize: 11 }} tickFormatter={(v: number) => `${(v / 1000).toFixed(0)}k`} />
         <Tooltip
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(value: any, name: any) => [
-            formatBRL(value),
-            name === "receita" ? "Receita" : "Investimento",
-          ]}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          labelFormatter={(label: any) => {
+          formatter={fmtDevice}
+          labelFormatter={(label: unknown) => {
             const item = chartData.find((d) => d.name === label);
             return `${label} — ROAS ${item?.roas.toFixed(1) ?? "0"}`;
           }}
         />
         <Legend
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(value: any) => (value === "receita" ? "Receita" : "Investimento")}
+          formatter={(value: unknown) => (value === "receita" ? "Receita" : "Investimento")}
         />
         <Bar dataKey="receita" fill="#10b981" radius={[4, 4, 0, 0]} />
         <Bar dataKey="investimento" fill="#ef4444" radius={[4, 4, 0, 0]} />

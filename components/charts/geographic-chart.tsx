@@ -11,6 +11,7 @@ import {
   Tooltip,
 } from "recharts";
 import type { GeographicSlice } from "@/lib/intelligence/data-layer/types";
+import type { RechartsFormatter } from "@/types/api";
 import { formatBRL } from "@/lib/format";
 
 interface GeographicChartProps {
@@ -41,14 +42,12 @@ const GeographicChart = React.memo(function GeographicChart({ data, maxRegions =
         />
         <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={110} />
         <Tooltip
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(value: any, name: any) => {
-            if (name === "receita") return [formatBRL(value), "Receita"];
-            if (name === "sessoes") return [value.toLocaleString("pt-BR"), "Sessões"];
-            return [value, name];
-          }}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          labelFormatter={(label: any) => {
+          formatter={((value: unknown, name: unknown) => {
+            if (name === "receita") return [formatBRL(Number(value)), "Receita"];
+            if (name === "sessoes") return [Number(value).toLocaleString("pt-BR"), "Sessões"];
+            return [String(value), String(name)];
+          }) as RechartsFormatter}
+          labelFormatter={(label: unknown) => {
             const item = chartData.find((d) => d.name === label);
             return `${item?.fullName ?? label} (${item?.share.toFixed(0)}%)`;
           }}

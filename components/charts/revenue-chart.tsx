@@ -13,6 +13,12 @@ import {
   Legend,
 } from "recharts";
 import type { ChartPoint } from "./chart-types";
+import type { RechartsFormatter } from "@/types/api";
+
+const fmtRevenue: RechartsFormatter = (value, name) => [
+  `R$ ${Number(value ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
+  name === "revenue" ? "Receita" : "Gasto Ads",
+];
 
 const RevenueChart = React.memo(function RevenueChart({ data }: { data: ChartPoint[] }) {
   return (
@@ -25,11 +31,7 @@ const RevenueChart = React.memo(function RevenueChart({ data }: { data: ChartPoi
           tickFormatter={(v: number) => `R$${(v / 1000).toFixed(0)}k`}
         />
         <Tooltip
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(value: any, name: any) => [
-            `R$ ${Number(value ?? 0).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
-            name === "revenue" ? "Receita" : "Gasto Ads",
-          ]}
+          formatter={fmtRevenue}
           labelFormatter={(label: unknown) => `Dia ${label}`}
         />
         <Legend formatter={(value: unknown) => (value === "revenue" ? "Receita" : "Gasto Ads")} />

@@ -13,6 +13,12 @@ import {
   Legend,
 } from "recharts";
 import type { ChartPoint } from "./chart-types";
+import type { RechartsFormatter } from "@/types/api";
+
+const fmtConversions: RechartsFormatter = (value, name) => [
+  Number(value ?? 0).toLocaleString("pt-BR"),
+  name === "conversions" ? "Conversões" : "CPC (R$)",
+];
 
 const ConversionsChart = React.memo(function ConversionsChart({ data }: { data: ChartPoint[] }) {
   return (
@@ -22,11 +28,7 @@ const ConversionsChart = React.memo(function ConversionsChart({ data }: { data: 
         <XAxis dataKey="label" tick={{ fontSize: 11 }} />
         <YAxis tick={{ fontSize: 11 }} />
         <Tooltip
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(value: any, name: any) => [
-            Number(value ?? 0).toLocaleString("pt-BR"),
-            name === "conversions" ? "Conversões" : "CPC (R$)",
-          ]}
+          formatter={fmtConversions}
           labelFormatter={(label: unknown) => `Dia ${label}`}
         />
         <Legend formatter={(value: unknown) => (value === "conversions" ? "Conversões" : "CPC (R$)")} />

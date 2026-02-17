@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DateRange, ApiResponse, OverviewResponse, CampaignsResponse, TimeSeriesResponse, GA4DataResponse } from "@/types/api";
 import { useDateRange } from "@/hooks/use-date-range";
 import { defaultRange, alertColors, channelColors, channelLabels } from "@/lib/constants";
-import { formatBRL, formatPct, fmtConv, fmtDate, roasStatus, cpaStatus, marginStatus } from "@/lib/format";
+import { formatBRL, formatPct, fmtConv, fmtDateSlash, roasStatus, cpaStatus, marginStatus } from "@/lib/format";
 import DateRangePicker from "@/components/ui/date-range-picker";
 import Kpi from "@/components/ui/kpi-card";
 import StatusBadge from "@/components/ui/status-badge";
@@ -27,7 +27,7 @@ export default function AquisicaoPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [skuPage, setSkuPage] = useState(0);
-  const [viewMode, setViewMode] = useState<"skus" | "campaigns" | "meta">("skus");
+  const [viewMode, setViewMode] = useState<"skus" | "campaigns">("skus");
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
@@ -109,7 +109,7 @@ export default function AquisicaoPage() {
       if (campsRes?.ok) setCampaigns(await campsRes.json());
       if (ga4Res?.ok) setGa4Data(await ga4Res.json());
     } catch {
-      setError("Não foi possível carregar os dados.");
+      setError("Erro ao carregar dados. Tente novamente ou aguarde alguns minutos.");
     } finally {
       setLoading(false);
     }
@@ -185,7 +185,7 @@ export default function AquisicaoPage() {
         <div>
           <h1 className="text-xl font-bold text-zinc-900">Google Ads</h1>
           <p className="text-sm text-zinc-500 mt-0.5">
-            {fmtDate(new Date(dateRange.startDate + "T12:00:00")).split("-").reverse().join("/")} — {fmtDate(new Date(dateRange.endDate + "T12:00:00")).split("-").reverse().join("/")}
+            {fmtDateSlash(dateRange.startDate)} — {fmtDateSlash(dateRange.endDate)}
             {overview && (
               <span className="ml-2 text-zinc-400">
                 {overview.source === "google-ads" ? `${overview.totalSkus} SKUs` : "Dados mock"}
@@ -285,12 +285,6 @@ export default function AquisicaoPage() {
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === "campaigns" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
           >
             Campanhas
-          </button>
-          <button
-            onClick={() => setViewMode("meta")}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${viewMode === "meta" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
-          >
-            Meta Ads
           </button>
         </div>
       )}
@@ -538,26 +532,6 @@ export default function AquisicaoPage() {
           </div>
         );
       })()}
-
-      {/* ─── META ADS — EM BREVE ─── */}
-      {viewMode === "meta" && (
-        <div className="rounded-2xl border bg-white p-8 text-center">
-          <div className="mx-auto max-w-md">
-            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-gradient-to-br from-blue-500 via-purple-500 to-pink-500 flex items-center justify-center">
-              <span className="text-white text-2xl font-bold">M</span>
-            </div>
-            <h3 className="text-lg font-semibold text-zinc-900 mb-2">Meta Ads — Em breve</h3>
-            <p className="text-sm text-zinc-500 mb-4">
-              Integração com Facebook Ads e Instagram Ads em desenvolvimento.
-              Acompanhe campanhas, ROAS e conversões do Meta junto com Google Ads.
-            </p>
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-purple-50 text-purple-700 text-xs font-medium">
-              <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
-              Em desenvolvimento
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* ─── GRÁFICOS ─── */}
       {timeseries && timeseries.series.length > 1 && !loading && (

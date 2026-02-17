@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isConfigured, getCustomer } from "@/lib/google-ads";
 import { fetchAllCampaignMetrics } from "@/lib/queries";
+import { requireAuth } from "@/lib/api-helpers";
 
 /* =========================
    Mock data (fallback)
@@ -61,6 +62,9 @@ function buildMockCampaigns() {
 ========================= */
 
 export async function GET(request: NextRequest) {
+  const auth = requireAuth(request);
+  if ("error" in auth) return auth.error;
+
   const { searchParams } = request.nextUrl;
   const period = searchParams.get("period") ?? "7d";
   const startDate = searchParams.get("startDate") ?? undefined;

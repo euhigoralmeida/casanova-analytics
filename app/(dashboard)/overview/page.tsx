@@ -6,7 +6,7 @@ import { useDateRange } from "@/hooks/use-date-range";
 import type { IntelligenceResponse } from "@/lib/intelligence/types";
 import type { CognitiveResponse } from "@/lib/intelligence/communication/types";
 import { defaultRange, smartAlertStyles } from "@/lib/constants";
-import { formatBRL, fmtDate } from "@/lib/format";
+import { formatBRL, fmtDateSlash } from "@/lib/format";
 import DateRangePicker from "@/components/ui/date-range-picker";
 import ChartsSection from "@/components/charts/charts-section";
 import Kpi from "@/components/ui/kpi-card";
@@ -49,7 +49,7 @@ export default function VisaoGeralPage() {
       if (ga4Res?.ok) setGa4Data(await ga4Res.json());
       if (intelRes?.ok) setIntelligence(await intelRes.json());
     } catch {
-      setError("Não foi possível carregar os dados.");
+      setError("Erro ao carregar dados. Tente novamente ou aguarde alguns minutos.");
     } finally {
       setLoading(false);
     }
@@ -104,7 +104,7 @@ export default function VisaoGeralPage() {
         <div>
           <h1 className="text-xl font-bold text-zinc-900">Visão Geral</h1>
           <p className="text-sm text-zinc-500 mt-0.5">
-            {fmtDate(new Date(dateRange.startDate + "T12:00:00")).split("-").reverse().join("/")} — {fmtDate(new Date(dateRange.endDate + "T12:00:00")).split("-").reverse().join("/")}
+            {fmtDateSlash(dateRange.startDate)} — {fmtDateSlash(dateRange.endDate)}
             {overview && (
               <span className="ml-2 text-zinc-400">
                 {overview.source === "google-ads" ? `Google Ads • ${overview.totalSkus} SKUs` : "Dados mock"}
@@ -234,7 +234,9 @@ export default function VisaoGeralPage() {
           ) : (
             <div className="rounded-2xl border border-zinc-200 bg-white p-5">
               <h2 className="text-sm font-semibold text-zinc-800 mb-3">Recomendações</h2>
-              <p className="text-sm text-zinc-400">Carregando análise inteligente...</p>
+              <p className="text-sm text-zinc-400">
+                {loading ? "Carregando análise inteligente..." : "Análise indisponível neste período."}
+              </p>
             </div>
           )}
 

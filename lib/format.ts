@@ -33,6 +33,12 @@ export function fmtDateBR(d: Date): string {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
+/** Format as dd/mm/yyyy (compact, for headers) */
+export function fmtDateSlash(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()}`;
+}
+
 /* =========================
    Helpers de status (KPI)
 ========================= */

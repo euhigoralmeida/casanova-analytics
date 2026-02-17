@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
-import { Save, Loader2, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { Save, Loader2, CheckCircle2, AlertCircle, RefreshCw, Download } from "lucide-react";
 import { YearSelector } from "@/components/planning/year-selector";
 import { AnnualPlanningTable } from "@/components/planning/annual-planning-table";
 import { TargetPlanningTable } from "@/components/planning/target-planning-table";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import type { PlanningYearData } from "@/types/api";
+import { PLANNING_TARGET_ROWS, computeTargetFullYear } from "@/lib/planning-target-calc";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 type SyncStatus = "idle" | "syncing" | "synced" | "error";
@@ -43,6 +44,35 @@ export default function PlanningPage() {
   const dirty = isActual ? actualDirty : targetDirty;
   const loading = isActual ? actualLoading : targetLoading;
 
+  const MONTH_LABELS = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
+
+  function exportPlanningCSV() {
+    const data = isActual ? actualData : targetData;
+    const computed = computeTargetFullYear(data);
+    const rows = PLANNING_TARGET_ROWS;
+    const bom = "\uFEFF";
+    const sep = ";";
+
+    const header = ["Métrica", ...MONTH_LABELS].join(sep);
+    const lines = rows.map((row) => {
+      const cells = [row.label];
+      for (let m = 1; m <= 12; m++) {
+        const val = computed.months[m]?.[row.key];
+        cells.push(val != null ? String(val) : "");
+      }
+      return cells.join(sep);
+    });
+
+    const csv = bom + [header, ...lines].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `planejamento-${isActual ? "atual" : "metas"}-${year}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // Load actual data
   useEffect(() => {
     let cancelled = false;
@@ -67,7 +97,7 @@ export default function PlanningPage() {
       .catch(() => {
         if (!cancelled) {
           setActualLoading(false);
-          setLoadError("Não foi possível carregar os dados de planejamento.");
+          setLoadError("Erro ao carregar dados. Tente novamente ou aguarde alguns minutos.");
         }
       });
 
@@ -95,7 +125,7 @@ export default function PlanningPage() {
       .catch(() => {
         if (!cancelled) {
           setTargetLoading(false);
-          setLoadError("Não foi possível carregar as metas de planejamento.");
+          setLoadError("Erro ao carregar dados. Tente novamente ou aguarde alguns minutos.");
         }
       });
 
@@ -279,6 +309,17 @@ export default function PlanningPage() {
               <AlertCircle className="h-4 w-4" /> Erro ao sincronizar
             </span>
           )}
+
+          {/* CSV Export */}
+          <button
+            onClick={exportPlanningCSV}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 shadow-sm transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50"
+            title="Exportar CSV"
+          >
+            <Download className="h-4 w-4" />
+            CSV
+          </button>
 
           {/* Sync button (only actual tab) */}
           {isActual && (

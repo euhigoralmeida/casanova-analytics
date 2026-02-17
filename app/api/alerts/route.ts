@@ -3,6 +3,7 @@ import { isConfigured, getCustomer, computeComparisonDates } from "@/lib/google-
 import { fetchAccountTotals, fetchAllCampaignMetrics, fetchAllSkuMetrics, fetchAccountTimeSeries } from "@/lib/queries";
 import { computeAllSmartAlerts } from "@/lib/alert-engine";
 import type { SmartAlert, SmartAlertsResponse } from "@/lib/alert-types";
+import { requireAuth } from "@/lib/api-helpers";
 
 /* =========================
    Mock fallback
@@ -95,6 +96,9 @@ function buildMockAlerts(): SmartAlert[] {
 ========================= */
 
 export async function GET(request: NextRequest) {
+  const auth = requireAuth(request);
+  if ("error" in auth) return auth.error;
+
   const { searchParams } = request.nextUrl;
   const period = searchParams.get("period") ?? "7d";
   const startDate = searchParams.get("startDate") ?? undefined;

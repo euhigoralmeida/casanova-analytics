@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isConfigured, getCustomer } from "@/lib/google-ads";
 import { fetchAllSkuMetrics, fetchAccountTotals } from "@/lib/queries";
-import { extractTenantId } from "@/lib/auth";
+import { requireAuth } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 import { computeTargetMonth } from "@/lib/planning-target-calc";
 import { loadSkuExtras } from "@/lib/sku-master";
@@ -108,7 +108,10 @@ export async function GET(request: NextRequest) {
   const startDate = searchParams.get("startDate") ?? undefined;
   const endDate = searchParams.get("endDate") ?? undefined;
 
-  const tenantId = extractTenantId(request);
+  const auth = requireAuth(request);
+  if ("error" in auth) return auth.error;
+  const tenantId = auth.session.tenantId;
+
   const [targets, skuExtras] = await Promise.all([
     getPlanningTargets(tenantId),
     loadSkuExtras(tenantId),

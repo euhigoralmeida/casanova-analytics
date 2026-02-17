@@ -14,6 +14,13 @@ import {
   Legend,
 } from "recharts";
 import type { ChartPoint } from "./chart-types";
+import type { RechartsFormatter } from "@/types/api";
+
+const fmtTraffic: RechartsFormatter = (value, name) => {
+  const v = Number(value ?? 0);
+  if (name === "ctr") return [`${v.toFixed(2)}%`, "CTR"];
+  return [v.toLocaleString("pt-BR"), name === "impressions" ? "Impressões" : "Cliques"];
+};
 
 const TrafficChart = React.memo(function TrafficChart({ data }: { data: ChartPoint[] }) {
   return (
@@ -33,12 +40,7 @@ const TrafficChart = React.memo(function TrafficChart({ data }: { data: ChartPoi
           tickFormatter={(v: number) => `${v}%`}
         />
         <Tooltip
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(value: any, name: any) => {
-            const v = Number(value ?? 0);
-            if (name === "ctr") return [`${v.toFixed(2)}%`, "CTR"];
-            return [v.toLocaleString("pt-BR"), name === "impressions" ? "Impressões" : "Cliques"];
-          }}
+          formatter={fmtTraffic}
           labelFormatter={(label: unknown) => `Dia ${label}`}
         />
         <Legend formatter={(value: unknown) => {

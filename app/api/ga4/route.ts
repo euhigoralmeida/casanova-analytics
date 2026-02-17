@@ -1,12 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
 import { fetchEcommerceFunnel, fetchGA4Summary, fetchGA4FunnelTimeSeries, fetchChannelAcquisition } from "@/lib/ga4-queries";
+import { requireAuth } from "@/lib/api-helpers";
 
 /* =========================
    GET handler — v2
 ========================= */
 
 export async function GET(request: NextRequest) {
+  const auth = requireAuth(request);
+  if ("error" in auth) return auth.error;
+
   const { searchParams } = request.nextUrl;
   const startDate = searchParams.get("startDate") ?? undefined;
   const endDate = searchParams.get("endDate") ?? undefined;

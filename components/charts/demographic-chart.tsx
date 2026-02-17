@@ -11,6 +11,7 @@ import {
   Tooltip,
 } from "recharts";
 import type { DemographicSlice } from "@/lib/intelligence/data-layer/types";
+import type { RechartsFormatter } from "@/types/api";
 import { formatBRL } from "@/lib/format";
 
 const AGE_LABELS: Record<string, string> = {
@@ -55,12 +56,11 @@ const DemographicChart = React.memo(function DemographicChart({ data, view }: De
         <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={(v) => formatBRL(v)} />
         <YAxis dataKey="name" type="category" tick={{ fontSize: 11 }} width={70} />
         <Tooltip
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(value: any, name: any) => {
-            if (name === "receita") return [formatBRL(value), "Receita"];
-            if (name === "sessoes") return [value.toLocaleString("pt-BR"), "Sessões"];
-            return [value, name];
-          }}
+          formatter={((value: unknown, name: unknown) => {
+            if (name === "receita") return [formatBRL(Number(value)), "Receita"];
+            if (name === "sessoes") return [Number(value).toLocaleString("pt-BR"), "Sessões"];
+            return [String(value), String(name)];
+          }) as RechartsFormatter}
         />
         <Bar dataKey="receita" fill="#8b5cf6" radius={[0, 4, 4, 0]} />
       </BarChart>

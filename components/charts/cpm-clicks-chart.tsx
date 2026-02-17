@@ -13,6 +13,13 @@ import {
   Legend,
 } from "recharts";
 import type { ChartPoint } from "./chart-types";
+import type { RechartsFormatter } from "@/types/api";
+
+const fmtCpm: RechartsFormatter = (value, name) => {
+  const v = Number(value ?? 0);
+  if (name === "cpm") return [`R$ ${v.toFixed(2)}`, "CPM"];
+  return [v.toLocaleString("pt-BR"), "Cliques"];
+};
 
 const CpmClicksChart = React.memo(function CpmClicksChart({ data }: { data: ChartPoint[] }) {
   return (
@@ -32,12 +39,7 @@ const CpmClicksChart = React.memo(function CpmClicksChart({ data }: { data: Char
           tickFormatter={(v: number) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v)}
         />
         <Tooltip
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(value: any, name: any) => {
-            const v = Number(value ?? 0);
-            if (name === "cpm") return [`R$ ${v.toFixed(2)}`, "CPM"];
-            return [v.toLocaleString("pt-BR"), "Cliques"];
-          }}
+          formatter={fmtCpm}
           labelFormatter={(label: unknown) => `Dia ${label}`}
         />
         <Legend formatter={(value: unknown) => {

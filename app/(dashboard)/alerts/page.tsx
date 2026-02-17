@@ -73,7 +73,7 @@ export default function AlertsPage() {
       const json: SmartAlertsResponse = await res.json();
       setData(json);
     } catch {
-      setError("Não foi possível carregar os alertas.");
+      setError("Erro ao carregar dados. Tente novamente ou aguarde alguns minutos.");
     } finally {
       setLoading(false);
     }
@@ -257,7 +257,10 @@ export default function AlertsPage() {
       {/* Error */}
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex items-center justify-between">
-          <p className="text-sm text-red-700">{error}</p>
+          <div>
+            <p className="font-semibold text-red-800">Erro</p>
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
           <button
             onClick={() => loadAlerts(dateRange)}
             className="px-3 py-1.5 text-sm bg-red-100 text-red-800 rounded-lg hover:bg-red-200 font-medium flex-shrink-0"

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { DateRange, GA4DataResponse } from "@/types/api";
 import { defaultRange } from "@/lib/constants";
-import { formatBRL, fmtDate } from "@/lib/format";
+import { formatBRL, fmtDateSlash } from "@/lib/format";
 import DateRangePicker from "@/components/ui/date-range-picker";
 import GA4FunnelChart from "@/components/charts/ga4-funnel-chart";
 import { RefreshCw } from "lucide-react";
@@ -22,7 +22,7 @@ export default function FunilPage() {
       if (!res.ok) throw new Error("Erro ao carregar dados GA4");
       setGa4Data(await res.json());
     } catch {
-      setError("Não foi possível carregar os dados do funil.");
+      setError("Erro ao carregar dados. Tente novamente ou aguarde alguns minutos.");
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,7 @@ export default function FunilPage() {
         <div>
           <h1 className="text-xl font-bold text-zinc-900">Funil E-commerce</h1>
           <p className="text-sm text-zinc-500 mt-0.5">
-            {fmtDate(new Date(dateRange.startDate + "T12:00:00")).split("-").reverse().join("/")} — {fmtDate(new Date(dateRange.endDate + "T12:00:00")).split("-").reverse().join("/")}
+            {fmtDateSlash(dateRange.startDate)} — {fmtDateSlash(dateRange.endDate)}
             {ga4Data?.source === "ga4" && <span className="ml-2 text-zinc-400">GA4</span>}
             {loading && <span className="ml-2 text-zinc-400">Atualizando...</span>}
           </p>
@@ -81,7 +81,7 @@ export default function FunilPage() {
             <p className="font-semibold text-red-800">Erro</p>
             <p className="text-sm text-red-700">{error}</p>
           </div>
-          <button onClick={() => loadData(dateRange)} className="px-3 py-1.5 text-sm bg-red-100 text-red-800 rounded-lg hover:bg-red-200 font-medium">Tentar novamente</button>
+          <button onClick={() => loadData(dateRange)} className="px-3 py-1.5 text-sm bg-red-100 text-red-800 rounded-lg hover:bg-red-200 font-medium flex-shrink-0">Tentar novamente</button>
         </div>
       )}
 
@@ -266,11 +266,17 @@ export default function FunilPage() {
       )}
 
       {/* ─── GRÁFICO DIÁRIO FUNIL ─── */}
-      {dailySeries && dailySeries.length > 1 && (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-5">
-          <h2 className="text-sm font-semibold text-zinc-800 mb-4">Tendência Diária do Funil</h2>
-          <GA4FunnelChart data={dailySeries} />
-        </div>
+      {ga4Data?.source === "ga4" && (
+        dailySeries && dailySeries.length > 1 ? (
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+            <h2 className="text-sm font-semibold text-zinc-800 mb-4">Tendência Diária do Funil</h2>
+            <GA4FunnelChart data={dailySeries} />
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5 text-center">
+            <p className="text-sm text-zinc-400">Dados insuficientes para gerar gráfico de tendência diária.</p>
+          </div>
+        )
       )}
     </div>
   );

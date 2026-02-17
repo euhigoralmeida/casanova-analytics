@@ -12,6 +12,9 @@ import {
   Legend,
 } from "recharts";
 import type { ChartPoint } from "./chart-types";
+import type { RechartsFormatter } from "@/types/api";
+
+const fmtRoas: RechartsFormatter = (value) => [Number(value ?? 0).toFixed(2), "ROAS"];
 
 const RoasChart = React.memo(function RoasChart({ data }: { data: ChartPoint[] }) {
   return (
@@ -21,8 +24,7 @@ const RoasChart = React.memo(function RoasChart({ data }: { data: ChartPoint[] }
         <XAxis dataKey="label" tick={{ fontSize: 11 }} />
         <YAxis tick={{ fontSize: 11 }} domain={[0, "auto"]} />
         <Tooltip
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          formatter={(value: any) => [Number(value ?? 0).toFixed(2), "ROAS"]}
+          formatter={fmtRoas}
           labelFormatter={(label: unknown) => `Dia ${label}`}
         />
         {/* Linha de meta ROAS 7 */}

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isConfigured, getCustomer } from "@/lib/google-ads";
 import { fetchSkuMetrics } from "@/lib/queries";
+import { requireAuth } from "@/lib/api-helpers";
 
 /* =========================
    Mock data (fallback)
@@ -85,6 +86,9 @@ function buildAlerts(roas: number, cpa: number, marginPct: number, stock: number
 ========================= */
 
 export async function GET(request: NextRequest) {
+  const auth = requireAuth(request);
+  if ("error" in auth) return auth.error;
+
   const { searchParams } = request.nextUrl;
   const period = searchParams.get("period") ?? "7d";
   const sku = searchParams.get("sku") ?? defaultSku;

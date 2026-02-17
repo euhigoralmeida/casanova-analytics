@@ -9,6 +9,7 @@ import { defaultRange } from "@/lib/constants";
 import { formatBRL } from "@/lib/format";
 import DateRangePicker from "@/components/ui/date-range-picker";
 import Kpi from "@/components/ui/kpi-card";
+import { KpiSkeleton, ChartSkeleton } from "@/components/ui/skeleton";
 import DeviceChart from "@/components/charts/device-chart";
 import DemographicChart from "@/components/charts/demographic-chart";
 import GeographicChart from "@/components/charts/geographic-chart";
@@ -72,7 +73,7 @@ export default function SegmentsPage() {
       setDemographics(data.segmentation?.demographics ?? []);
       setGeographic(data.segmentation?.geographic ?? []);
     } catch {
-      setError("Não foi possível carregar os dados de segmentação.");
+      setError("Erro ao carregar dados. Tente novamente ou aguarde alguns minutos.");
     } finally {
       setLoading(false);
     }
@@ -150,7 +151,10 @@ export default function SegmentsPage() {
 
       {error && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex items-center justify-between">
-          <p className="text-sm text-red-700">{error}</p>
+          <div>
+            <p className="font-semibold text-red-800">Erro</p>
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
           <button
             onClick={() => loadData(dateRange)}
             className="px-3 py-1.5 text-sm bg-red-100 text-red-800 rounded-lg hover:bg-red-200 font-medium flex-shrink-0"
@@ -161,19 +165,11 @@ export default function SegmentsPage() {
       )}
 
       {loading && (
-        <div className="space-y-4 animate-pulse">
+        <div className="space-y-4">
           <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-            {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="rounded-xl border border-zinc-200 bg-white p-3">
-                <div className="h-3 w-16 bg-zinc-200 rounded" />
-                <div className="h-6 w-24 bg-zinc-100 rounded mt-2" />
-              </div>
-            ))}
+            <KpiSkeleton /><KpiSkeleton /><KpiSkeleton /><KpiSkeleton />
           </div>
-          <div className="rounded-2xl border border-zinc-200 bg-white p-5">
-            <div className="h-4 w-48 bg-zinc-200 rounded" />
-            <div className="h-72 bg-zinc-100 rounded mt-3" />
-          </div>
+          <ChartSkeleton />
         </div>
       )}
 
