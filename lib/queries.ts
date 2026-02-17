@@ -13,6 +13,7 @@ export type SkuMetrics = {
   costBRL: number;
   conversions: number;
   revenue: number;
+  campaignStatus: "ENABLED" | "PAUSED";
 };
 
 /* =========================
@@ -36,6 +37,7 @@ export async function fetchSkuMetrics(
     SELECT
       segments.product_item_id,
       segments.product_title,
+      campaign.status,
       metrics.impressions,
       metrics.clicks,
       metrics.cost_micros,
@@ -44,7 +46,7 @@ export async function fetchSkuMetrics(
     FROM shopping_performance_view
     WHERE ${dateClause}
       AND segments.product_item_id = '${sku}'
-      AND campaign.status = 'ENABLED'
+      AND campaign.status != 'REMOVED'
   `);
 
   if (!rows.length) return null;
@@ -58,7 +60,10 @@ export async function fetchSkuMetrics(
     costBRL: 0,
     conversions: 0,
     revenue: 0,
+    campaignStatus: "PAUSED",
   };
+
+  let hasEnabled = false;
 
   for (const row of rows) {
     const r = row as Record<string, Record<string, unknown>>;
@@ -68,7 +73,10 @@ export async function fetchSkuMetrics(
     result.costBRL += ((r.metrics?.cost_micros as number) || 0) / 1_000_000;
     result.conversions += (r.metrics?.conversions as number) || 0;
     result.revenue += (r.metrics?.conversions_value as number) || 0;
+    if (resolveCampaignStatus(r.campaign?.status) === "ENABLED") hasEnabled = true;
   }
+
+  result.campaignStatus = hasEnabled ? "ENABLED" : "PAUSED";
 
   setCache(cacheKey, result);
   return result;
@@ -94,6 +102,7 @@ export async function fetchAllSkuMetrics(
     SELECT
       segments.product_item_id,
       segments.product_title,
+      campaign.status,
       metrics.impressions,
       metrics.clicks,
       metrics.cost_micros,
@@ -101,16 +110,18 @@ export async function fetchAllSkuMetrics(
       metrics.conversions_value
     FROM shopping_performance_view
     WHERE ${dateClause}
-      AND campaign.status = 'ENABLED'
+      AND campaign.status != 'REMOVED'
     ORDER BY metrics.conversions_value DESC
   `);
 
   // Agrupar por SKU (product_item_id)
   const map = new Map<string, SkuMetrics>();
+  const statusMap = new Map<string, Set<string>>();
 
   for (const row of rows) {
     const r = row as Record<string, Record<string, unknown>>;
     const skuId = (r.segments?.product_item_id as string) || "unknown";
+    const campStatus = resolveCampaignStatus(r.campaign?.status);
     const existing = map.get(skuId) ?? {
       sku: skuId,
       title: (r.segments?.product_title as string) || skuId,
@@ -119,6 +130,7 @@ export async function fetchAllSkuMetrics(
       costBRL: 0,
       conversions: 0,
       revenue: 0,
+      campaignStatus: "PAUSED" as const,
     };
 
     existing.impressions += (r.metrics?.impressions as number) || 0;
@@ -127,7 +139,16 @@ export async function fetchAllSkuMetrics(
     existing.conversions += (r.metrics?.conversions as number) || 0;
     existing.revenue += (r.metrics?.conversions_value as number) || 0;
 
+    if (!statusMap.has(skuId)) statusMap.set(skuId, new Set());
+    statusMap.get(skuId)!.add(campStatus);
+
     map.set(skuId, existing);
+  }
+
+  // Resolver campaignStatus: ENABLED se qualquer campanha estiver ativa
+  for (const [skuId, entry] of map) {
+    const statuses = statusMap.get(skuId)!;
+    entry.campaignStatus = statuses.has("ENABLED") ? "ENABLED" : "PAUSED";
   }
 
   const result = Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
@@ -169,7 +190,7 @@ export async function fetchAccountTotals(
       metrics.conversions_value
     FROM campaign
     WHERE ${dateClause}
-      AND campaign.status = 'ENABLED'
+      AND campaign.status != 'REMOVED'
   `);
 
   const result: AccountTotals = {

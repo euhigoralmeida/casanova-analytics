@@ -79,6 +79,7 @@ export type OverviewResponse = {
     ctr: number;
     conversions: number;
     status: "escalar" | "manter" | "pausar";
+    campaignStatus?: "ENABLED" | "PAUSED";
     ml: { price: number; ecomPrice: number; mlSales: number };
   }[];
 };

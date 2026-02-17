@@ -166,6 +166,7 @@ export async function GET(request: NextRequest) {
           ctr,
           conversions: purchases,
           status: deriveStatus(roas, cpa, marginPct, stock, purchases),
+          campaignStatus: data.campaignStatus,
           ml: {
             price: 0,
             ecomPrice: 0,

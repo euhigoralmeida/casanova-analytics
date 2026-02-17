@@ -33,6 +33,7 @@ export default function AquisicaoPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterChannel, setFilterChannel] = useState("all");
   const [filterCampStatus, setFilterCampStatus] = useState("all");
+  const [filterSkuCampStatus, setFilterSkuCampStatus] = useState("all");
   const [sortField, setSortField] = useState("");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const SKUS_PER_PAGE = 20;
@@ -56,8 +57,9 @@ export default function AquisicaoPage() {
       list = list.filter((s) => s.sku.toLowerCase().includes(q) || s.nome.toLowerCase().includes(q));
     }
     if (filterStatus !== "all") list = list.filter((s) => s.status === filterStatus);
+    if (filterSkuCampStatus !== "all") list = list.filter((s) => (s.campaignStatus ?? "ENABLED") === filterSkuCampStatus);
     return sortArray(list, sortField, sortDir);
-  }, [overview, searchQuery, filterStatus, sortField, sortDir]);
+  }, [overview, searchQuery, filterStatus, filterSkuCampStatus, sortField, sortDir]);
 
   const filteredCampaigns = useMemo(() => {
     if (!campaigns) return [];
@@ -86,6 +88,7 @@ export default function AquisicaoPage() {
     setFilterStatus("all");
     setFilterChannel("all");
     setFilterCampStatus("all");
+    setFilterSkuCampStatus("all");
     setSortField("");
     setSkuPage(0);
   }
@@ -340,6 +343,18 @@ export default function AquisicaoPage() {
                   </button>
                 ))}
               </div>
+              <span className="text-zinc-300">|</span>
+              <div className="flex gap-1">
+                {[
+                  { value: "all", label: "Todas" },
+                  { value: "ENABLED", label: "Ativas" },
+                  { value: "PAUSED", label: "Pausadas" },
+                ].map((opt) => (
+                  <button key={opt.value} onClick={() => { setFilterSkuCampStatus(opt.value); setSkuPage(0); }} className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${filterSkuCampStatus === opt.value ? "bg-zinc-200 text-zinc-700" : "bg-zinc-100 text-zinc-400 hover:text-zinc-600"}`}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -354,13 +369,14 @@ export default function AquisicaoPage() {
                     <SortableHeader label="Conv" field="conversions" current={sortField} dir={sortDir} onSort={handleSort} className="text-right w-14" />
                     <SortableHeader label="CPA" field="cpa" current={sortField} dir={sortDir} onSort={handleSort} className="text-right" />
                     <SortableHeader label="CTR" field="ctr" current={sortField} dir={sortDir} onSort={handleSort} className="text-right w-16" />
+                    <th className="py-2.5 px-2 text-center w-12">Camp.</th>
                     <th className="py-2.5 px-5 text-center w-16">Ação</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pageSkus.length === 0 && (
-                    <tr><td colSpan={10} className="py-8 text-center text-zinc-400 text-sm">
-                      {searchQuery || filterStatus !== "all" ? `Nenhum SKU encontrado${searchQuery ? ` para "${searchQuery}"` : ""}` : "Nenhum SKU disponível para o período."}
+                    <tr><td colSpan={11} className="py-8 text-center text-zinc-400 text-sm">
+                      {searchQuery || filterStatus !== "all" || filterSkuCampStatus !== "all" ? `Nenhum SKU encontrado${searchQuery ? ` para "${searchQuery}"` : ""}` : "Nenhum SKU disponível para o período."}
                     </td></tr>
                   )}
                   {pageSkus.map((s, i) => (
@@ -374,6 +390,7 @@ export default function AquisicaoPage() {
                       <td className="py-2 px-2 text-right tabular-nums">{fmtConv(s.conversions)}</td>
                       <td className="py-2 px-2 text-right tabular-nums">{s.conversions > 0 ? formatBRL(s.cpa) : "—"}</td>
                       <td className="py-2 px-2 text-right tabular-nums">{s.ctr > 0 ? `${s.ctr.toFixed(2)}%` : "—"}</td>
+                      <td className="py-2 px-2 text-center">{s.campaignStatus && <CampaignStatusBadge status={s.campaignStatus} />}</td>
                       <td className="py-2 px-5 text-center"><StatusBadge status={s.status} /></td>
                     </tr>
                   ))}
@@ -386,7 +403,7 @@ export default function AquisicaoPage() {
                       <td className="py-2.5 px-2 text-right tabular-nums">{formatBRL(overview.shoppingTotals.ads)}</td>
                       <td className="py-2.5 px-2 text-right tabular-nums">{overview.shoppingTotals.ads > 0 ? (overview.shoppingTotals.revenue / overview.shoppingTotals.ads).toFixed(1) : "—"}</td>
                       <td className="py-2.5 px-2 text-right tabular-nums">{fmtConv(overview.skus.reduce((sum, s) => sum + s.conversions, 0))}</td>
-                      <td className="py-2.5" colSpan={3} />
+                      <td className="py-2.5" colSpan={4} />
                     </tr>
                     {overview.accountTotals && (
                       <tr className="text-zinc-500 bg-zinc-50">
@@ -396,7 +413,7 @@ export default function AquisicaoPage() {
                         <td className="py-2 px-2 pb-3 text-right tabular-nums">{overview.accountTotals.ads > 0 ? (overview.accountTotals.revenue / overview.accountTotals.ads).toFixed(1) : "—"}</td>
                         <td className="py-2 px-2 pb-3 text-right tabular-nums">{fmtConv(overview.accountTotals.conversions)}</td>
                         <td className="py-2 px-2 pb-3 text-right tabular-nums">{overview.accountTotals.impressions > 0 ? `${(overview.accountTotals.clicks / overview.accountTotals.impressions * 100).toFixed(2)}%` : "—"}</td>
-                        <td className="py-2 pb-3" colSpan={2} />
+                        <td className="py-2 pb-3" colSpan={3} />
                       </tr>
                     )}
                   </tfoot>
