@@ -6,13 +6,13 @@ export function getAIConfig() {
     enabled: process.env.AI_ENABLED !== "false",
 
     chat: {
-      model: process.env.AI_CHAT_MODEL || "gemini-1.5-flash",
+      model: process.env.AI_CHAT_MODEL || "gemini-2.0-flash",
       maxTokens: 1024,
       temperature: 0.3,
     },
 
     insights: {
-      model: process.env.AI_INSIGHTS_MODEL || "gemini-1.5-flash",
+      model: process.env.AI_INSIGHTS_MODEL || "gemini-2.0-flash",
       maxTokens: 512,
       temperature: 0.2,
     },
