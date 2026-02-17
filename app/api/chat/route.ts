@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { getSession } from "@/lib/auth";
 import { AI_CONFIG } from "@/lib/ai/config";
-import { createGeminiClient } from "@/lib/ai/client";
+import { createGeminiClient, withRetry } from "@/lib/ai/client";
 import { GEMINI_TOOLS } from "@/lib/ai/tools";
 import { executeTool } from "@/lib/ai/tool-executor";
 import { buildContextSummary, buildPeriodContext } from "@/lib/ai/context-builder";
@@ -101,13 +101,13 @@ export async function POST(req: NextRequest) {
     // Start chat with history
     const chat = model.startChat({ history: geminiHistory });
 
-    // Send the last user message
+    // Send the last user message (with retry for 429 rate limits)
     const lastMessage = messages[messages.length - 1].content;
-    let result = await chat.sendMessage(lastMessage);
+    let result = await withRetry(() => chat.sendMessage(lastMessage));
     let response = result.response;
 
     // Agentic loop: handle function calls
-    const maxToolRounds = 5;
+    const maxToolRounds = 3;
     for (let round = 0; round < maxToolRounds; round++) {
       const functionCalls = response.functionCalls();
       if (!functionCalls || functionCalls.length === 0) break;
@@ -128,8 +128,8 @@ export async function POST(req: NextRequest) {
         });
       }
 
-      // Send function results back to the model
-      result = await chat.sendMessage(functionResponses);
+      // Send function results back to the model (with retry for 429)
+      result = await withRetry(() => chat.sendMessage(functionResponses));
       response = result.response;
     }
 
@@ -141,10 +141,19 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("Chat API error:", err);
-    const detail = err instanceof Error ? err.message : String(err);
-    return new Response(JSON.stringify({ error: "Erro ao processar pergunta", detail }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    const msg = err instanceof Error ? err.message : String(err);
+    const isRateLimit = msg.includes("429") || msg.includes("Resource exhausted");
+    return new Response(
+      JSON.stringify({
+        error: isRateLimit
+          ? "Limite de requisições da IA atingido. Aguarde ~15 segundos e tente novamente."
+          : "Erro ao processar pergunta",
+        detail: isRateLimit ? undefined : msg,
+      }),
+      {
+        status: isRateLimit ? 429 : 500,
+        headers: { "Content-Type": "application/json" },
+      },
+    );
   }
 }

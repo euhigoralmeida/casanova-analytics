@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
 import { AI_CONFIG } from "@/lib/ai/config";
-import { createGeminiClient } from "@/lib/ai/client";
+import { createGeminiClient, withRetry } from "@/lib/ai/client";
 import { buildContextSummary, buildPeriodContext } from "@/lib/ai/context-builder";
 import { insightsSystemPrompt, insightsUserPrompt } from "@/lib/ai/prompts";
 import { cacheGet, cacheSet, insightsCacheKey } from "@/lib/ai/cache";
@@ -70,8 +70,8 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    const result = await model.generateContent(
-      insightsUserPrompt(contextSummary, periodContext),
+    const result = await withRetry(() =>
+      model.generateContent(insightsUserPrompt(contextSummary, periodContext)),
     );
     const rawText = result.response.text();
 
