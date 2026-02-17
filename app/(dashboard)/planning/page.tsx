@@ -34,6 +34,7 @@ export default function PlanningPage() {
   const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
   const [syncedCount, setSyncedCount] = useState(0);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   // Derived
   const isActual = activeTab === "actual";
@@ -47,8 +48,12 @@ export default function PlanningPage() {
     setActualDirty(false);
     actualPending.current = [];
 
+    setLoadError(null);
     fetch(`/api/planning?year=${year}&planType=actual`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Erro ao carregar dados");
+        return r.json();
+      })
       .then((json) => {
         if (!cancelled) {
           setActualData(json.entries ?? {});
@@ -58,7 +63,10 @@ export default function PlanningPage() {
         }
       })
       .catch(() => {
-        if (!cancelled) setActualLoading(false);
+        if (!cancelled) {
+          setActualLoading(false);
+          setLoadError("Não foi possível carregar os dados de planejamento.");
+        }
       });
 
     return () => { cancelled = true; };
@@ -72,7 +80,10 @@ export default function PlanningPage() {
     targetPending.current = [];
 
     fetch(`/api/planning?year=${year}&planType=target`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Erro ao carregar metas");
+        return r.json();
+      })
       .then((json) => {
         if (!cancelled) {
           setTargetData(json.entries ?? {});
@@ -80,7 +91,10 @@ export default function PlanningPage() {
         }
       })
       .catch(() => {
-        if (!cancelled) setTargetLoading(false);
+        if (!cancelled) {
+          setTargetLoading(false);
+          setLoadError("Não foi possível carregar as metas de planejamento.");
+        }
       });
 
     return () => { cancelled = true; };
@@ -357,6 +371,13 @@ export default function PlanningPage() {
           </span>
         )}
       </div>
+
+      {/* Error */}
+      {loadError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {loadError}
+        </div>
+      )}
 
       {/* Table */}
       {loading ? (

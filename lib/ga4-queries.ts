@@ -60,23 +60,15 @@ export type GA4Response = {
 };
 
 /* =========================
-   GA4 Cache (5 min TTL)
+   GA4 Cache (shares 2-min TTL from google-ads.ts)
 ========================= */
-
-const GA4_TTL = 5 * 60 * 1000;
 
 function getGA4Cached<T>(key: string): T | null {
   return getCached<T>(`ga4:${key}`);
 }
 
 function setGA4Cache(key: string, data: unknown): void {
-  // Override the default 2-min cache with 5-min for GA4
-  const entry = { data, ts: Date.now() };
-  // Use the same cache map but with custom key prefix
   setCache(`ga4:${key}`, data);
-  // Note: relies on the 2-min TTL from google-ads.ts, but GA4 data changes less frequently
-  void entry;
-  void GA4_TTL;
 }
 
 /* =========================

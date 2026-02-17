@@ -23,7 +23,6 @@ const tenants: Tenant[] = [
     users: [
       {
         email: "admin@casanova.com",
-        // hash de "casanova2024" — gerado com bcrypt.hashSync("casanova2024", 10)
         passwordHash: "$2b$10$KmWh4VEMh1vOMCuXbe2KRe/lUansSYhDyKX7H5h/ZcEuDyKnfwWe2",
         role: "admin",
         name: "Admin Casanova",

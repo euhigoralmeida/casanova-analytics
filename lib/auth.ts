@@ -1,7 +1,12 @@
 import crypto from "crypto";
 
-const AUTH_SECRET = process.env.AUTH_SECRET || "dev-secret-change-in-production-32ch";
 const COOKIE_NAME = "ca_session";
+
+function getSecret(): string {
+  const secret = process.env.AUTH_SECRET;
+  if (!secret) throw new Error("AUTH_SECRET env var is required");
+  return secret;
+}
 const MAX_AGE = 86400; // 24h
 
 export type SessionPayload = {
@@ -14,7 +19,7 @@ export type SessionPayload = {
 function sign(payload: SessionPayload): string {
   const data = JSON.stringify(payload);
   const encoded = Buffer.from(data).toString("base64url");
-  const hmac = crypto.createHmac("sha256", AUTH_SECRET).update(encoded).digest("base64url");
+  const hmac = crypto.createHmac("sha256", getSecret()).update(encoded).digest("base64url");
   return `${encoded}.${hmac}`;
 }
 
@@ -22,7 +27,7 @@ function verify(token: string): SessionPayload | null {
   const [encoded, hmac] = token.split(".");
   if (!encoded || !hmac) return null;
 
-  const expected = crypto.createHmac("sha256", AUTH_SECRET).update(encoded).digest("base64url");
+  const expected = crypto.createHmac("sha256", getSecret()).update(encoded).digest("base64url");
   if (hmac !== expected) return null;
 
   try {

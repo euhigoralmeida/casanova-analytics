@@ -51,6 +51,7 @@ function SeverityIcon({ severity }: { severity: string }) {
 export default function AlertsPage() {
   const [dateRange, setDateRange] = useState<DateRange>(defaultRange);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<SmartAlertsResponse | null>(null);
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
@@ -59,6 +60,7 @@ export default function AlertsPage() {
 
   const loadAlerts = useCallback(async (range: DateRange) => {
     setLoading(true);
+    setError(null);
     try {
       const params = new URLSearchParams();
       params.set("period", range.preset ?? "custom");
@@ -66,12 +68,14 @@ export default function AlertsPage() {
       params.set("endDate", range.endDate);
 
       const res = await fetch(`/api/alerts?${params.toString()}`);
-      if (res.ok) {
-        const json: SmartAlertsResponse = await res.json();
-        setData(json);
-      }
-    } catch { /* silent */ }
-    finally { setLoading(false); }
+      if (!res.ok) throw new Error("Erro ao carregar alertas");
+      const json: SmartAlertsResponse = await res.json();
+      setData(json);
+    } catch {
+      setError("Não foi possível carregar os alertas.");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -220,6 +224,13 @@ export default function AlertsPage() {
               </button>
             </span>
           )}
+        </div>
+      )}
+
+      {/* Error */}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+          {error}
         </div>
       )}
 

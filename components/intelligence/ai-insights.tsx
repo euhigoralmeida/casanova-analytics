@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Sparkles, RefreshCw } from "lucide-react";
+import DOMPurify from "isomorphic-dompurify";
 
 interface AiInsightsProps {
   startDate: string;
@@ -87,14 +88,14 @@ export default function AiInsights({ startDate, endDate }: AiInsightsProps) {
         <div className="space-y-3">
           <div
             className="text-sm text-zinc-700 leading-relaxed prose prose-sm max-w-none prose-strong:text-violet-800"
-            dangerouslySetInnerHTML={{ __html: formatMarkdown(analysis) }}
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatMarkdown(analysis)) }}
           />
           {highlights.length > 0 && (
             <ul className="space-y-1.5 mt-3 pt-3 border-t border-violet-200">
               {highlights.map((h, i) => (
                 <li key={i} className="flex items-start gap-2 text-sm text-zinc-600">
                   <span className="text-violet-500 mt-0.5">•</span>
-                  <span dangerouslySetInnerHTML={{ __html: formatMarkdown(h) }} />
+                  <span dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatMarkdown(h)) }} />
                 </li>
               ))}
             </ul>

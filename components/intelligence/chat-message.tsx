@@ -1,5 +1,7 @@
 "use client";
 
+import DOMPurify from "isomorphic-dompurify";
+
 interface ChatMessageProps {
   role: "user" | "assistant";
   content: string;
@@ -20,7 +22,7 @@ export default function ChatMessage({ role, content }: ChatMessageProps) {
     <div className="flex justify-start">
       <div
         className="max-w-[85%] bg-violet-50 border border-violet-100 rounded-xl px-4 py-3 text-sm text-zinc-700 leading-relaxed prose prose-sm max-w-none prose-strong:text-violet-800"
-        dangerouslySetInnerHTML={{ __html: formatMarkdown(content) }}
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formatMarkdown(content)) }}
       />
     </div>
   );

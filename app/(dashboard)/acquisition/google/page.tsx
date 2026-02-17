@@ -154,8 +154,12 @@ export default function AquisicaoPage() {
 
   useEffect(() => {
     const range = defaultRange();
+    setLoading(true);
     fetch(`/api/overview?${buildParams(range)}`)
-      .then((r) => r.json())
+      .then((r) => {
+        if (!r.ok) throw new Error("Erro ao carregar overview");
+        return r.json();
+      })
       .then((overviewJson: OverviewResponse) => {
         setOverview(overviewJson);
         const firstSku = overviewJson.skus[0]?.sku ?? "27290BR-CP";
@@ -174,7 +178,8 @@ export default function AquisicaoPage() {
         if (campsJson) setCampaigns(campsJson);
         if (ga4Json) setGa4Data(ga4Json);
       })
-      .catch(() => setError("Não foi possível carregar os dados."));
+      .catch(() => setError("Não foi possível carregar os dados."))
+      .finally(() => setLoading(false));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

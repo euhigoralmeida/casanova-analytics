@@ -57,7 +57,7 @@ export default function FunilPage() {
           <p className="text-sm text-zinc-500 mt-0.5">
             {fmtDate(new Date(dateRange.startDate + "T12:00:00")).split("-").reverse().join("/")} — {fmtDate(new Date(dateRange.endDate + "T12:00:00")).split("-").reverse().join("/")}
             {ga4Data?.source === "ga4" && <span className="ml-2 text-zinc-400">GA4</span>}
-            {loading && <span className="ml-2 text-zinc-400">Carregando...</span>}
+            {loading && <span className="ml-2 text-zinc-400">Atualizando...</span>}
           </p>
         </div>
         <DateRangePicker value={dateRange} onChange={applyDateRange} loading={loading} />
@@ -71,6 +71,31 @@ export default function FunilPage() {
             <p className="text-sm text-red-700">{error}</p>
           </div>
           <button onClick={() => loadData(dateRange)} className="px-3 py-1.5 text-sm bg-red-100 text-red-800 rounded-lg hover:bg-red-200 font-medium">Tentar novamente</button>
+        </div>
+      )}
+
+      {/* ─── LOADING SKELETON ─── */}
+      {loading && !ga4Data && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+            <div className="h-4 w-40 bg-zinc-200 rounded animate-pulse mb-5" />
+            <div className="space-y-3">
+              {[100, 85, 60, 40, 20].map((w, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <div className="h-8 bg-zinc-100 rounded animate-pulse" style={{ width: `${w}%` }} />
+                  <div className="h-3 w-16 bg-zinc-100 rounded animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {[1, 2].map((i) => (
+              <div key={i} className="rounded-2xl border border-zinc-200 bg-white p-5">
+                <div className="h-4 w-32 bg-zinc-200 rounded animate-pulse mb-4" />
+                <div className="h-48 bg-zinc-100 rounded animate-pulse" />
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
