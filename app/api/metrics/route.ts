@@ -115,7 +115,7 @@ export async function GET(request: NextRequest) {
           source: "google-ads",
           skuTitle: sku,
           updatedAt: new Date().toISOString(),
-          cards: { roas: 0, cpa: 0, arpur: 0, marginPct, revenue: 0, ads: 0, grossProfit: 0, profitAfterAds: 0, stock, leadTimeDays, cpc: 0, cpm: 0 },
+          cards: { roas: 0, cpa: 0, arpur: 0, marginPct, revenue: 0, ads: 0, grossProfit: 0, profitAfterAds: 0, stock, leadTimeDays, cpc: 0, cpm: 0, conversions: 0, clicks: 0, convRate: 0 },
           alerts: [],
           funnel: [
             { etapa: "Impressões", qtd: 0, taxa: 100, custo: null },

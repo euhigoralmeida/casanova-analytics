@@ -33,7 +33,7 @@ export default function AquisicaoPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterChannel, setFilterChannel] = useState("all");
   const [filterCampStatus, setFilterCampStatus] = useState("all");
-  const [filterSkuCampStatus, setFilterSkuCampStatus] = useState("all");
+  const [filterSkuCampStatus, setFilterSkuCampStatus] = useState("ENABLED");
   const [sortField, setSortField] = useState("");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const SKUS_PER_PAGE = 20;
@@ -88,7 +88,7 @@ export default function AquisicaoPage() {
     setFilterStatus("all");
     setFilterChannel("all");
     setFilterCampStatus("all");
-    setFilterSkuCampStatus("all");
+    setFilterSkuCampStatus("ENABLED");
     setSortField("");
     setSkuPage(0);
   }
