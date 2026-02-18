@@ -14,7 +14,7 @@ import {
   fetchAccountTimeSeries,
   fetchSkuTimeSeries,
 } from "@/lib/queries";
-import { fetchEcommerceFunnel, fetchGA4Summary, fetchChannelAcquisition } from "@/lib/ga4-queries";
+import { fetchEcommerceFunnel, fetchGA4Summary, fetchChannelAcquisition, fetchRetentionSummary, fetchUserLifetimeValue, fetchCohortRetention } from "@/lib/ga4-queries";
 import { prisma } from "@/lib/db";
 import { computeTargetMonth } from "@/lib/planning-target-calc";
 
@@ -303,6 +303,44 @@ async function executeToolInternal(
         })),
         pacing: result.pacingProjections,
         resumo: result.executiveSummary,
+      };
+    }
+
+    case "get_retention_metrics": {
+      if (!isGA4Configured()) return { error: "GA4 não configurado" };
+      const ga4Client = getGA4Client();
+      const [summary, ltv, cohorts] = await Promise.all([
+        fetchRetentionSummary(ga4Client, startDate, endDate),
+        fetchUserLifetimeValue(ga4Client, startDate, endDate),
+        fetchCohortRetention(ga4Client, startDate, endDate),
+      ]);
+      return {
+        resumo: {
+          usuariosTotal: summary.totalUsers,
+          novos: summary.newUsers,
+          retornantes: summary.returningUsers,
+          taxaRetorno: summary.returnRate,
+          sessoesPorUsuario: summary.avgSessionsPerUser,
+          compras: summary.purchases,
+          compradores: summary.purchasers,
+          receita: summary.revenue,
+          ticketMedio: summary.avgOrderValue,
+          ltvPorComprador: summary.purchasers > 0 ? Math.round((summary.revenue / summary.purchasers) * 100) / 100 : 0,
+          frequenciaRecompra: summary.repurchaseEstimate,
+        },
+        topCanaisLTV: ltv.slice(0, 5).map((c) => ({
+          canal: c.channel,
+          usuarios: c.users,
+          compradores: c.purchasers,
+          receita: c.revenue,
+          receitaPorComprador: c.revenuePerPurchaser,
+          comprasPorUsuario: c.purchasesPerUser,
+        })),
+        cohorts: cohorts.slice(0, 6).map((c) => ({
+          semana: c.cohortWeek,
+          usuariosIniciais: c.usersStart,
+          retencao: c.retention.slice(0, 5),
+        })),
       };
     }
 

@@ -1,5 +1,5 @@
 export type AlertSeverity = "danger" | "warn" | "info" | "success";
-export type AlertCategory = "account" | "campaign" | "sku" | "trend";
+export type AlertCategory = "account" | "campaign" | "sku" | "trend" | "retention";
 
 export type SmartAlert = {
   id: string;

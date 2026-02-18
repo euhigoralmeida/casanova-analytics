@@ -18,9 +18,10 @@ function generateMockData(): RetentionData {
       returnRate: 31.74,
       avgSessionsPerUser: 2.4,
       purchases: 312,
+      purchasers: 195,
       revenue: 89450.0,
       avgOrderValue: 286.7,
-      repurchaseEstimate: 1.42,
+      repurchaseEstimate: 1.65,
     },
     cohorts: [
       { cohortWeek: "Semana 1", usersStart: 680, retention: [100, 38, 24, 16, 12, 9, 7, 5, 4] },
@@ -33,12 +34,12 @@ function generateMockData(): RetentionData {
       { cohortWeek: "Semana 8", usersStart: 700, retention: [100, 39, 0, 0, 0, 0, 0, 0, 0] },
     ],
     channelLTV: [
-      { channel: "Paid Shopping", users: 1240, revenue: 42800, purchases: 148, revenuePerUser: 34.52, purchasesPerUser: 0.12, avgTicket: 289.19 },
-      { channel: "Organic Search", users: 1580, revenue: 21300, purchases: 78, revenuePerUser: 13.48, purchasesPerUser: 0.05, avgTicket: 273.08 },
-      { channel: "Direct", users: 820, revenue: 12400, purchases: 42, revenuePerUser: 15.12, purchasesPerUser: 0.05, avgTicket: 295.24 },
-      { channel: "Paid Search", users: 450, revenue: 7200, purchases: 24, revenuePerUser: 16.0, purchasesPerUser: 0.05, avgTicket: 300.0 },
-      { channel: "Organic Social", users: 380, revenue: 3800, purchases: 12, revenuePerUser: 10.0, purchasesPerUser: 0.03, avgTicket: 316.67 },
-      { channel: "Email", users: 350, revenue: 1950, purchases: 8, revenuePerUser: 5.57, purchasesPerUser: 0.02, avgTicket: 243.75 },
+      { channel: "Paid Shopping", users: 1240, purchasers: 92, revenue: 42800, purchases: 148, revenuePerUser: 34.52, revenuePerPurchaser: 465.22, purchasesPerUser: 0.12, avgTicket: 289.19 },
+      { channel: "Organic Search", users: 1580, purchasers: 48, revenue: 21300, purchases: 78, revenuePerUser: 13.48, revenuePerPurchaser: 443.75, purchasesPerUser: 0.05, avgTicket: 273.08 },
+      { channel: "Direct", users: 820, purchasers: 28, revenue: 12400, purchases: 42, revenuePerUser: 15.12, revenuePerPurchaser: 442.86, purchasesPerUser: 0.05, avgTicket: 295.24 },
+      { channel: "Paid Search", users: 450, purchasers: 16, revenue: 7200, purchases: 24, revenuePerUser: 16.0, revenuePerPurchaser: 450.0, purchasesPerUser: 0.05, avgTicket: 300.0 },
+      { channel: "Organic Social", users: 380, purchasers: 8, revenue: 3800, purchases: 12, revenuePerUser: 10.0, revenuePerPurchaser: 475.0, purchasesPerUser: 0.03, avgTicket: 316.67 },
+      { channel: "Email", users: 350, purchasers: 6, revenue: 1950, purchases: 8, revenuePerUser: 5.57, revenuePerPurchaser: 325.0, purchasesPerUser: 0.02, avgTicket: 243.75 },
     ],
   };
 }

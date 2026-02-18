@@ -64,6 +64,8 @@ export type OverviewResponse = {
     marginTarget: number;
     marginActual: number;
     approvalRate?: number;
+    pedidosCaptadosTarget?: number;
+    ticketMedioTarget?: number;
   };
   skus: {
     sku: string;

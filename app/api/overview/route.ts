@@ -72,10 +72,12 @@ type PlanningTargets = {
   marginTarget: number;
   adsTarget: number;           // Investimento Total planejado
   approvalRate: number;        // % Aprovação Receita
+  pedidosCaptadosTarget: number; // Pedidos Captados meta
+  ticketMedioTarget: number;   // Ticket Médio planejado
 };
 
 async function getPlanningTargets(tenantId: string): Promise<PlanningTargets> {
-  const defaults: PlanningTargets = { revenueTarget: 150000, revenueCaptadaTarget: 0, roasTarget: 7, roasFaturadoTarget: 0, marginTarget: 25, adsTarget: 0, approvalRate: 0 };
+  const defaults: PlanningTargets = { revenueTarget: 150000, revenueCaptadaTarget: 0, roasTarget: 7, roasFaturadoTarget: 0, marginTarget: 25, adsTarget: 0, approvalRate: 0, pedidosCaptadosTarget: 0, ticketMedioTarget: 0 };
   try {
     const now = new Date();
     const rows = await prisma.planningEntry.findMany({
@@ -96,6 +98,8 @@ async function getPlanningTargets(tenantId: string): Promise<PlanningTargets> {
       marginTarget: defaults.marginTarget,
       adsTarget: all.investimento_total ?? 0,
       approvalRate: all.pct_aprovacao_receita ?? 0,
+      pedidosCaptadosTarget: all.pedidos_captados ?? 0,
+      ticketMedioTarget: all.ticket_medio_real ?? 0,
     };
   } catch {
     return defaults;
@@ -211,6 +215,8 @@ export async function GET(request: NextRequest) {
           marginTarget: targets.marginTarget,
           marginActual,
           approvalRate: targets.approvalRate,
+          pedidosCaptadosTarget: targets.pedidosCaptadosTarget,
+          ticketMedioTarget: targets.ticketMedioTarget,
         },
         skus,
       });

@@ -128,6 +128,19 @@ export const GEMINI_TOOLS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "get_retention_metrics",
+    description:
+      "Métricas de retenção GA4: novos vs retornantes, taxa de retorno, LTV por canal, cohort analysis semanal.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        startDate: { type: SchemaType.STRING, description: "Data início yyyy-mm-dd" },
+        endDate: { type: SchemaType.STRING, description: "Data fim yyyy-mm-dd" },
+      },
+      required: ["startDate", "endDate"],
+    },
+  },
+  {
     name: "compare_periods",
     description:
       "Compara métricas da conta entre dois períodos. Retorna métricas de ambos + variação percentual.",

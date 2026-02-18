@@ -13,6 +13,8 @@ import {
   Settings,
   LogOut,
   ChevronDown,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -38,7 +40,7 @@ const navItems: NavItem[] = [
       { label: "Segmentação", href: "/acquisition/segments" },
     ],
   },
-  { label: "Retenção", href: "/retention", icon: Heart, comingSoon: true },
+  { label: "Retenção", href: "/retention", icon: Heart },
   { label: "Funil", href: "/funnel", icon: Filter },
   { label: "Alertas", href: "/alerts", icon: Bell },
   { label: "Configurações", href: "/settings", icon: Settings },
@@ -52,7 +54,17 @@ function ComingSoonBadge() {
   );
 }
 
-export default function Sidebar({ tenantName, onClose }: { tenantName?: string; onClose?: () => void }) {
+export default function Sidebar({
+  tenantName,
+  onClose,
+  collapsed = false,
+  onToggleCollapse,
+}: {
+  tenantName?: string;
+  onClose?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+}) {
   const pathname = usePathname();
   const router = useRouter();
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>(() => {
@@ -87,17 +99,29 @@ export default function Sidebar({ tenantName, onClose }: { tenantName?: string; 
   }
 
   return (
-    <aside className="flex flex-col h-full w-60 bg-white border-r border-zinc-200">
+    <aside
+      className={`flex flex-col h-full bg-white border-r border-zinc-200 transition-all duration-200 ${
+        collapsed ? "w-16" : "w-60"
+      }`}
+    >
       {/* Logo + Tenant */}
-      <div className="px-5 pt-5 pb-4 border-b border-zinc-100">
-        <Image src="/logo-casanova.png" alt="Casanova Analytics" width={140} height={36} priority />
-        {tenantName && (
-          <p className="text-xs text-zinc-500 mt-2 truncate">{tenantName}</p>
+      <div className={`border-b border-zinc-100 ${collapsed ? "px-2 pt-5 pb-4" : "px-5 pt-5 pb-4"}`}>
+        {collapsed ? (
+          <div className="flex justify-center">
+            <Image src="/logo-casanova.png" alt="Casanova Analytics" width={32} height={32} priority className="object-contain" />
+          </div>
+        ) : (
+          <>
+            <Image src="/logo-casanova.png" alt="Casanova Analytics" width={140} height={36} priority />
+            {tenantName && (
+              <p className="text-xs text-zinc-500 mt-2 truncate">{tenantName}</p>
+            )}
+          </>
         )}
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 py-3 px-3 space-y-0.5 overflow-y-auto">
+      <nav className={`flex-1 py-3 space-y-0.5 overflow-y-auto ${collapsed ? "px-1.5" : "px-3"}`}>
         {navItems.map((item) => {
           const Icon = item.icon;
           const hasChildren = !!item.children;
@@ -105,6 +129,27 @@ export default function Sidebar({ tenantName, onClose }: { tenantName?: string; 
           const expanded = expandedMenus[item.label] ?? false;
 
           if (hasChildren) {
+            if (collapsed) {
+              // Collapsed: show parent icon only, click navigates to first non-coming-soon child
+              const firstChild = item.children!.find((c) => !c.comingSoon);
+              const active = parentActive;
+              return (
+                <Link
+                  key={item.label}
+                  href={firstChild?.href ?? "#"}
+                  onClick={() => onClose?.()}
+                  title={item.label}
+                  className={`flex items-center justify-center p-2.5 rounded-lg transition-colors ${
+                    active
+                      ? "bg-emerald-50 text-emerald-700"
+                      : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                  }`}
+                >
+                  <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
+                </Link>
+              );
+            }
+
             return (
               <div key={item.label}>
                 {/* Parent item (toggle) */}
@@ -165,6 +210,17 @@ export default function Sidebar({ tenantName, onClose }: { tenantName?: string; 
 
           // Simple item (no children)
           if (item.comingSoon) {
+            if (collapsed) {
+              return (
+                <span
+                  key={item.href}
+                  title={item.label}
+                  className="flex items-center justify-center p-2.5 rounded-lg text-zinc-400 cursor-default"
+                >
+                  <Icon size={18} strokeWidth={1.8} />
+                </span>
+              );
+            }
             return (
               <span
                 key={item.href}
@@ -178,6 +234,25 @@ export default function Sidebar({ tenantName, onClose }: { tenantName?: string; 
           }
 
           const active = isActive(item.href!);
+
+          if (collapsed) {
+            return (
+              <Link
+                key={item.href}
+                href={item.href!}
+                onClick={() => onClose?.()}
+                title={item.label}
+                className={`flex items-center justify-center p-2.5 rounded-lg transition-colors ${
+                  active
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                }`}
+              >
+                <Icon size={18} strokeWidth={active ? 2.2 : 1.8} />
+              </Link>
+            );
+          }
+
           return (
             <Link
               key={item.href}
@@ -196,14 +271,31 @@ export default function Sidebar({ tenantName, onClose }: { tenantName?: string; 
         })}
       </nav>
 
-      {/* Logout */}
-      <div className="px-3 pb-4 border-t border-zinc-100 pt-3">
+      {/* Bottom: Collapse toggle + Logout */}
+      <div className={`border-t border-zinc-100 pt-2 pb-4 ${collapsed ? "px-1.5" : "px-3"} space-y-0.5`}>
+        {/* Collapse toggle — desktop only */}
+        {onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+            className={`flex items-center rounded-lg text-sm font-medium text-zinc-400 hover:bg-zinc-50 hover:text-zinc-700 w-full transition-colors ${
+              collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2"
+            }`}
+          >
+            {collapsed ? <PanelLeftOpen size={18} strokeWidth={1.8} /> : <PanelLeftClose size={18} strokeWidth={1.8} />}
+            {!collapsed && <span>Recolher</span>}
+          </button>
+        )}
+
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 w-full transition-colors"
+          title={collapsed ? "Sair" : undefined}
+          className={`flex items-center rounded-lg text-sm font-medium text-zinc-500 hover:bg-zinc-50 hover:text-zinc-900 w-full transition-colors ${
+            collapsed ? "justify-center p-2.5" : "gap-3 px-3 py-2.5"
+          }`}
         >
           <LogOut size={18} strokeWidth={1.8} />
-          Sair
+          {!collapsed && "Sair"}
         </button>
       </div>
     </aside>

@@ -49,8 +49,8 @@ export default function RetentionPage() {
         { key: "users", label: "Usuários" },
         { key: "revenue", label: "Receita" },
         { key: "purchases", label: "Compras" },
-        { key: "revenuePerUser", label: "Receita/Usuário" },
-        { key: "purchasesPerUser", label: "Compras/Usuário" },
+        { key: "revenuePerPurchaser", label: "Receita/Comprador" },
+        { key: "purchasesPerUser", label: "Taxa Conv." },
         { key: "avgTicket", label: "Ticket Médio" },
       ],
       `ltv-por-canal-${dateRange.startDate}-${dateRange.endDate}.csv`,
@@ -160,10 +160,10 @@ export default function RetentionPage() {
                 <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wide">LTV Médio</p>
               </div>
               <p className="text-2xl font-bold text-zinc-900">
-                {formatBRL(summary.totalUsers > 0 ? summary.revenue / summary.totalUsers : 0)}
+                {formatBRL(summary.purchasers > 0 ? summary.revenue / summary.purchasers : 0)}
               </p>
               <p className="text-[11px] text-zinc-400 mt-0.5">
-                Ticket: {formatBRL(summary.avgOrderValue)}
+                {summary.purchasers.toLocaleString("pt-BR")} compradores · Ticket: {formatBRL(summary.avgOrderValue)}
               </p>
             </div>
 
@@ -274,18 +274,18 @@ export default function RetentionPage() {
                       <th className="px-3 py-3 font-medium text-right">Usuários</th>
                       <th className="px-3 py-3 font-medium text-right">Receita</th>
                       <th className="px-3 py-3 font-medium text-right">Compras</th>
-                      <th className="px-3 py-3 font-medium text-right">Receita/Usuário</th>
-                      <th className="px-3 py-3 font-medium text-right">Compras/Usuário</th>
+                      <th className="px-3 py-3 font-medium text-right">Receita/Comprador</th>
+                      <th className="px-3 py-3 font-medium text-right">Taxa Conv.</th>
                       <th className="px-5 py-3 font-medium text-right">Ticket Médio</th>
                     </tr>
                   </thead>
                   <tbody>
                     {[...channelLTV]
-                      .sort((a, b) => b.revenuePerUser - a.revenuePerUser)
+                      .sort((a, b) => b.revenuePerPurchaser - a.revenuePerPurchaser)
                       .map((ch, idx) => {
                         const rpuColor =
-                          ch.revenuePerUser >= 20 ? "text-emerald-700 bg-emerald-50" :
-                          ch.revenuePerUser >= 10 ? "text-amber-700 bg-amber-50" :
+                          ch.revenuePerPurchaser >= 350 ? "text-emerald-700 bg-emerald-50" :
+                          ch.revenuePerPurchaser >= 200 ? "text-amber-700 bg-amber-50" :
                           "text-red-700 bg-red-50";
                         return (
                           <tr key={ch.channel} className="border-b border-zinc-50 last:border-0 hover:bg-zinc-50/50 transition-colors">
@@ -300,7 +300,7 @@ export default function RetentionPage() {
                             <td className="px-3 py-2.5 text-right text-xs text-zinc-600">{ch.purchases.toLocaleString("pt-BR")}</td>
                             <td className="px-3 py-2.5 text-right">
                               <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${rpuColor}`}>
-                                {formatBRL(ch.revenuePerUser)}
+                                {formatBRL(ch.revenuePerPurchaser)}
                               </span>
                             </td>
                             <td className="px-3 py-2.5 text-right text-xs text-zinc-600">

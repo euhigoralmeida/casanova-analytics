@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isConfigured, getCustomer, computeComparisonDates } from "@/lib/google-ads";
+import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
 import { fetchAccountTotals, fetchAllCampaignMetrics, fetchAllSkuMetrics, fetchAccountTimeSeries } from "@/lib/queries";
+import { fetchRetentionSummary } from "@/lib/ga4-queries";
 import { computeAllSmartAlerts } from "@/lib/alert-engine";
 import type { SmartAlert, SmartAlertsResponse } from "@/lib/alert-types";
 import { requireAuth } from "@/lib/api-helpers";
@@ -88,6 +90,18 @@ function buildMockAlerts(): SmartAlert[] {
       previousValue: 1223.5,
       deltaPct: 3,
     },
+    {
+      id: "ret-return-rate-warn",
+      category: "retention",
+      severity: "warn",
+      title: "Taxa de retorno abaixo do ideal",
+      description: "Taxa de retorno de 18.5% — ideal é acima de 25%.",
+      metric: "return_rate",
+      currentValue: 18.5,
+      previousValue: 0,
+      deltaPct: 0,
+      recommendation: "Considere campanhas de reativação para usuários inativos",
+    },
   ];
 }
 
@@ -134,6 +148,11 @@ export async function GET(request: NextRequest) {
         fetchAccountTimeSeries(customer, period, startDate, endDate),
       ]);
 
+      // Fetch retention data from GA4 if configured
+      const retentionSummary = isGA4Configured()
+        ? await fetchRetentionSummary(getGA4Client(), startDate, endDate).catch(() => undefined)
+        : undefined;
+
       const alerts = computeAllSmartAlerts(
         currentAccount,
         previousAccount,
@@ -142,6 +161,7 @@ export async function GET(request: NextRequest) {
         currentSkus,
         previousSkus,
         dailyTimeSeries,
+        retentionSummary,
       );
 
       const summary = {

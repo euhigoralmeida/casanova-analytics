@@ -31,20 +31,42 @@ function readTenantName(): string | undefined {
   }
 }
 
+function readSidebarCollapsed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return localStorage.getItem("ca_sidebar_collapsed") === "1";
+  } catch {
+    return false;
+  }
+}
+
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
   const [tenantName] = useState(readTenantName);
   const dateRange = useMemo(() => defaultRange(), []);
 
   const title = pageTitles[pathname] ?? "Dashboard";
+
+  function toggleCollapse() {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try { localStorage.setItem("ca_sidebar_collapsed", next ? "1" : "0"); } catch { /* ignore */ }
+      return next;
+    });
+  }
 
   return (
     <div className="min-h-screen bg-zinc-50 flex">
       {/* Sidebar — desktop */}
       <div className="hidden lg:block shrink-0">
         <div className="fixed inset-y-0 left-0 z-30">
-          <Sidebar tenantName={tenantName} />
+          <Sidebar
+            tenantName={tenantName}
+            collapsed={sidebarCollapsed}
+            onToggleCollapse={toggleCollapse}
+          />
         </div>
       </div>
 
@@ -62,7 +84,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       )}
 
       {/* Main */}
-      <div className="flex-1 lg:ml-60 flex flex-col min-h-screen">
+      <div
+        className={`flex-1 flex flex-col min-h-screen transition-all duration-200 ${
+          sidebarCollapsed ? "lg:ml-16" : "lg:ml-60"
+        }`}
+      >
         <Header
           title={title}
           sidebarOpen={sidebarOpen}

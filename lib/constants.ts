@@ -22,6 +22,7 @@ export const categoryLabels: Record<string, string> = {
   campaign: "Campanha",
   sku: "SKU",
   trend: "Tendência",
+  retention: "Retenção",
 };
 
 /* =========================

@@ -468,6 +468,7 @@ export type RetentionSummary = {
   returnRate: number;
   avgSessionsPerUser: number;
   purchases: number;
+  purchasers: number;
   revenue: number;
   avgOrderValue: number;
   repurchaseEstimate: number;
@@ -476,9 +477,11 @@ export type RetentionSummary = {
 export type ChannelLTV = {
   channel: string;
   users: number;
+  purchasers: number;
   revenue: number;
   purchases: number;
   revenuePerUser: number;
+  revenuePerPurchaser: number;
   purchasesPerUser: number;
   avgTicket: number;
 };
@@ -519,7 +522,7 @@ export async function fetchCohortRetention(
     if (cohortEnd > end) break;
     const fmtD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
     cohorts.push({
-      dimension: `cohort_${i}`,
+      dimension: `week${i}`,
       dateRange: { startDate: fmtD(cohortStart), endDate: fmtD(cohortEnd) },
     });
   }
@@ -533,6 +536,7 @@ export async function fetchCohortRetention(
     cohortSpec: {
       cohorts: cohorts.map((c) => ({
         name: c.dimension,
+        dimension: "firstSessionDate",
         dateRange: c.dateRange,
       })),
       cohortsRange: {
@@ -604,6 +608,7 @@ export async function fetchRetentionSummary(
       { name: "sessions" },
       { name: "ecommercePurchases" },
       { name: "purchaseRevenue" },
+      { name: "totalPurchasers" },
     ],
   });
 
@@ -613,6 +618,9 @@ export async function fetchRetentionSummary(
   let totalSessions = 0;
   let totalPurchases = 0;
   let totalRevenue = 0;
+  let totalPurchasers = 0;
+  let returningPurchases = 0;
+  let returningPurchasers = 0;
 
   for (const row of response.rows ?? []) {
     const segment = row.dimensionValues?.[0]?.value ?? "";
@@ -621,14 +629,21 @@ export async function fetchRetentionSummary(
     const sessions = Math.round(vals[1] ?? 0);
     const purchases = Math.round(vals[2] ?? 0);
     const revenue = Math.round((vals[3] ?? 0) * 100) / 100;
+    const purchasers = Math.round(vals[4] ?? 0);
 
     totalUsers += users;
     totalSessions += sessions;
     totalPurchases += purchases;
     totalRevenue += revenue;
+    totalPurchasers += purchasers;
 
-    if (segment === "new") newUsers = users;
-    else if (segment === "returning") returningUsers = users;
+    if (segment === "new") {
+      newUsers = users;
+    } else if (segment === "returning") {
+      returningUsers = users;
+      returningPurchases = purchases;
+      returningPurchasers = purchasers;
+    }
   }
 
   const result: RetentionSummary = {
@@ -638,9 +653,10 @@ export async function fetchRetentionSummary(
     returnRate: totalUsers > 0 ? Math.round((returningUsers / totalUsers) * 10000) / 100 : 0,
     avgSessionsPerUser: totalUsers > 0 ? Math.round((totalSessions / totalUsers) * 100) / 100 : 0,
     purchases: totalPurchases,
+    purchasers: totalPurchasers,
     revenue: Math.round(totalRevenue * 100) / 100,
     avgOrderValue: totalPurchases > 0 ? Math.round((totalRevenue / totalPurchases) * 100) / 100 : 0,
-    repurchaseEstimate: returningUsers > 0 ? Math.round((totalPurchases / returningUsers) * 100) / 100 : 0,
+    repurchaseEstimate: returningPurchasers > 0 ? Math.round((returningPurchases / returningPurchasers) * 100) / 100 : 0,
   };
 
   setGA4Cache(cacheKey, result);
@@ -668,6 +684,7 @@ export async function fetchUserLifetimeValue(
       { name: "totalUsers" },
       { name: "purchaseRevenue" },
       { name: "ecommercePurchases" },
+      { name: "totalPurchasers" },
     ],
     orderBys: [{ metric: { metricName: "purchaseRevenue" }, desc: true }],
   });
@@ -678,12 +695,15 @@ export async function fetchUserLifetimeValue(
     const users = Math.round(vals[0] ?? 0);
     const revenue = Math.round((vals[1] ?? 0) * 100) / 100;
     const purchases = Math.round(vals[2] ?? 0);
+    const purchasers = Math.round(vals[3] ?? 0);
     return {
       channel,
       users,
+      purchasers,
       revenue,
       purchases,
       revenuePerUser: users > 0 ? Math.round((revenue / users) * 100) / 100 : 0,
+      revenuePerPurchaser: purchasers > 0 ? Math.round((revenue / purchasers) * 100) / 100 : 0,
       purchasesPerUser: users > 0 ? Math.round((purchases / users) * 100) / 100 : 0,
       avgTicket: purchases > 0 ? Math.round((revenue / purchases) * 100) / 100 : 0,
     };

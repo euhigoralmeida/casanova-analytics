@@ -1,5 +1,6 @@
 import type { SmartAlert } from "./alert-types";
 import type { AccountTotals, CampaignMetrics, SkuMetrics, DailyMetrics } from "./queries";
+import type { RetentionSummary } from "./ga4-queries";
 
 /* =========================
    Helpers
@@ -492,6 +493,90 @@ function computeTrendAlerts(dailyData: DailyMetrics[]): SmartAlert[] {
 }
 
 /* =========================
+   Alertas de Retenção
+========================= */
+
+function computeRetentionAlerts(summary: RetentionSummary): SmartAlert[] {
+  const alerts: SmartAlert[] = [];
+
+  // Taxa de retorno
+  if (summary.returnRate < 15) {
+    alerts.push({
+      id: "ret-return-rate-danger",
+      category: "retention",
+      severity: "danger",
+      title: "Taxa de retorno muito baixa",
+      description: `Apenas ${summary.returnRate.toFixed(1)}% dos usuários retornam ao site.`,
+      metric: "return_rate",
+      currentValue: summary.returnRate,
+      previousValue: 0,
+      deltaPct: 0,
+      recommendation: "Invista em remarketing, e-mail marketing e programas de fidelidade",
+    });
+  } else if (summary.returnRate < 25) {
+    alerts.push({
+      id: "ret-return-rate-warn",
+      category: "retention",
+      severity: "warn",
+      title: "Taxa de retorno abaixo do ideal",
+      description: `Taxa de retorno de ${summary.returnRate.toFixed(1)}% — ideal é acima de 25%.`,
+      metric: "return_rate",
+      currentValue: summary.returnRate,
+      previousValue: 0,
+      deltaPct: 0,
+      recommendation: "Considere campanhas de reativação para usuários inativos",
+    });
+  } else if (summary.returnRate >= 35) {
+    alerts.push({
+      id: "ret-return-rate-healthy",
+      category: "retention",
+      severity: "success",
+      title: "Taxa de retorno saudável",
+      description: `${summary.returnRate.toFixed(1)}% dos usuários retornam — excelente retenção.`,
+      metric: "return_rate",
+      currentValue: summary.returnRate,
+      previousValue: 0,
+      deltaPct: 0,
+    });
+  }
+
+  // Frequência de recompra
+  if (summary.repurchaseEstimate < 1) {
+    alerts.push({
+      id: "ret-repurchase-low",
+      category: "retention",
+      severity: "warn",
+      title: "Baixa frequência de recompra",
+      description: `Frequência estimada de ${summary.repurchaseEstimate.toFixed(2)} compras por cliente retornante.`,
+      metric: "repurchase_frequency",
+      currentValue: summary.repurchaseEstimate,
+      previousValue: 0,
+      deltaPct: 0,
+      recommendation: "Implemente cross-sell, bundles e automações pós-compra",
+    });
+  }
+
+  // LTV médio por comprador
+  const ltvPerPurchaser = summary.purchasers > 0 ? summary.revenue / summary.purchasers : 0;
+  if (ltvPerPurchaser > 0 && ltvPerPurchaser < 150) {
+    alerts.push({
+      id: "ret-ltv-low",
+      category: "retention",
+      severity: "warn",
+      title: "LTV médio por comprador baixo",
+      description: `LTV médio de ${fmtBRL(ltvPerPurchaser)} por comprador — considere estratégias de upsell.`,
+      metric: "ltv",
+      currentValue: Math.round(ltvPerPurchaser * 100) / 100,
+      previousValue: 0,
+      deltaPct: 0,
+      recommendation: "Foque em aumentar ticket médio e frequência de compra",
+    });
+  }
+
+  return alerts;
+}
+
+/* =========================
    Orquestrador
 ========================= */
 
@@ -505,12 +590,14 @@ export function computeAllSmartAlerts(
   currentSkus: SkuMetrics[],
   previousSkus: SkuMetrics[],
   dailyTimeSeries: DailyMetrics[],
+  retentionSummary?: RetentionSummary,
 ): SmartAlert[] {
   const all = [
     ...computeAccountAlerts(currentAccount, previousAccount),
     ...computeCampaignAlerts(currentCampaigns, previousCampaigns),
     ...computeSkuAlerts(currentSkus, previousSkus),
     ...computeTrendAlerts(dailyTimeSeries),
+    ...(retentionSummary ? computeRetentionAlerts(retentionSummary) : []),
   ];
 
   all.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 2) - (SEVERITY_ORDER[b.severity] ?? 2));

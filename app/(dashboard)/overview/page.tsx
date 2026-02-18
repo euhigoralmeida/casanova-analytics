@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { DateRange, OverviewResponse, SmartAlertsResponse, TimeSeriesResponse, GA4DataResponse } from "@/types/api";
+import type { DateRange, OverviewResponse, SmartAlertsResponse, TimeSeriesResponse, GA4DataResponse, RetentionData } from "@/types/api";
 import { useDateRange } from "@/hooks/use-date-range";
 import type { IntelligenceResponse } from "@/lib/intelligence/types";
 import type { CognitiveResponse } from "@/lib/intelligence/communication/types";
@@ -25,6 +25,7 @@ export default function VisaoGeralPage() {
   const [timeseries, setTimeseries] = useState<TimeSeriesResponse | null>(null);
   const [ga4Data, setGa4Data] = useState<GA4DataResponse | null>(null);
   const [intelligence, setIntelligence] = useState<IntelligenceResponse & Partial<CognitiveResponse> | null>(null);
+  const [retention, setRetention] = useState<RetentionData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,12 +35,13 @@ export default function VisaoGeralPage() {
     try {
       const base = buildParams(range);
 
-      const [overviewRes, alertsRes, tsRes, ga4Res, intelRes] = await Promise.all([
+      const [overviewRes, alertsRes, tsRes, ga4Res, intelRes, retentionRes] = await Promise.all([
         fetch(`/api/overview?${base}`),
         fetch(`/api/alerts?${base}`).catch(() => null),
         fetch(`/api/timeseries?${buildParams(range, { scope: "account" })}`).catch(() => null),
         fetch(`/api/ga4?startDate=${range.startDate}&endDate=${range.endDate}`).catch(() => null),
         fetch(`/api/intelligence?${base}`).catch(() => null),
+        fetch(`/api/retention?startDate=${range.startDate}&endDate=${range.endDate}`).catch(() => null),
       ]);
 
       if (!overviewRes.ok) throw new Error("Erro ao carregar dados");
@@ -48,6 +50,7 @@ export default function VisaoGeralPage() {
       if (tsRes?.ok) setTimeseries(await tsRes.json());
       if (ga4Res?.ok) setGa4Data(await ga4Res.json());
       if (intelRes?.ok) setIntelligence(await intelRes.json());
+      if (retentionRes?.ok) setRetention(await retentionRes.json());
     } catch {
       setError("Erro ao carregar dados. Tente novamente ou aguarde alguns minutos.");
     } finally {
@@ -86,10 +89,6 @@ export default function VisaoGeralPage() {
   }, []);
 
   const acct = overview?.accountTotals;
-  const roasColor = overview
-    ? (overview.meta.roasActual >= overview.meta.roasTarget ? "text-emerald-600" : overview.meta.roasActual >= overview.meta.roasTarget * 0.7 ? "text-amber-600" : "text-red-600")
-    : undefined;
-
   // Top 5 alerts sorted by severity
   const severityOrder: Record<string, number> = { danger: 0, warn: 1, info: 2, success: 3 };
   const topAlerts = smartAlerts
@@ -97,7 +96,7 @@ export default function VisaoGeralPage() {
     : [];
 
   return (
-    <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6 space-y-6">
+    <div className="px-4 sm:px-6 py-6 space-y-6">
 
       {/* ─── ROW 1: Header — título + date picker + refresh ─── */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -139,60 +138,84 @@ export default function VisaoGeralPage() {
       {/* ─── LOADING ─── */}
       {loading && !overview && (
         <>
-          <div className="grid gap-4 grid-cols-2 lg:grid-cols-5">
-            <KpiSkeleton /><KpiSkeleton /><KpiSkeleton /><KpiSkeleton /><KpiSkeleton />
+          <div className="grid gap-4 grid-cols-2 lg:grid-cols-6">
+            <KpiSkeleton /><KpiSkeleton /><KpiSkeleton /><KpiSkeleton /><KpiSkeleton /><KpiSkeleton />
           </div>
           <AlertsSkeleton />
           <ChartSkeleton />
         </>
       )}
 
-      {/* ─── ROW 2: 5 KPI Cards com progress bar embutido ─── */}
-      {overview && acct && !loading && (
-        <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
-          <Kpi
-            title="Receita"
-            value={formatBRL(acct.revenue)}
-            subtitle={`${(Math.round(acct.conversions * 100) / 100).toLocaleString("pt-BR")} conversões`}
-            progress={
-              overview.meta.revenueCaptadaTarget
-                ? { actual: acct.revenue, target: overview.meta.revenueCaptadaTarget, format: (v) => formatBRL(v) }
-                : overview.meta.revenueTarget > 0
-                  ? { actual: acct.revenue, target: overview.meta.revenueTarget, format: (v) => formatBRL(v) }
+      {/* ─── ROW 2: KPI Cards — cores unificadas via progress bar ─── */}
+      {overview && acct && !loading && (() => {
+        const ltvValue = retention?.summary
+          ? (retention.summary.purchasers > 0 ? retention.summary.revenue / retention.summary.purchasers : 0)
+          : null;
+        const conversions = Math.round(acct.conversions * 100) / 100;
+        const ticketMedio = conversions > 0 ? Math.round((acct.revenue / conversions) * 100) / 100 : 0;
+        const pedidosTarget = overview.meta.pedidosCaptadosTarget ?? 0;
+        const ticketTarget = overview.meta.ticketMedioTarget ?? 0;
+        const returnRate = retention?.summary?.returnRate ?? 0;
+        return (
+          <div className="grid gap-3 grid-cols-2 lg:grid-cols-6">
+            <Kpi
+              title="Receita"
+              value={formatBRL(acct.revenue)}
+              subtitle={`${conversions.toLocaleString("pt-BR")} conversões`}
+              progress={
+                overview.meta.revenueCaptadaTarget
+                  ? { actual: acct.revenue, target: overview.meta.revenueCaptadaTarget, format: (v) => formatBRL(v) }
+                  : overview.meta.revenueTarget > 0
+                    ? { actual: acct.revenue, target: overview.meta.revenueTarget, format: (v) => formatBRL(v) }
+                    : undefined
+              }
+            />
+            <Kpi
+              title="Investimento"
+              value={formatBRL(acct.ads)}
+              subtitle={`${acct.clicks.toLocaleString("pt-BR")} cliques`}
+              progress={
+                overview.meta.adsTarget
+                  ? { actual: overview.meta.adsActual ?? acct.ads, target: overview.meta.adsTarget, format: (v) => formatBRL(v) }
                   : undefined
-            }
-          />
-          <Kpi
-            title="Investimento"
-            value={formatBRL(acct.ads)}
-            subtitle={`${acct.clicks.toLocaleString("pt-BR")} cliques`}
-            progress={
-              overview.meta.adsTarget
-                ? { actual: overview.meta.adsActual ?? acct.ads, target: overview.meta.adsTarget, format: (v) => formatBRL(v) }
-                : undefined
-            }
-          />
-          <Kpi
-            title="ROAS"
-            value={overview.meta.roasActual.toFixed(1)}
-            subtitle={`Meta: ${overview.meta.roasTarget.toFixed(1)}`}
-            color={roasColor}
-            progress={{ actual: overview.meta.roasActual, target: overview.meta.roasTarget, format: (v) => v.toFixed(1) }}
-          />
-          <Kpi
-            title="Conversões"
-            value={(Math.round(acct.conversions * 100) / 100).toLocaleString("pt-BR")}
-            subtitle={`CTR: ${acct.impressions > 0 ? ((acct.clicks / acct.impressions) * 100).toFixed(2) : 0}%`}
-          />
-          <Kpi
-            title="Margem"
-            value={`${overview.meta.marginActual}%`}
-            subtitle={`Meta: ${overview.meta.marginTarget}%`}
-            color={overview.meta.marginActual >= overview.meta.marginTarget ? "text-emerald-600" : "text-amber-600"}
-            progress={{ actual: overview.meta.marginActual, target: overview.meta.marginTarget, format: (v) => `${v}%` }}
-          />
-        </div>
-      )}
+              }
+            />
+            <Kpi
+              title="ROAS"
+              value={overview.meta.roasActual.toFixed(1)}
+              subtitle={`Meta: ${overview.meta.roasTarget.toFixed(1)}`}
+              progress={{ actual: overview.meta.roasActual, target: overview.meta.roasTarget, format: (v) => v.toFixed(1) }}
+            />
+            <Kpi
+              title="Pedidos Captados"
+              value={conversions.toLocaleString("pt-BR")}
+              subtitle={pedidosTarget > 0 ? `Meta: ${Math.round(pedidosTarget).toLocaleString("pt-BR")}` : `CTR: ${acct.impressions > 0 ? ((acct.clicks / acct.impressions) * 100).toFixed(2) : 0}%`}
+              progress={
+                pedidosTarget > 0
+                  ? { actual: conversions, target: pedidosTarget, format: (v) => Math.round(v).toLocaleString("pt-BR") }
+                  : undefined
+              }
+            />
+            <Kpi
+              title="Ticket Médio"
+              value={formatBRL(ticketMedio)}
+              subtitle={ticketTarget > 0 ? `Meta: ${formatBRL(ticketTarget)}` : `${conversions.toLocaleString("pt-BR")} pedidos`}
+              progress={
+                ticketTarget > 0
+                  ? { actual: ticketMedio, target: ticketTarget, format: (v) => formatBRL(v) }
+                  : undefined
+              }
+            />
+            <Kpi
+              title="LTV Médio"
+              value={ltvValue !== null ? formatBRL(ltvValue) : "—"}
+              subtitle={retention?.summary
+                ? `Taxa retorno: ${returnRate.toFixed(1).replace(".", ",")}% · ${retention.summary.purchasers.toLocaleString("pt-BR")} compradores`
+                : "Carregando..."}
+            />
+          </div>
+        );
+      })()}
 
       {/* ─── ROW 3: Executive Summary consolidado ─── */}
       {intelligence && !loading && (
