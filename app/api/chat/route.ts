@@ -116,10 +116,13 @@ export async function POST(req: NextRequest) {
           fc.args as Record<string, unknown>,
           session.tenantId,
         );
+        // Gemini requires response to be an object (Struct), not an array
+        const parsed = JSON.parse(toolResult);
+        const responseObj = Array.isArray(parsed) ? { data: parsed } : parsed;
         functionResponses.push({
           functionResponse: {
             name: fc.name,
-            response: JSON.parse(toolResult),
+            response: responseObj,
           },
         });
       }
