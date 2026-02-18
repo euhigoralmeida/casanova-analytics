@@ -9,7 +9,7 @@ interface KpiProgress {
 export default function Kpi(props: {
   title: string;
   value: string;
-  subtitle?: string;
+  subtitle?: React.ReactNode;
   status?: KpiStatus;
   color?: string;
   progress?: KpiProgress;

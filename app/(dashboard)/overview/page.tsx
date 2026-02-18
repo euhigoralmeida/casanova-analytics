@@ -210,7 +210,7 @@ export default function VisaoGeralPage() {
               title="LTV Médio"
               value={ltvValue !== null ? formatBRL(ltvValue) : "—"}
               subtitle={retention?.summary
-                ? `Taxa retorno: ${returnRate.toFixed(1).replace(".", ",")}% · ${retention.summary.purchasers.toLocaleString("pt-BR")} compradores`
+                ? <>Taxa retorno: {returnRate.toFixed(1).replace(".", ",")}%<br />{retention.summary.purchasers.toLocaleString("pt-BR")} compradores</>
                 : "Carregando..."}
             />
           </div>
