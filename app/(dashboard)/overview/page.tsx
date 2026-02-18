@@ -12,7 +12,6 @@ import ChartsSection from "@/components/charts/charts-section";
 import Kpi from "@/components/ui/kpi-card";
 import { KpiSkeleton, AlertsSkeleton, ChartSkeleton } from "@/components/ui/skeleton";
 import { ExecutiveSummary } from "@/components/intelligence/executive-summary";
-import { RecommendationsPanel } from "@/components/intelligence/recommendations-panel";
 import { BudgetPlanCard } from "@/components/intelligence/budget-plan-card";
 import { SegmentationSummary } from "@/components/intelligence/segmentation-summary";
 import { StrategicAdvisorCard } from "@/components/intelligence/strategic-advisor-card";
@@ -68,26 +67,6 @@ export default function VisaoGeralPage() {
     setDateRange(range);
     loadData(range);
   }
-
-  const handleFollowAction = useCallback(async (insightId: string, action: string) => {
-    try {
-      await fetch("/api/intelligence", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ insightId, actionType: "followed", description: action }),
-      });
-    } catch { /* silent */ }
-  }, []);
-
-  const handleDismissAction = useCallback(async (insightId: string, action: string) => {
-    try {
-      await fetch("/api/intelligence", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ insightId, actionType: "dismissed", description: action }),
-      });
-    } catch { /* silent */ }
-  }, []);
 
   const acct = overview?.accountTotals;
   // Top 5 alerts sorted by severity
@@ -247,68 +226,48 @@ export default function VisaoGeralPage() {
         <StrategicAdvisorCard startDate={dateRange.startDate} endDate={dateRange.endDate} />
       )}
 
-      {/* ─── ROW 4: Recomendações (7fr) + Alertas top 5 (5fr) ─── */}
+      {/* ─── ROW 4: Alertas compactos ─── */}
       {overview && !loading && (
-        <div className="grid gap-6 lg:grid-cols-[7fr_5fr]">
-          {/* Recommendations */}
-          {intelligence ? (
-            <RecommendationsPanel
-              insights={intelligence.insights}
-              quickWins={intelligence.summary.quickWins}
-              onFollow={handleFollowAction}
-              onDismiss={handleDismissAction}
-            />
-          ) : (
-            <div className="rounded-2xl border border-zinc-200 bg-white p-5">
-              <h2 className="text-sm font-semibold text-zinc-800 mb-3">Recomendações</h2>
-              <p className="text-sm text-zinc-400">
-                {loading ? "Carregando análise inteligente..." : "Análise indisponível neste período."}
-              </p>
-            </div>
-          )}
-
-          {/* Compact Alerts — top 5 */}
-          <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden">
-            <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-100 flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-zinc-800">Alertas</h3>
-              {smartAlerts && smartAlerts.summary.danger > 0 && (
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
-                  {smartAlerts.summary.danger} crítico{smartAlerts.summary.danger > 1 ? "s" : ""}
-                </span>
-              )}
-            </div>
-            {topAlerts.length > 0 ? (
-              <div className="divide-y divide-zinc-50">
-                {topAlerts.map((alert) => {
-                  const sc = smartAlertStyles[alert.severity];
-                  return (
-                    <div key={alert.id} className="flex items-center gap-2.5 px-5 py-2.5">
-                      <span className="flex-shrink-0 text-sm">{sc.icon}</span>
-                      <span className={`text-sm font-medium truncate flex-1 ${sc.text}`}>
-                        {alert.title}
-                      </span>
-                      {alert.deltaPct !== 0 && (
-                        <span className={`flex-shrink-0 text-[11px] font-mono px-2 py-0.5 rounded-md ${alert.deltaPct < 0 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
-                          {alert.deltaPct < 0 ? "↓" : "↑"} {Math.abs(alert.deltaPct)}%
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="px-5 py-4">
-                <p className="text-sm text-zinc-400">Nenhum alerta no período</p>
-              </div>
-            )}
-            {smartAlerts && smartAlerts.alerts.length > 5 && (
-              <div className="px-5 py-2.5 border-t border-zinc-100">
-                <Link href="/alerts" className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-0.5">
-                  Ver todos os {smartAlerts.alerts.length} alertas <ChevronRight className="h-3 w-3" />
-                </Link>
-              </div>
+        <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden">
+          <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-100 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-zinc-800">Alertas</h3>
+            {smartAlerts && smartAlerts.summary.danger > 0 && (
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
+                {smartAlerts.summary.danger} crítico{smartAlerts.summary.danger > 1 ? "s" : ""}
+              </span>
             )}
           </div>
+          {topAlerts.length > 0 ? (
+            <div className="divide-y divide-zinc-50">
+              {topAlerts.map((alert) => {
+                const sc = smartAlertStyles[alert.severity];
+                return (
+                  <div key={alert.id} className="flex items-center gap-2.5 px-5 py-2.5">
+                    <span className="flex-shrink-0 text-sm">{sc.icon}</span>
+                    <span className={`text-sm font-medium truncate flex-1 ${sc.text}`}>
+                      {alert.title}
+                    </span>
+                    {alert.deltaPct !== 0 && (
+                      <span className={`flex-shrink-0 text-[11px] font-mono px-2 py-0.5 rounded-md ${alert.deltaPct < 0 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
+                        {alert.deltaPct < 0 ? "↓" : "↑"} {Math.abs(alert.deltaPct)}%
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="px-5 py-4">
+              <p className="text-sm text-zinc-400">Nenhum alerta no período</p>
+            </div>
+          )}
+          {smartAlerts && smartAlerts.alerts.length > 5 && (
+            <div className="px-5 py-2.5 border-t border-zinc-100">
+              <Link href="/alerts" className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-0.5">
+                Ver todos os {smartAlerts.alerts.length} alertas <ChevronRight className="h-3 w-3" />
+              </Link>
+            </div>
+          )}
         </div>
       )}
 
