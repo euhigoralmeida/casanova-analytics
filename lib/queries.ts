@@ -16,11 +16,11 @@ export type SkuMetrics = {
   campaignStatus: "ENABLED" | "PAUSED";
 };
 
-/** Data de corte para status: 3 dias atrás (yyyy-mm-dd) */
-function statusCutoffDate(): string {
-  const d = new Date();
-  d.setDate(d.getDate() - 3);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/** Data de corte para status: último dia do range -1 (produtos ativos = impressões no(s) último(s) dia(s)) */
+function statusCutoffDate(rangeEnd?: string): string {
+  const base = rangeEnd ? new Date(rangeEnd + "T12:00:00") : new Date();
+  base.setDate(base.getDate() - 1);
+  return `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, "0")}-${String(base.getDate()).padStart(2, "0")}`;
 }
 
 /* =========================
@@ -59,8 +59,8 @@ export async function fetchSkuMetrics(
 
   if (!rows.length) return null;
 
-  // Cutoff: últimos 3 dias para determinar status atual
-  const cutoffStr = statusCutoffDate();
+  // Cutoff: último dia do range para determinar status atual
+  const cutoffStr = statusCutoffDate(endDate);
   let isRecentEnabled = false;
 
   const result: SkuMetrics = {
@@ -130,8 +130,8 @@ export async function fetchAllSkuMetrics(
     ORDER BY metrics.conversions_value DESC
   `);
 
-  // Cutoff: últimos 3 dias para determinar status atual do produto
-  const cutoffStr = statusCutoffDate();
+  // Cutoff: último dia do range para determinar status atual do produto
+  const cutoffStr = statusCutoffDate(endDate);
   const recentEnabled = new Set<string>();
 
   // Agrupar por SKU (product_item_id)

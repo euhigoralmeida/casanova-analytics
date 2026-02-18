@@ -152,28 +152,19 @@ export default function AquisicaoPage() {
   useEffect(() => {
     const range = defaultRange();
     setLoading(true);
-    fetch(`/api/overview?${buildParams(range)}`)
-      .then((r) => {
-        if (!r.ok) throw new Error("Erro ao carregar overview");
-        return r.json();
-      })
-      .then((overviewJson: OverviewResponse) => {
-        setOverview(overviewJson);
-        const firstSku = overviewJson.skus[0]?.sku ?? "27290BR-CP";
-        setSku(firstSku);
-        const tsParams = buildParams(range, { scope: "account" });
-        return Promise.all([
-          fetch(`/api/metrics?${buildParams(range, { sku: firstSku })}`).then((r) => r.json()),
-          fetch(`/api/timeseries?${tsParams}`).then((r) => r.json()).catch(() => null),
-          fetch(`/api/campaigns?${buildParams(range)}`).then((r) => r.json()).catch(() => null),
-          fetch(`/api/ga4?startDate=${range.startDate}&endDate=${range.endDate}`).then((r) => r.json()).catch(() => null),
-        ]);
-      })
-      .then(([metricsJson, tsJson, campsJson, ga4Json]: [ApiResponse, TimeSeriesResponse | null, CampaignsResponse | null, GA4DataResponse | null]) => {
-        setData(metricsJson);
-        if (tsJson) setTimeseries(tsJson);
-        if (campsJson) setCampaigns(campsJson);
-        if (ga4Json) setGa4Data(ga4Json);
+    const tsParams = buildParams(range, { scope: "account" });
+    Promise.all([
+      fetch(`/api/overview?${buildParams(range)}`),
+      fetch(`/api/timeseries?${tsParams}`).catch(() => null),
+      fetch(`/api/campaigns?${buildParams(range)}`).catch(() => null),
+      fetch(`/api/ga4?startDate=${range.startDate}&endDate=${range.endDate}`).catch(() => null),
+    ])
+      .then(async ([overviewRes, tsRes, campsRes, ga4Res]) => {
+        if (!overviewRes.ok) throw new Error("Erro ao carregar overview");
+        setOverview(await overviewRes.json());
+        if (tsRes?.ok) setTimeseries(await tsRes.json());
+        if (campsRes?.ok) setCampaigns(await campsRes.json());
+        if (ga4Res?.ok) setGa4Data(await ga4Res.json());
       })
       .catch(() => setError("Não foi possível carregar os dados."))
       .finally(() => setLoading(false));
@@ -191,7 +182,11 @@ export default function AquisicaoPage() {
             {fmtDateSlash(dateRange.startDate)} — {fmtDateSlash(dateRange.endDate)}
             {overview && (
               <span className="ml-2 text-zinc-400">
-                {overview.source === "google-ads" ? `${overview.totalSkus} SKUs` : "Dados mock"}
+                {overview.source === "google-ads"
+                  ? filteredSkus.length !== overview.skus.length
+                    ? `${filteredSkus.length} de ${overview.totalSkus} SKUs`
+                    : `${overview.totalSkus} SKUs`
+                  : "Dados mock"}
               </span>
             )}
             {loading && <span className="ml-2 text-zinc-400">Carregando...</span>}
