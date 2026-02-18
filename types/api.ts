@@ -130,6 +130,7 @@ export type TimeSeriesResponse = {
 };
 
 export type { GA4FunnelStep, GA4SummaryData, GA4DailyPoint, ChannelAcquisition, GA4DataResponse } from "@/lib/ga4-queries";
+export type { CohortRetentionData, RetentionSummary, ChannelLTV, RetentionData } from "@/lib/ga4-queries";
 
 export type KpiStatus = "ok" | "warn" | "danger" | undefined;
 

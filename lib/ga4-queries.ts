@@ -451,6 +451,252 @@ export async function fetchGA4Geographic(
    Channel Acquisition Query
 ========================= */
 
+/* =========================
+   Retention Types
+========================= */
+
+export type CohortRetentionData = {
+  cohortWeek: string;
+  usersStart: number;
+  retention: number[];
+};
+
+export type RetentionSummary = {
+  totalUsers: number;
+  newUsers: number;
+  returningUsers: number;
+  returnRate: number;
+  avgSessionsPerUser: number;
+  purchases: number;
+  revenue: number;
+  avgOrderValue: number;
+  repurchaseEstimate: number;
+};
+
+export type ChannelLTV = {
+  channel: string;
+  users: number;
+  revenue: number;
+  purchases: number;
+  revenuePerUser: number;
+  purchasesPerUser: number;
+  avgTicket: number;
+};
+
+export type RetentionData = {
+  source: "ga4" | "not_configured";
+  updatedAt?: string;
+  summary: RetentionSummary;
+  cohorts: CohortRetentionData[];
+  channelLTV: ChannelLTV[];
+};
+
+/* =========================
+   Cohort Retention Query
+========================= */
+
+export async function fetchCohortRetention(
+  client: BetaAnalyticsDataClient,
+  startDate: string,
+  endDate: string,
+): Promise<CohortRetentionData[]> {
+  const cacheKey = `retention-cohort:${startDate}:${endDate}`;
+  const cached = getGA4Cached<CohortRetentionData[]>(cacheKey);
+  if (cached) return cached;
+
+  // Build weekly cohorts spanning the date range
+  const start = new Date(startDate + "T12:00:00");
+  const end = new Date(endDate + "T12:00:00");
+  const diffDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  const numWeeks = Math.min(12, Math.max(4, Math.floor(diffDays / 7)));
+
+  const cohorts = [];
+  for (let i = 0; i < numWeeks; i++) {
+    const cohortStart = new Date(start);
+    cohortStart.setDate(cohortStart.getDate() + i * 7);
+    const cohortEnd = new Date(cohortStart);
+    cohortEnd.setDate(cohortEnd.getDate() + 6);
+    if (cohortEnd > end) break;
+    const fmtD = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    cohorts.push({
+      dimension: `cohort_${i}`,
+      dateRange: { startDate: fmtD(cohortStart), endDate: fmtD(cohortEnd) },
+    });
+  }
+
+  if (cohorts.length === 0) {
+    return [];
+  }
+
+  const [response] = await client.runReport({
+    property: getPropertyId(),
+    cohortSpec: {
+      cohorts: cohorts.map((c) => ({
+        name: c.dimension,
+        dateRange: c.dateRange,
+      })),
+      cohortsRange: {
+        granularity: "WEEKLY" as const,
+        endOffset: Math.min(8, cohorts.length),
+      },
+    },
+    dimensions: [{ name: "cohort" }, { name: "cohortNthWeek" }],
+    metrics: [{ name: "cohortActiveUsers" }, { name: "cohortTotalUsers" }],
+  });
+
+  // Parse into structured data
+  const cohortMap: Record<string, { usersStart: number; weeklyUsers: Record<number, number> }> = {};
+
+  for (const row of response.rows ?? []) {
+    const cohortName = row.dimensionValues?.[0]?.value ?? "";
+    const weekNum = parseInt(row.dimensionValues?.[1]?.value ?? "0", 10);
+    const activeUsers = parseInt(row.metricValues?.[0]?.value ?? "0", 10);
+    const totalUsers = parseInt(row.metricValues?.[1]?.value ?? "0", 10);
+
+    if (!cohortMap[cohortName]) {
+      cohortMap[cohortName] = { usersStart: 0, weeklyUsers: {} };
+    }
+    if (weekNum === 0) {
+      cohortMap[cohortName].usersStart = totalUsers || activeUsers;
+    }
+    cohortMap[cohortName].weeklyUsers[weekNum] = activeUsers;
+  }
+
+  const result: CohortRetentionData[] = cohorts.map((c, i) => {
+    const data = cohortMap[c.dimension];
+    const usersStart = data?.usersStart ?? 0;
+    const retention: number[] = [];
+    const maxWeek = Math.min(8, cohorts.length);
+    for (let w = 0; w <= maxWeek; w++) {
+      const active = data?.weeklyUsers[w] ?? 0;
+      retention.push(usersStart > 0 ? Math.round((active / usersStart) * 10000) / 100 : 0);
+    }
+    return {
+      cohortWeek: `Semana ${i + 1}`,
+      usersStart,
+      retention,
+    };
+  });
+
+  setGA4Cache(cacheKey, result);
+  return result;
+}
+
+/* =========================
+   Retention Summary Query
+========================= */
+
+export async function fetchRetentionSummary(
+  client: BetaAnalyticsDataClient,
+  startDate: string,
+  endDate: string,
+): Promise<RetentionSummary> {
+  const cacheKey = `retention-summary:${startDate}:${endDate}`;
+  const cached = getGA4Cached<RetentionSummary>(cacheKey);
+  if (cached) return cached;
+
+  const [response] = await client.runReport({
+    property: getPropertyId(),
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: "newVsReturning" }],
+    metrics: [
+      { name: "totalUsers" },
+      { name: "sessions" },
+      { name: "ecommercePurchases" },
+      { name: "purchaseRevenue" },
+    ],
+  });
+
+  let totalUsers = 0;
+  let newUsers = 0;
+  let returningUsers = 0;
+  let totalSessions = 0;
+  let totalPurchases = 0;
+  let totalRevenue = 0;
+
+  for (const row of response.rows ?? []) {
+    const segment = row.dimensionValues?.[0]?.value ?? "";
+    const vals = (row.metricValues ?? []).map((v) => parseFloat(v.value ?? "0"));
+    const users = Math.round(vals[0] ?? 0);
+    const sessions = Math.round(vals[1] ?? 0);
+    const purchases = Math.round(vals[2] ?? 0);
+    const revenue = Math.round((vals[3] ?? 0) * 100) / 100;
+
+    totalUsers += users;
+    totalSessions += sessions;
+    totalPurchases += purchases;
+    totalRevenue += revenue;
+
+    if (segment === "new") newUsers = users;
+    else if (segment === "returning") returningUsers = users;
+  }
+
+  const result: RetentionSummary = {
+    totalUsers,
+    newUsers,
+    returningUsers,
+    returnRate: totalUsers > 0 ? Math.round((returningUsers / totalUsers) * 10000) / 100 : 0,
+    avgSessionsPerUser: totalUsers > 0 ? Math.round((totalSessions / totalUsers) * 100) / 100 : 0,
+    purchases: totalPurchases,
+    revenue: Math.round(totalRevenue * 100) / 100,
+    avgOrderValue: totalPurchases > 0 ? Math.round((totalRevenue / totalPurchases) * 100) / 100 : 0,
+    repurchaseEstimate: returningUsers > 0 ? Math.round((totalPurchases / returningUsers) * 100) / 100 : 0,
+  };
+
+  setGA4Cache(cacheKey, result);
+  return result;
+}
+
+/* =========================
+   User Lifetime Value by Channel
+========================= */
+
+export async function fetchUserLifetimeValue(
+  client: BetaAnalyticsDataClient,
+  startDate: string,
+  endDate: string,
+): Promise<ChannelLTV[]> {
+  const cacheKey = `retention-ltv:${startDate}:${endDate}`;
+  const cached = getGA4Cached<ChannelLTV[]>(cacheKey);
+  if (cached) return cached;
+
+  const [response] = await client.runReport({
+    property: getPropertyId(),
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: "firstUserDefaultChannelGroup" }],
+    metrics: [
+      { name: "totalUsers" },
+      { name: "purchaseRevenue" },
+      { name: "ecommercePurchases" },
+    ],
+    orderBys: [{ metric: { metricName: "purchaseRevenue" }, desc: true }],
+  });
+
+  const channels: ChannelLTV[] = (response.rows ?? []).map((row) => {
+    const channel = row.dimensionValues?.[0]?.value ?? "(unknown)";
+    const vals = (row.metricValues ?? []).map((v) => parseFloat(v.value ?? "0"));
+    const users = Math.round(vals[0] ?? 0);
+    const revenue = Math.round((vals[1] ?? 0) * 100) / 100;
+    const purchases = Math.round(vals[2] ?? 0);
+    return {
+      channel,
+      users,
+      revenue,
+      purchases,
+      revenuePerUser: users > 0 ? Math.round((revenue / users) * 100) / 100 : 0,
+      purchasesPerUser: users > 0 ? Math.round((purchases / users) * 100) / 100 : 0,
+      avgTicket: purchases > 0 ? Math.round((revenue / purchases) * 100) / 100 : 0,
+    };
+  });
+
+  setGA4Cache(cacheKey, channels);
+  return channels;
+}
+
+/* =========================
+   Channel Acquisition Query
+========================= */
+
 export async function fetchChannelAcquisition(
   client: BetaAnalyticsDataClient,
   startDate: string,
