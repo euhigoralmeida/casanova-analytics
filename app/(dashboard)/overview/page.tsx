@@ -105,10 +105,8 @@ export default function VisaoGeralPage() {
           <h1 className="text-xl font-bold text-zinc-900">Visão Geral</h1>
           <p className="text-sm text-zinc-500 mt-0.5">
             {fmtDateSlash(dateRange.startDate)} — {fmtDateSlash(dateRange.endDate)}
-            {overview && (
-              <span className="ml-2 text-zinc-400">
-                {overview.source === "google-ads" ? `Google Ads • ${overview.totalSkus} SKUs` : "Dados mock"}
-              </span>
+            {overview && overview.source !== "google-ads" && (
+              <span className="ml-2 text-zinc-400">Dados mock</span>
             )}
           </p>
         </div>
