@@ -133,6 +133,25 @@ export type TimeSeriesResponse = {
 
 export type { GA4FunnelStep, GA4SummaryData, GA4DailyPoint, ChannelAcquisition, GA4DataResponse } from "@/lib/ga4-queries";
 export type { CohortRetentionData, RetentionSummary, ChannelLTV, RetentionData } from "@/lib/ga4-queries";
+export type { ClarityBehavioralMetrics, ClarityPageAnalysis, ClarityDeviceBreakdown, ClarityData } from "@/lib/clarity";
+
+/* =========================
+   CRO Data Response (combined GA4 + Clarity)
+========================= */
+
+export type CRODataResponse = {
+  source: "full" | "ga4_only" | "clarity_only" | "not_configured";
+  updatedAt: string;
+  // GA4 data
+  funnel?: import("@/lib/ga4-queries").GA4FunnelStep[];
+  overallConversionRate?: number;
+  summary?: import("@/lib/ga4-queries").GA4SummaryData;
+  dailySeries?: import("@/lib/ga4-queries").GA4DailyPoint[];
+  channelAcquisition?: import("@/lib/ga4-queries").ChannelAcquisition[];
+  // Clarity data
+  clarity?: import("@/lib/clarity").ClarityData;
+  clarityDashboardUrl?: string;
+};
 
 export type KpiStatus = "ok" | "warn" | "danger" | undefined;
 

@@ -15,7 +15,7 @@ const pageTitles: Record<string, string> = {
   "/acquisition/meta": "Meta Ads",
   "/acquisition/segments": "Segmentação",
   "/retention": "Retenção",
-  "/funnel": "Funil E-commerce",
+  "/funnel": "CRO & Funil",
   "/alerts": "Alertas",
   "/settings": "Configurações",
 };

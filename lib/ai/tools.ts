@@ -141,6 +141,15 @@ export const GEMINI_TOOLS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "get_cro_clarity",
+    description:
+      "Métricas comportamentais do Microsoft Clarity: dead clicks, rage clicks, scroll depth, tempo engajamento, erros JS, quickbacks. Análise por página e dispositivo. Sempre usa últimos 3 dias com cache 24h.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {},
+    },
+  },
+  {
     name: "compare_periods",
     description:
       "Compara métricas da conta entre dois períodos. Retorna métricas de ambos + variação percentual.",

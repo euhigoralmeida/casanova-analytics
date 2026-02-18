@@ -344,6 +344,46 @@ async function executeToolInternal(
       };
     }
 
+    case "get_cro_clarity": {
+      const { isClarityConfigured, fetchClarityInsights } = await import("@/lib/clarity");
+      if (!isClarityConfigured()) return { error: "Microsoft Clarity não configurado" };
+      const clarityData = await fetchClarityInsights(3);
+      if (clarityData.source !== "clarity") return { error: "Erro ao buscar dados do Clarity" };
+      const b = clarityData.behavioral;
+      const top5Pages = clarityData.pageAnalysis.slice(0, 5).map((p) => ({
+        pagina: p.pageTitle,
+        url: p.url,
+        uxScore: p.uxScore,
+        deadClicks: p.deadClicks,
+        rageClicks: p.rageClicks,
+        scrollDepth: p.scrollDepth,
+        trafego: p.traffic,
+      }));
+      const worstDevice = clarityData.deviceBreakdown.reduce((worst, d) =>
+        d.rageClicks > worst.rageClicks ? d : worst, clarityData.deviceBreakdown[0]);
+      return {
+        metricas: {
+          deadClicks: b.deadClicks,
+          rageClicks: b.rageClicks,
+          scrollDepthMedio: b.avgScrollDepth,
+          tempoEngajamentoMedio: b.avgEngagementTime,
+          quickbacks: b.quickbackClicks,
+          errosJS: b.scriptErrors,
+          errorClicks: b.errorClicks,
+          trafego: b.totalTraffic,
+          paginasPorSessao: b.pagesPerSession,
+        },
+        pioresPaginas: top5Pages,
+        dispositivoMaisProblematico: {
+          dispositivo: worstDevice.device,
+          rageClicks: worstDevice.rageClicks,
+          deadClicks: worstDevice.deadClicks,
+          scrollDepth: worstDevice.scrollDepth,
+          trafego: worstDevice.traffic,
+        },
+      };
+    }
+
     case "compare_periods": {
       if (!isConfigured()) return { error: "Google Ads não configurado" };
       const customer = getCustomer();

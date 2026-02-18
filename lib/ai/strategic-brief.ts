@@ -14,6 +14,7 @@ import { buildContextSummary, buildPeriodContext } from "./context-builder";
 import { prisma } from "@/lib/db";
 import { computeTargetMonth } from "@/lib/planning-target-calc";
 import { formatBRL } from "@/lib/format";
+import { isClarityConfigured, fetchClarityInsights } from "@/lib/clarity";
 
 export async function buildStrategicBrief(
   tenantId: string,
@@ -26,12 +27,13 @@ export async function buildStrategicBrief(
   sections.push(buildPeriodContext(startDate, endDate));
   sections.push("");
 
-  // Parallel fetches: cognitive + GA4 + planning + action history
-  const [cognitive, ga4Extras, planningSection, actionsSection] = await Promise.all([
+  // Parallel fetches: cognitive + GA4 + planning + action history + clarity
+  const [cognitive, ga4Extras, planningSection, actionsSection, clarityData] = await Promise.all([
     fetchCognitiveDirectly(tenantId, startDate, endDate).catch(() => null),
     fetchGA4Extras(startDate, endDate),
     fetchPlanningTargets(tenantId),
     fetchRecentActions(tenantId),
+    isClarityConfigured() ? fetchClarityInsights(3).catch(() => null) : Promise.resolve(null),
   ]);
 
   // 1. AQUISICAO — from cognitive engine
@@ -62,6 +64,24 @@ export async function buildStrategicBrief(
     sections.push(`Compras: ${s.purchases} | Receita GA4: ${formatBRL(s.purchaseRevenue)}`);
     sections.push(`Ticket medio: ${formatBRL(s.avgOrderValue)}`);
     sections.push(`Abandono carrinho: ${s.cartAbandonmentRate}% | Abandono checkout: ${s.checkoutAbandonmentRate}%`);
+    sections.push("");
+  }
+
+  // 2.5 CRO (Comportamento — Clarity)
+  if (clarityData && clarityData.source === "clarity") {
+    sections.push("## CRO (Comportamento - Clarity)");
+    const b = clarityData.behavioral;
+    sections.push(`Dead clicks: ${b.deadClicks.toLocaleString("pt-BR")} | Rage clicks: ${b.rageClicks.toLocaleString("pt-BR")}`);
+    sections.push(`Scroll depth medio: ${b.avgScrollDepth.toFixed(0)}% | Tempo engajamento: ${Math.floor(b.avgEngagementTime / 60)}m${Math.round(b.avgEngagementTime % 60)}s`);
+    sections.push(`Quickbacks: ${b.quickbackClicks} | Erros JS: ${b.scriptErrors} | Error clicks: ${b.errorClicks}`);
+    sections.push(`Trafego total: ${b.totalTraffic.toLocaleString("pt-BR")} sessoes | Paginas/sessao: ${b.pagesPerSession}`);
+    const worstPages = clarityData.pageAnalysis.slice(0, 3);
+    if (worstPages.length > 0) {
+      sections.push("Piores paginas (UX Score):");
+      for (const p of worstPages) {
+        sections.push(`- ${p.pageTitle} (${p.url}): Score ${p.uxScore}/100, ${p.rageClicks} rage clicks, ${p.deadClicks} dead clicks`);
+      }
+    }
     sections.push("");
   }
 

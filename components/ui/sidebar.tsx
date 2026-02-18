@@ -8,7 +8,7 @@ import {
   CalendarDays,
   Megaphone,
   Heart,
-  Filter,
+  MousePointerClick,
   Bell,
   Settings,
   LogOut,
@@ -41,7 +41,7 @@ const navItems: NavItem[] = [
     ],
   },
   { label: "Retenção", href: "/retention", icon: Heart },
-  { label: "Funil", href: "/funnel", icon: Filter },
+  { label: "CRO", href: "/funnel", icon: MousePointerClick },
   { label: "Alertas", href: "/alerts", icon: Bell },
   { label: "Configurações", href: "/settings", icon: Settings },
 ];
