@@ -11,7 +11,6 @@ import DateRangePicker from "@/components/ui/date-range-picker";
 import ChartsSection from "@/components/charts/charts-section";
 import Kpi from "@/components/ui/kpi-card";
 import { KpiSkeleton, AlertsSkeleton, ChartSkeleton } from "@/components/ui/skeleton";
-import { ExecutiveSummary } from "@/components/intelligence/executive-summary";
 import { BudgetPlanCard } from "@/components/intelligence/budget-plan-card";
 import { SegmentationSummary } from "@/components/intelligence/segmentation-summary";
 import { StrategicAdvisorCard } from "@/components/intelligence/strategic-advisor-card";
@@ -197,31 +196,7 @@ export default function VisaoGeralPage() {
         );
       })()}
 
-      {/* ─── ROW 3: Executive Summary consolidado ─── */}
-      {intelligence && !loading && (
-        <ExecutiveSummary
-          summary={intelligence.summary}
-          mode={intelligence.mode}
-          bottleneck={intelligence.bottleneck}
-          pacingProjections={intelligence.pacingProjections}
-          executiveSummary={intelligence.executiveSummary}
-          accountTrend={intelligence.accountTrend}
-        />
-      )}
-
-      {/* Legacy fallback when no intelligence */}
-      {!intelligence && overview && !loading && (
-        <div className="rounded-2xl border border-zinc-200 bg-gradient-to-r from-blue-50 to-indigo-50 p-5">
-          <h2 className="font-semibold text-sm text-indigo-900 mb-2">Resumo</h2>
-          <p className="text-sm text-zinc-600">
-            {overview.meta.roasActual >= overview.meta.roasTarget
-              ? `ROAS ${overview.meta.roasActual.toFixed(1)} acima da meta (${overview.meta.roasTarget.toFixed(1)}). Operação saudável.`
-              : `ROAS ${overview.meta.roasActual.toFixed(1)} abaixo da meta (${overview.meta.roasTarget.toFixed(1)}). Atenção necessária.`}
-          </p>
-        </div>
-      )}
-
-      {/* ─── ROW 3.5: Consultor Estratégico (IA proativa cross-domain) ─── */}
+      {/* ─── ROW 3: Consultor Estratégico (IA proativa cross-domain) ─── */}
       {!loading && (
         <StrategicAdvisorCard startDate={dateRange.startDate} endDate={dateRange.endDate} />
       )}
