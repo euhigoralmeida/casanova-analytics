@@ -16,6 +16,13 @@ export type SkuMetrics = {
   campaignStatus: "ENABLED" | "PAUSED";
 };
 
+/** Data de corte para status: 3 dias atrás (yyyy-mm-dd) */
+function statusCutoffDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 3);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 /* =========================
    Query: métricas de um SKU
 ========================= */
@@ -33,11 +40,13 @@ export async function fetchSkuMetrics(
 
   const dateClause = buildDateClause(period, startDate, endDate);
 
-  // Query principal (original, sem filtro de campaign.status)
+  // Query única com campaign.status e date para detectar status ativo
   const rows = await customer.query(`
     SELECT
       segments.product_item_id,
       segments.product_title,
+      segments.date,
+      campaign.status,
       metrics.impressions,
       metrics.clicks,
       metrics.cost_micros,
@@ -50,27 +59,10 @@ export async function fetchSkuMetrics(
 
   if (!rows.length) return null;
 
-  // Status check (não-bloqueante): últimos 7 dias em campanhas ativas
-  let isEnabled = true;
-  try {
-    const now = new Date();
-    const statusEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    const sevenAgo = new Date(now);
-    sevenAgo.setDate(sevenAgo.getDate() - 7);
-    const statusStart = `${sevenAgo.getFullYear()}-${String(sevenAgo.getMonth() + 1).padStart(2, "0")}-${String(sevenAgo.getDate()).padStart(2, "0")}`;
-    const enabledRows = await customer.query(`
-      SELECT segments.product_item_id
-      FROM shopping_performance_view
-      WHERE segments.date BETWEEN '${statusStart}' AND '${statusEnd}'
-        AND segments.product_item_id = '${sku}'
-        AND campaign.status = 'ENABLED'
-    `);
-    isEnabled = enabledRows.length > 0;
-  } catch {
-    // Status query falhou — default para ENABLED
-  }
+  // Cutoff: últimos 3 dias para determinar status atual
+  const cutoffStr = statusCutoffDate();
+  let isRecentEnabled = false;
 
-  // Agregar múltiplas linhas (pode haver mais de uma campanha por SKU)
   const result: SkuMetrics = {
     sku,
     title: "",
@@ -79,11 +71,18 @@ export async function fetchSkuMetrics(
     costBRL: 0,
     conversions: 0,
     revenue: 0,
-    campaignStatus: isEnabled ? "ENABLED" : "PAUSED",
+    campaignStatus: "PAUSED",
   };
 
   for (const row of rows) {
     const r = row as Record<string, Record<string, unknown>>;
+    const rowDate = (r.segments?.date as string) || "";
+    const campStatus = resolveCampaignStatus(r.campaign?.status);
+
+    if (rowDate >= cutoffStr && campStatus === "ENABLED") {
+      isRecentEnabled = true;
+    }
+
     result.title = result.title || (r.segments?.product_title as string) || sku;
     result.impressions += (r.metrics?.impressions as number) || 0;
     result.clicks += (r.metrics?.clicks as number) || 0;
@@ -91,6 +90,8 @@ export async function fetchSkuMetrics(
     result.conversions += (r.metrics?.conversions as number) || 0;
     result.revenue += (r.metrics?.conversions_value as number) || 0;
   }
+
+  result.campaignStatus = isRecentEnabled ? "ENABLED" : "PAUSED";
 
   setCache(cacheKey, result);
   return result;
@@ -112,11 +113,13 @@ export async function fetchAllSkuMetrics(
 
   const dateClause = buildDateClause(period, startDate, endDate);
 
-  // Query principal (original, sem filtro de campaign.status)
+  // Query única com campaign.status e date para detectar status ativo na mesma query
   const rows = await customer.query(`
     SELECT
       segments.product_item_id,
       segments.product_title,
+      segments.date,
+      campaign.status,
       metrics.impressions,
       metrics.clicks,
       metrics.cost_micros,
@@ -127,28 +130,9 @@ export async function fetchAllSkuMetrics(
     ORDER BY metrics.conversions_value DESC
   `);
 
-  // Status check (não-bloqueante): últimos 7 dias em campanhas ativas
-  let enabledSkuIds: Set<string> | null = null;
-  try {
-    const now = new Date();
-    const statusEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
-    const sevenAgo = new Date(now);
-    sevenAgo.setDate(sevenAgo.getDate() - 7);
-    const statusStart = `${sevenAgo.getFullYear()}-${String(sevenAgo.getMonth() + 1).padStart(2, "0")}-${String(sevenAgo.getDate()).padStart(2, "0")}`;
-    const enabledRows = await customer.query(`
-      SELECT segments.product_item_id
-      FROM shopping_performance_view
-      WHERE segments.date BETWEEN '${statusStart}' AND '${statusEnd}'
-        AND campaign.status = 'ENABLED'
-    `);
-    enabledSkuIds = new Set<string>();
-    for (const row of enabledRows) {
-      const r = row as Record<string, Record<string, unknown>>;
-      enabledSkuIds.add((r.segments?.product_item_id as string) || "unknown");
-    }
-  } catch {
-    // Status query falhou — todos ficam ENABLED por default
-  }
+  // Cutoff: últimos 3 dias para determinar status atual do produto
+  const cutoffStr = statusCutoffDate();
+  const recentEnabled = new Set<string>();
 
   // Agrupar por SKU (product_item_id)
   const map = new Map<string, SkuMetrics>();
@@ -156,6 +140,14 @@ export async function fetchAllSkuMetrics(
   for (const row of rows) {
     const r = row as Record<string, Record<string, unknown>>;
     const skuId = (r.segments?.product_item_id as string) || "unknown";
+    const rowDate = (r.segments?.date as string) || "";
+    const campStatus = resolveCampaignStatus(r.campaign?.status);
+
+    // Rastrear SKUs com atividade recente em campanhas ativas
+    if (rowDate >= cutoffStr && campStatus === "ENABLED") {
+      recentEnabled.add(skuId);
+    }
+
     const existing = map.get(skuId) ?? {
       sku: skuId,
       title: (r.segments?.product_title as string) || skuId,
@@ -164,7 +156,7 @@ export async function fetchAllSkuMetrics(
       costBRL: 0,
       conversions: 0,
       revenue: 0,
-      campaignStatus: !enabledSkuIds || enabledSkuIds.has(skuId) ? "ENABLED" as const : "PAUSED" as const,
+      campaignStatus: "PAUSED" as const, // será definido após o loop
     };
 
     existing.impressions += (r.metrics?.impressions as number) || 0;
@@ -174,6 +166,11 @@ export async function fetchAllSkuMetrics(
     existing.revenue += (r.metrics?.conversions_value as number) || 0;
 
     map.set(skuId, existing);
+  }
+
+  // Definir status baseado em atividade recente
+  for (const [skuId, entry] of map) {
+    entry.campaignStatus = recentEnabled.has(skuId) ? "ENABLED" : "PAUSED";
   }
 
   const result = Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
