@@ -15,6 +15,7 @@ import { ExecutiveSummary } from "@/components/intelligence/executive-summary";
 import { RecommendationsPanel } from "@/components/intelligence/recommendations-panel";
 import { BudgetPlanCard } from "@/components/intelligence/budget-plan-card";
 import { SegmentationSummary } from "@/components/intelligence/segmentation-summary";
+import { StrategicAdvisorCard } from "@/components/intelligence/strategic-advisor-card";
 import { RefreshCw, ChevronRight } from "lucide-react";
 import Link from "next/link";
 
@@ -239,6 +240,11 @@ export default function VisaoGeralPage() {
               : `ROAS ${overview.meta.roasActual.toFixed(1)} abaixo da meta (${overview.meta.roasTarget.toFixed(1)}). Atenção necessária.`}
           </p>
         </div>
+      )}
+
+      {/* ─── ROW 3.5: Consultor Estratégico (IA proativa cross-domain) ─── */}
+      {!loading && (
+        <StrategicAdvisorCard startDate={dateRange.startDate} endDate={dateRange.endDate} />
       )}
 
       {/* ─── ROW 4: Recomendações (7fr) + Alertas top 5 (5fr) ─── */}

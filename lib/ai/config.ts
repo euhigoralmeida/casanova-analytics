@@ -22,8 +22,17 @@ export function getAIConfig() {
       insightsPerHour: parseInt(process.env.AI_INSIGHTS_RATE_LIMIT || "12", 10),
     },
 
+    strategic: {
+      model: process.env.AI_STRATEGIC_MODEL || "gemini-2.0-flash",
+      maxTokens: 2048,
+      temperature: 0.35,
+    },
+
+    provider: (process.env.LLM_PROVIDER || "gemini") as "gemini" | "claude",
+
     cache: {
       insightsTtlMs: parseInt(process.env.AI_INSIGHTS_CACHE_TTL || "300", 10) * 1000,
+      advisorTtlMs: 10 * 60 * 1000, // 10 min
     },
   };
 }

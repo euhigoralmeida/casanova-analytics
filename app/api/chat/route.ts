@@ -5,7 +5,8 @@ import { createGeminiClient, withRetry } from "@/lib/ai/client";
 import { GEMINI_TOOLS } from "@/lib/ai/tools";
 import { executeTool } from "@/lib/ai/tool-executor";
 import { buildContextSummary, buildPeriodContext } from "@/lib/ai/context-builder";
-import { chatSystemPrompt } from "@/lib/ai/prompts";
+import { chatSystemPrompt, strategicChatSystemPrompt } from "@/lib/ai/prompts";
+import { buildStrategicBrief } from "@/lib/ai/strategic-brief";
 import { checkChatLimit } from "@/lib/ai/rate-limiter";
 import { fetchCognitiveDirectly } from "@/lib/ai/fetch-cognitive";
 import type { Content, Part } from "@google/generative-ai";
@@ -46,9 +47,10 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { messages, context } = body as {
+  const { messages, context, mode } = body as {
     messages: ChatMessage[];
     context: { startDate: string; endDate: string };
+    mode?: "standard" | "strategic";
   };
 
   if (!messages?.length || !context?.startDate || !context?.endDate) {
@@ -59,29 +61,43 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    // Fetch cognitive context
-    let contextSummary = "Dados de análise não disponíveis no momento.";
-    try {
-      const cognitiveData = await fetchCognitiveDirectly(session.tenantId, context.startDate, context.endDate);
-      if (cognitiveData) {
-        contextSummary = buildContextSummary(cognitiveData);
+    const isStrategic = mode === "strategic";
+    const periodContext = buildPeriodContext(context.startDate, context.endDate);
+    let systemPrompt: string;
+
+    if (isStrategic) {
+      // Strategic mode: use full cross-domain brief
+      let brief = "Dados de análise não disponíveis no momento.";
+      try {
+        brief = await buildStrategicBrief(session.tenantId, context.startDate, context.endDate);
+      } catch (ctxErr) {
+        console.error("Chat: strategic brief error (non-fatal):", ctxErr);
       }
-    } catch (ctxErr) {
-      console.error("Chat: cognitive context error (non-fatal):", ctxErr);
+      systemPrompt = strategicChatSystemPrompt(brief, periodContext);
+    } else {
+      // Standard mode: cognitive context only
+      let contextSummary = "Dados de análise não disponíveis no momento.";
+      try {
+        const cognitiveData = await fetchCognitiveDirectly(session.tenantId, context.startDate, context.endDate);
+        if (cognitiveData) {
+          contextSummary = buildContextSummary(cognitiveData);
+        }
+      } catch (ctxErr) {
+        console.error("Chat: cognitive context error (non-fatal):", ctxErr);
+      }
+      systemPrompt = chatSystemPrompt(contextSummary, periodContext);
     }
 
-    const periodContext = buildPeriodContext(context.startDate, context.endDate);
-    const systemPrompt = chatSystemPrompt(contextSummary, periodContext);
-
     // Create Gemini model with tools
+    const chatConfig = isStrategic ? AI_CONFIG.strategic : AI_CONFIG.chat;
     const genAI = createGeminiClient(apiKey);
     const model = genAI.getGenerativeModel({
       model: AI_CONFIG.chat.model,
       systemInstruction: systemPrompt,
       tools: [{ functionDeclarations: GEMINI_TOOLS }],
       generationConfig: {
-        maxOutputTokens: AI_CONFIG.chat.maxTokens,
-        temperature: AI_CONFIG.chat.temperature,
+        maxOutputTokens: chatConfig.maxTokens,
+        temperature: chatConfig.temperature,
       },
     });
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { Sparkles, Send, X, Loader2 } from "lucide-react";
+import { Sparkles, Send, X, Loader2, BrainCircuit } from "lucide-react";
 import ChatMessage from "./chat-message";
 import AskSuggestions from "./ask-suggestions";
 import { usePathname } from "next/navigation";
@@ -49,6 +49,34 @@ const DEFAULT_SUGGESTIONS = [
   "Quais ações rápidas?",
 ];
 
+const STRATEGIC_SUGGESTIONS_BY_PATH: Record<string, string[]> = {
+  "/overview": [
+    "Qual decisão teria maior impacto agora?",
+    "Onde estou desperdiçando budget?",
+    "CRO ou aquisição — onde focar?",
+    "O que NÃO devo fazer este mês?",
+  ],
+  "/acquisition/google": [
+    "O budget está no lugar certo?",
+    "Quais campanhas contradizem a estratégia?",
+    "Investir mais ou otimizar funil primeiro?",
+    "Trade-off: mais tráfego vs melhor conversão?",
+  ],
+  "/funnel": [
+    "Onde 1 hora de trabalho gera mais R$?",
+    "O funil justifica o investimento atual?",
+    "Checkout ou carrinho — qual priorizar?",
+    "O gargalo é tráfego ou conversão?",
+  ],
+};
+
+const DEFAULT_STRATEGIC_SUGGESTIONS = [
+  "Qual decisão teria maior impacto?",
+  "Onde estou desperdiçando budget?",
+  "O que NÃO devo fazer agora?",
+  "CRO ou aquisição — onde focar?",
+];
+
 export default function AskAnalytics({ dateRange }: AskAnalyticsProps) {
   const pathname = usePathname();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -56,6 +84,7 @@ export default function AskAnalytics({ dateRange }: AskAnalyticsProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const [strategicMode, setStrategicMode] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -63,7 +92,9 @@ export default function AskAnalytics({ dateRange }: AskAnalyticsProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  const suggestions = SUGGESTIONS_BY_PATH[pathname] ?? DEFAULT_SUGGESTIONS;
+  const suggestions = strategicMode
+    ? (STRATEGIC_SUGGESTIONS_BY_PATH[pathname] ?? DEFAULT_STRATEGIC_SUGGESTIONS)
+    : (SUGGESTIONS_BY_PATH[pathname] ?? DEFAULT_SUGGESTIONS);
 
   const sendMessage = useCallback(async (text: string) => {
     if (!text.trim() || loading) return;
@@ -83,6 +114,7 @@ export default function AskAnalytics({ dateRange }: AskAnalyticsProps) {
         body: JSON.stringify({
           messages: newMessages,
           context: { startDate: dateRange.startDate, endDate: dateRange.endDate },
+          mode: strategicMode ? "strategic" : "standard",
         }),
       });
 
@@ -99,7 +131,7 @@ export default function AskAnalytics({ dateRange }: AskAnalyticsProps) {
     } finally {
       setLoading(false);
     }
-  }, [messages, loading, dateRange]);
+  }, [messages, loading, dateRange, strategicMode]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -129,10 +161,22 @@ export default function AskAnalytics({ dateRange }: AskAnalyticsProps) {
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Pergunte qualquer coisa sobre seus dados..."
+            placeholder={strategicMode ? "Pergunte sobre estratégia cross-domain..." : "Pergunte qualquer coisa sobre seus dados..."}
             className="flex-1 text-sm text-zinc-700 placeholder:text-zinc-400 bg-transparent outline-none"
             disabled={loading}
           />
+          <button
+            type="button"
+            onClick={() => setStrategicMode(!strategicMode)}
+            className={`p-1.5 rounded-lg transition-colors shrink-0 ${
+              strategicMode
+                ? "text-violet-600 bg-violet-100 hover:bg-violet-200"
+                : "text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100"
+            }`}
+            title={strategicMode ? "Modo Estratégico ativo" : "Ativar Modo Estratégico"}
+          >
+            <BrainCircuit size={16} />
+          </button>
           {loading ? (
             <Loader2 size={16} className="text-violet-500 animate-spin shrink-0" />
           ) : (
@@ -160,6 +204,11 @@ export default function AskAnalytics({ dateRange }: AskAnalyticsProps) {
             <div className="flex items-center gap-2">
               <Sparkles size={14} className="text-violet-500" />
               <span className="text-xs font-medium text-violet-700">Análise IA</span>
+              {strategicMode && (
+                <span className="text-[10px] font-semibold text-violet-600 bg-violet-100 px-1.5 py-0.5 rounded">
+                  Estratégico
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -186,7 +235,7 @@ export default function AskAnalytics({ dateRange }: AskAnalyticsProps) {
             {loading && (
               <div className="flex items-center gap-2 text-sm text-violet-500">
                 <Loader2 size={14} className="animate-spin" />
-                <span>Analisando seus dados...</span>
+                <span>{strategicMode ? "Analisando estratégia cross-domain..." : "Analisando seus dados..."}</span>
               </div>
             )}
 
