@@ -75,14 +75,51 @@ export async function buildStrategicBrief(
     sections.push(`Scroll depth medio: ${b.avgScrollDepth.toFixed(0)}% | Tempo engajamento: ${Math.floor(b.avgEngagementTime / 60)}m${Math.round(b.avgEngagementTime % 60)}s`);
     sections.push(`Quickbacks: ${b.quickbackClicks} | Erros JS: ${b.scriptErrors} | Error clicks: ${b.errorClicks}`);
     sections.push(`Trafego total: ${b.totalTraffic.toLocaleString("pt-BR")} sessoes | Paginas/sessao: ${b.pagesPerSession}`);
+    if (b.botSessions > 0) {
+      const botPct = b.totalTraffic > 0 ? Math.round((b.botSessions / b.totalTraffic) * 100) : 0;
+      sections.push(`Bots: ${b.botSessions} sessoes (${botPct}%) | Usuarios distintos: ${b.distinctUsers.toLocaleString("pt-BR")}`);
+    }
+    if (b.activeTimeRatio > 0) {
+      sections.push(`Responsividade (active/total time): ${Math.round(b.activeTimeRatio * 100)}%`);
+    }
     const worstPages = clarityData.pageAnalysis.slice(0, 3);
     if (worstPages.length > 0) {
-      sections.push("Piores paginas (UX Score):");
+      sections.push("Piores paginas (Impact Score):");
       for (const p of worstPages) {
-        sections.push(`- ${p.pageTitle} (${p.url}): Score ${p.uxScore}/100, ${p.rageClicks} rage clicks, ${p.deadClicks} dead clicks`);
+        sections.push(`- ${p.pageTitle} (${p.url}): UX ${p.uxScore}/100, Impact ${p.impactScore}, dead ${p.deadClickRate}%/sess, rage ${p.rageClickRate}%/sess, ${p.traffic} sessoes`);
       }
     }
     sections.push("");
+
+    // Channel UX quality
+    if (clarityData.channelBreakdown.length > 0) {
+      sections.push("## CRO (Qualidade UX por Canal - Clarity)");
+      for (const ch of clarityData.channelBreakdown.slice(0, 6)) {
+        sections.push(`- ${ch.channel}: ${ch.traffic} sess, dead ${ch.deadClickRate}%, rage ${ch.rageClickRate}%, scroll ${ch.scrollDepth.toFixed(0)}%, erros JS: ${ch.scriptErrors}`);
+      }
+      sections.push("");
+    }
+
+    // Campaign UX quality
+    if (clarityData.campaignBreakdown.length > 0) {
+      sections.push("## CRO (Qualidade UX por Campanha - Clarity)");
+      for (const camp of clarityData.campaignBreakdown.slice(0, 5)) {
+        sections.push(`- ${camp.campaign}: ${camp.traffic} sess, dead ${camp.deadClickRate}%, rage ${camp.rageClickRate}%, erros JS: ${camp.scriptErrors}`);
+      }
+      sections.push("");
+    }
+
+    // Technical diagnostics (OS + Browser)
+    const techWithErrors = clarityData.techBreakdown.filter(t => t.scriptErrors > 0);
+    if (techWithErrors.length > 0) {
+      sections.push("## DIAGNOSTICO TECNICO (Erros JS por OS/Browser - Clarity)");
+      const totalErrors = techWithErrors.reduce((s, t) => s + t.scriptErrors, 0);
+      for (const t of techWithErrors.slice(0, 8)) {
+        const pct = totalErrors > 0 ? Math.round((t.scriptErrors / totalErrors) * 100) : 0;
+        sections.push(`- ${t.name} (${t.type}): ${t.scriptErrors} erros (${pct}% do total), taxa ${t.scriptErrorRate}%/sess, ${t.traffic} sessoes`);
+      }
+      sections.push("");
+    }
   }
 
   // 3. RETENCAO & LTV

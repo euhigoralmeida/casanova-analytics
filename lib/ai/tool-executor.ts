@@ -354,10 +354,14 @@ async function executeToolInternal(
         pagina: p.pageTitle,
         url: p.url,
         uxScore: p.uxScore,
+        impactScore: p.impactScore,
         deadClicks: p.deadClicks,
+        deadClickRate: p.deadClickRate,
         rageClicks: p.rageClicks,
+        rageClickRate: p.rageClickRate,
         scrollDepth: p.scrollDepth,
         trafego: p.traffic,
+        quickbacks: p.quickbacks,
       }));
       const worstDevice = clarityData.deviceBreakdown.reduce((worst, d) =>
         d.rageClicks > worst.rageClicks ? d : worst, clarityData.deviceBreakdown[0]);
@@ -372,6 +376,9 @@ async function executeToolInternal(
           errorClicks: b.errorClicks,
           trafego: b.totalTraffic,
           paginasPorSessao: b.pagesPerSession,
+          botSessions: b.botSessions,
+          distinctUsers: b.distinctUsers,
+          activeTimeRatio: b.activeTimeRatio,
         },
         pioresPaginas: top5Pages,
         dispositivoMaisProblematico: {
@@ -380,7 +387,33 @@ async function executeToolInternal(
           deadClicks: worstDevice.deadClicks,
           scrollDepth: worstDevice.scrollDepth,
           trafego: worstDevice.traffic,
+          errosJS: worstDevice.scriptErrors,
+          quickbacks: worstDevice.quickbacks,
+          engajamento: worstDevice.engagementTime,
         },
+        canais: clarityData.channelBreakdown.slice(0, 6).map((c) => ({
+          canal: c.channel,
+          trafego: c.traffic,
+          deadClickRate: c.deadClickRate,
+          rageClickRate: c.rageClickRate,
+          scrollDepth: c.scrollDepth,
+          errosJS: c.scriptErrors,
+          quickbacks: c.quickbacks,
+        })),
+        campanhas: clarityData.campaignBreakdown.slice(0, 5).map((c) => ({
+          campanha: c.campaign,
+          trafego: c.traffic,
+          deadClickRate: c.deadClickRate,
+          rageClickRate: c.rageClickRate,
+          errosJS: c.scriptErrors,
+        })),
+        diagnosticoTecnico: clarityData.techBreakdown.filter((t) => t.scriptErrors > 0).slice(0, 6).map((t) => ({
+          nome: t.name,
+          tipo: t.type,
+          trafego: t.traffic,
+          errosJS: t.scriptErrors,
+          taxaErro: t.scriptErrorRate,
+        })),
       };
     }
 
