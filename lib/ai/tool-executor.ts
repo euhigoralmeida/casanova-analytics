@@ -417,6 +417,40 @@ async function executeToolInternal(
       };
     }
 
+    case "get_meta_ads_metrics": {
+      const { isMetaAdsConfigured, fetchMetaCampaigns, fetchMetaAccountTotals } = await import("@/lib/meta-ads");
+      if (!isMetaAdsConfigured()) return { error: "Meta Ads não configurado" };
+      const [metaCampaigns, metaTotals] = await Promise.all([
+        fetchMetaCampaigns(startDate, endDate),
+        fetchMetaAccountTotals(startDate, endDate),
+      ]);
+      return {
+        contaTotais: {
+          investimento: metaTotals.spend,
+          impressoes: metaTotals.impressions,
+          cliques: metaTotals.clicks,
+          conversoes: metaTotals.conversions,
+          receita: metaTotals.revenue,
+          roas: metaTotals.roas,
+          cpa: metaTotals.cpa,
+          ctr: metaTotals.ctr,
+        },
+        campanhas: metaCampaigns
+          .sort((a, b) => b.spend - a.spend)
+          .slice(0, 10)
+          .map((c) => ({
+            campanha: c.campaignName,
+            objetivo: c.objective,
+            status: c.status,
+            investimento: c.spend,
+            receita: c.revenue,
+            roas: c.roas,
+            cpa: c.cpa,
+            conversoes: c.conversions,
+          })),
+      };
+    }
+
     case "compare_periods": {
       if (!isConfigured()) return { error: "Google Ads não configurado" };
       const customer = getCustomer();

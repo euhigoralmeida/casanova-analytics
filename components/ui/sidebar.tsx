@@ -36,7 +36,8 @@ const navItems: NavItem[] = [
     icon: Megaphone,
     children: [
       { label: "Google Ads", href: "/acquisition/google" },
-      { label: "Meta Ads", href: "/acquisition/meta", comingSoon: true },
+      { label: "Meta Ads", href: "/acquisition/meta" },
+      { label: "TikTok Ads", href: "/acquisition/tiktok", comingSoon: true },
       { label: "Segmentação", href: "/acquisition/segments" },
     ],
   },

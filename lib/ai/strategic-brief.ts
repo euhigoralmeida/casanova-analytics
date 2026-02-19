@@ -43,6 +43,13 @@ export async function buildStrategicBrief(
     sections.push("");
   }
 
+  // 1.5 AQUISICAO (Meta Ads)
+  const metaSection = await fetchMetaAdsSection(startDate, endDate);
+  if (metaSection) {
+    sections.push(metaSection);
+    sections.push("");
+  }
+
   // 2. CRO — funnel data
   if (ga4Extras.funnel) {
     sections.push("## CRO (Funil de Conversao)");
@@ -233,6 +240,36 @@ async function fetchPlanningTargets(tenantId: string): Promise<string | null> {
 
     return lines.length > 1 ? lines.join("\n") : null;
   } catch {
+    return null;
+  }
+}
+
+async function fetchMetaAdsSection(startDate: string, endDate: string): Promise<string | null> {
+  try {
+    const { isMetaAdsConfigured, fetchMetaCampaigns, fetchMetaAccountTotals } = await import("@/lib/meta-ads");
+    if (!isMetaAdsConfigured()) return null;
+
+    const [campaigns, totals] = await Promise.all([
+      fetchMetaCampaigns(startDate, endDate),
+      fetchMetaAccountTotals(startDate, endDate),
+    ]);
+
+    const lines: string[] = ["## AQUISICAO (Meta Ads)"];
+    lines.push(`Investimento: ${formatBRL(totals.spend)} | Receita: ${formatBRL(totals.revenue)} | ROAS: ${totals.roas} | CPA: ${formatBRL(totals.cpa)}`);
+    lines.push(`Impressoes: ${totals.impressions.toLocaleString("pt-BR")} | Cliques: ${totals.clicks.toLocaleString("pt-BR")} | Conversoes: ${totals.conversions}`);
+    lines.push(`CTR: ${totals.ctr}% | CPC: ${formatBRL(totals.cpc)}`);
+
+    const topCampaigns = campaigns.sort((a, b) => b.spend - a.spend).slice(0, 5);
+    if (topCampaigns.length > 0) {
+      lines.push("Top campanhas por investimento:");
+      for (const c of topCampaigns) {
+        lines.push(`- ${c.campaignName} (${c.status}): ${formatBRL(c.spend)} invest, ROAS ${c.roas}, ${c.conversions} conv, ${formatBRL(c.revenue)} receita`);
+      }
+    }
+
+    return lines.join("\n");
+  } catch (err) {
+    console.error("Error fetching Meta Ads for brief:", err);
     return null;
   }
 }

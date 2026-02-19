@@ -150,6 +150,19 @@ export const GEMINI_TOOLS: FunctionDeclaration[] = [
     },
   },
   {
+    name: "get_meta_ads_metrics",
+    description:
+      "Métricas do Meta Ads (Facebook/Instagram): investimento, impressões, cliques, conversões, receita, ROAS, CPA por campanha. Inclui totais da conta e top campanhas.",
+    parameters: {
+      type: SchemaType.OBJECT,
+      properties: {
+        startDate: { type: SchemaType.STRING, description: "Data início yyyy-mm-dd" },
+        endDate: { type: SchemaType.STRING, description: "Data fim yyyy-mm-dd" },
+      },
+      required: ["startDate", "endDate"],
+    },
+  },
+  {
     name: "compare_periods",
     description:
       "Compara métricas da conta entre dois períodos. Retorna métricas de ambos + variação percentual.",
