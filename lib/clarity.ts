@@ -642,9 +642,18 @@ export async function fetchClarityInsights(numOfDays = 3): Promise<ClarityData> 
       return cached.data;
     }
 
-    // No cache available — return mock data (not empty zeros)
-    console.log("Clarity: no cache available, returning mock data");
-    return generateMockClarityData();
+    // No cache available — return empty structure (sections render but with zeros)
+    console.log("Clarity: no cache available, returning empty data");
+    return {
+      source: "not_configured",
+      numDaysCovered: numOfDays,
+      behavioral: emptyBehavioral(),
+      pageAnalysis: [],
+      deviceBreakdown: [],
+      channelBreakdown: [],
+      campaignBreakdown: [],
+      techBreakdown: [],
+    };
   }
 }
 

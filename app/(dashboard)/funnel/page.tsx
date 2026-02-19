@@ -345,6 +345,7 @@ export default function CROPage() {
   const dailySeries = data?.dailySeries;
   const clarity = data?.clarity;
   const hasGA4Data = data?.source === "full" || data?.source === "ga4_only";
+  const clarityLive = clarity && clarity.source === "clarity";
   const recommendations = data ? generateCRORecommendations(data) : [];
 
   // Detect bottleneck (step with highest dropoff)
@@ -450,6 +451,17 @@ export default function CROPage() {
               <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wide">Receita GA4</p>
               <p className="text-2xl font-bold text-zinc-900 mt-1">{formatBRL(summary.purchaseRevenue)}</p>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- CLARITY DISCLAIMER --- */}
+      {clarity && !clarityLive && (
+        <div className="rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 flex items-center gap-3">
+          <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-purple-800">Fase de implementacao — Microsoft Clarity</p>
+            <p className="text-xs text-purple-600">Os dados comportamentais serao preenchidos automaticamente quando a integracao estiver ativa. As secoes abaixo mostram a estrutura que sera populada com dados reais.</p>
           </div>
         </div>
       )}
