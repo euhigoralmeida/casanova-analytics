@@ -344,7 +344,6 @@ export default function CROPage() {
   const channels = data?.channelAcquisition;
   const dailySeries = data?.dailySeries;
   const clarity = data?.clarity;
-  const hasClarityData = clarity && clarity.source === "clarity";
   const hasGA4Data = data?.source === "full" || data?.source === "ga4_only";
   const recommendations = data ? generateCRORecommendations(data) : [];
 
@@ -460,9 +459,6 @@ export default function CROPage() {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Comportamento (Clarity)</h2>
-            {!hasClarityData && (
-              <span className="text-[10px] bg-zinc-200 text-zinc-500 px-1.5 py-0.5 rounded-full">Dados de exemplo</span>
-            )}
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Dead Clicks */}
@@ -599,11 +595,8 @@ export default function CROPage() {
       {/* --- ANALISE DE PAGINAS (sorted by Impact Score) --- */}
       {pageAnalysis.length > 0 && (
         <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden">
-          <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-100 flex items-center justify-between">
+          <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-100">
             <h3 className="text-sm font-semibold text-zinc-800">Analise de Paginas (Impact Score)</h3>
-            {!hasClarityData && (
-              <span className="text-[10px] bg-zinc-200 text-zinc-500 px-1.5 py-0.5 rounded-full">Dados de exemplo</span>
-            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -684,9 +677,6 @@ export default function CROPage() {
           <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-100 flex items-center gap-2">
             <Globe className="h-4 w-4 text-purple-500" />
             <h3 className="text-sm font-semibold text-zinc-800">Qualidade UX por Canal</h3>
-            {!hasClarityData && (
-              <span className="text-[10px] bg-zinc-200 text-zinc-500 px-1.5 py-0.5 rounded-full ml-auto">Dados de exemplo</span>
-            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -733,9 +723,6 @@ export default function CROPage() {
           <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-100 flex items-center gap-2">
             <Megaphone className="h-4 w-4 text-purple-500" />
             <h3 className="text-sm font-semibold text-zinc-800">Qualidade UX por Campanha</h3>
-            {!hasClarityData && (
-              <span className="text-[10px] bg-zinc-200 text-zinc-500 px-1.5 py-0.5 rounded-full ml-auto">Dados de exemplo</span>
-            )}
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -780,9 +767,6 @@ export default function CROPage() {
           <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-100 flex items-center gap-2">
             <Cpu className="h-4 w-4 text-purple-500" />
             <h3 className="text-sm font-semibold text-zinc-800">Diagnostico Tecnico</h3>
-            {!hasClarityData && (
-              <span className="text-[10px] bg-zinc-200 text-zinc-500 px-1.5 py-0.5 rounded-full ml-auto">Dados de exemplo</span>
-            )}
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-0 lg:gap-px lg:bg-zinc-100">
             {/* OS */}
@@ -846,9 +830,6 @@ export default function CROPage() {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Dispositivos</h2>
-            {!hasClarityData && (
-              <span className="text-[10px] bg-zinc-200 text-zinc-500 px-1.5 py-0.5 rounded-full">Dados de exemplo</span>
-            )}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {clarity.deviceBreakdown.map((dev) => {
