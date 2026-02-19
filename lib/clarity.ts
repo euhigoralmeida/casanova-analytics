@@ -591,7 +591,7 @@ export async function fetchClarityInsights(numOfDays = 3): Promise<ClarityData> 
     return generateMockClarityData();
   }
 
-  // Check cache
+  // Check cache (use even if expired as fallback for rate limits)
   const cacheKey = getCacheKey(numOfDays);
   const cached = _cache.get(cacheKey);
   if (cached && Date.now() < cached.expiresAt) {
@@ -633,17 +633,18 @@ export async function fetchClarityInsights(numOfDays = 3): Promise<ClarityData> 
 
     return data;
   } catch (err) {
-    console.error("Clarity API error:", err);
-    return {
-      source: "not_configured",
-      numDaysCovered: numOfDays,
-      behavioral: emptyBehavioral(),
-      pageAnalysis: [],
-      deviceBreakdown: [],
-      channelBreakdown: [],
-      campaignBreakdown: [],
-      techBreakdown: [],
-    };
+    const errMsg = String(err);
+    console.error("Clarity API error:", errMsg);
+
+    // On rate limit (429) or any error, return expired cache if available
+    if (cached) {
+      console.log("Clarity: using expired cache as fallback");
+      return cached.data;
+    }
+
+    // No cache available — return mock data (not empty zeros)
+    console.log("Clarity: no cache available, returning mock data");
+    return generateMockClarityData();
   }
 }
 
