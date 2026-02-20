@@ -345,7 +345,7 @@ export default function CROPage() {
   const dailySeries = data?.dailySeries;
   const clarity = data?.clarity;
   const hasGA4Data = data?.source === "full" || data?.source === "ga4_only";
-  const clarityLive = clarity && clarity.source === "clarity";
+  const clarityLive = clarity && clarity.source === "clarity" && clarity.behavioral.totalTraffic > 0;
   const recommendations = data ? generateCRORecommendations(data) : [];
 
   // Detect bottleneck (step with highest dropoff)
@@ -421,10 +421,45 @@ export default function CROPage() {
       )}
 
       {/* --- NOT CONFIGURED --- */}
-      {data?.source === "not_configured" && !funnel && (
-        <div className="rounded-2xl border bg-white p-8 text-center">
-          <p className="text-lg font-semibold text-zinc-700 mb-2">GA4 e Clarity nao configurados</p>
-          <p className="text-sm text-zinc-500">Configure as credenciais GA4 e/ou Clarity no .env.local para ver dados reais.</p>
+      {data?.source === "not_configured" && (
+        <div className="rounded-2xl border border-zinc-200 bg-white p-8">
+          <div className="max-w-lg mx-auto text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center mb-4">
+              <MousePointerClick className="h-6 w-6 text-purple-600" />
+            </div>
+            <p className="text-lg font-semibold text-zinc-700 mb-2">Configuracao necessaria</p>
+            <p className="text-sm text-zinc-500 mb-6">Para visualizar dados reais de CRO, configure as credenciais no <code className="text-xs bg-zinc-100 px-1.5 py-0.5 rounded">.env.local</code></p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
+              <div className="rounded-xl border border-zinc-200 p-4">
+                <p className="text-sm font-semibold text-zinc-700 mb-1">Google Analytics 4</p>
+                <p className="text-xs text-zinc-500 mb-2">Funil de conversao, sessoes, aquisicao por canal</p>
+                <div className="space-y-1">
+                  <code className="block text-[10px] text-zinc-400 bg-zinc-50 px-2 py-1 rounded">GA4_PROPERTY_ID</code>
+                  <code className="block text-[10px] text-zinc-400 bg-zinc-50 px-2 py-1 rounded">GA4_CLIENT_EMAIL</code>
+                  <code className="block text-[10px] text-zinc-400 bg-zinc-50 px-2 py-1 rounded">GA4_PRIVATE_KEY_BASE64</code>
+                </div>
+              </div>
+              <div className="rounded-xl border border-zinc-200 p-4">
+                <p className="text-sm font-semibold text-zinc-700 mb-1">Microsoft Clarity</p>
+                <p className="text-xs text-zinc-500 mb-2">Comportamento UX, dead/rage clicks, scroll depth</p>
+                <div className="space-y-1">
+                  <code className="block text-[10px] text-zinc-400 bg-zinc-50 px-2 py-1 rounded">CLARITY_PROJECT_ID</code>
+                  <code className="block text-[10px] text-zinc-400 bg-zinc-50 px-2 py-1 rounded">CLARITY_API_TOKEN</code>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- GA4 NOT CONFIGURED (when Clarity works but GA4 doesn't) --- */}
+      {data?.source === "clarity_only" && (
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 flex items-center gap-3">
+          <div className="h-2 w-2 rounded-full bg-blue-400 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-medium text-blue-800">Google Analytics 4 nao configurado</p>
+            <p className="text-xs text-blue-600">Configure as credenciais GA4 no .env.local para ativar funil de conversao, sessoes e aquisicao por canal.</p>
+          </div>
         </div>
       )}
 
@@ -455,19 +490,20 @@ export default function CROPage() {
         </div>
       )}
 
-      {/* --- CLARITY DISCLAIMER --- */}
-      {clarity && !clarityLive && (
+      {/* --- CLARITY NOT CONFIGURED (when GA4 works but Clarity doesn't) --- */}
+      {data?.source === "ga4_only" && !clarity?.source?.includes("rate") && (
         <div className="rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 flex items-center gap-3">
-          <div className="h-2 w-2 rounded-full bg-purple-400 animate-pulse flex-shrink-0" />
+          <div className="h-2 w-2 rounded-full bg-purple-400 flex-shrink-0" />
           <div>
-            <p className="text-sm font-medium text-purple-800">Fase de implementacao — Microsoft Clarity</p>
-            <p className="text-xs text-purple-600">Os dados comportamentais serao preenchidos automaticamente quando a integracao estiver ativa. As secoes abaixo mostram a estrutura que sera populada com dados reais.</p>
+            <p className="text-sm font-medium text-purple-800">Microsoft Clarity nao configurado</p>
+            <p className="text-xs text-purple-600">Configure <code className="bg-purple-100 px-1 rounded">CLARITY_PROJECT_ID</code> e <code className="bg-purple-100 px-1 rounded">CLARITY_API_TOKEN</code> no .env.local para ativar metricas comportamentais (dead clicks, rage clicks, scroll depth, etc).</p>
           </div>
         </div>
       )}
 
+
       {/* --- KPIs CLARITY (enriched with rates) --- */}
-      {clarity && clarity.behavioral && (
+      {clarityLive && clarity.behavioral && (
         <div>
           <div className="flex items-center gap-2 mb-3">
             <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Comportamento (Clarity)</h2>
@@ -838,7 +874,7 @@ export default function CROPage() {
       )}
 
       {/* --- DISPOSITIVOS (enriched) --- */}
-      {clarity && clarity.deviceBreakdown.length > 0 && (
+      {clarityLive && clarity.deviceBreakdown.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-3">
             <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Dispositivos</h2>

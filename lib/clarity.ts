@@ -104,7 +104,7 @@ export type ClarityTechBreakdown = {
 };
 
 export type ClarityData = {
-  source: "clarity" | "not_configured";
+  source: "clarity" | "not_configured" | "rate_limited";
   numDaysCovered: number;
   behavioral: ClarityBehavioralMetrics;
   pageAnalysis: ClarityPageAnalysis[];
@@ -129,8 +129,11 @@ export function getClarityDashboardUrl(): string {
 }
 
 /* =========================
-   Cache (24h TTL)
+   Cache (24h TTL) — file-based for persistence across restarts/cold starts
 ========================= */
+
+import * as fs from "fs";
+import * as path from "path";
 
 type CacheEntry = {
   data: ClarityData;
@@ -138,10 +141,54 @@ type CacheEntry = {
 };
 
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const _cache = new Map<string, CacheEntry>();
+const _memCache = new Map<string, CacheEntry>();
+
+// File-based cache dir: /tmp on Vercel, .cache locally
+const CACHE_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), ".cache");
 
 function getCacheKey(numOfDays: number): string {
   return `clarity_${numOfDays}d`;
+}
+
+function getCacheFilePath(key: string): string {
+  return path.join(CACHE_DIR, `${key}.json`);
+}
+
+function readFileCache(key: string): CacheEntry | null {
+  try {
+    const filePath = getCacheFilePath(key);
+    if (!fs.existsSync(filePath)) return null;
+    const raw = fs.readFileSync(filePath, "utf-8");
+    return JSON.parse(raw) as CacheEntry;
+  } catch {
+    return null;
+  }
+}
+
+function writeFileCache(key: string, entry: CacheEntry): void {
+  try {
+    if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
+    fs.writeFileSync(getCacheFilePath(key), JSON.stringify(entry));
+  } catch (err) {
+    console.error("Clarity cache write error:", err);
+  }
+}
+
+function getCache(key: string): CacheEntry | null {
+  // Memory first, then file
+  const mem = _memCache.get(key);
+  if (mem) return mem;
+  const file = readFileCache(key);
+  if (file) {
+    _memCache.set(key, file); // hydrate memory
+    return file;
+  }
+  return null;
+}
+
+function setCache(key: string, entry: CacheEntry): void {
+  _memCache.set(key, entry);
+  writeFileCache(key, entry);
 }
 
 /* =========================
@@ -588,12 +635,21 @@ function extractPageTitle(url: string): string {
 
 export async function fetchClarityInsights(numOfDays = 3): Promise<ClarityData> {
   if (!isClarityConfigured()) {
-    return generateMockClarityData();
+    return {
+      source: "not_configured",
+      numDaysCovered: numOfDays,
+      behavioral: emptyBehavioral(),
+      pageAnalysis: [],
+      deviceBreakdown: [],
+      channelBreakdown: [],
+      campaignBreakdown: [],
+      techBreakdown: [],
+    };
   }
 
   // Check cache (use even if expired as fallback for rate limits)
   const cacheKey = getCacheKey(numOfDays);
-  const cached = _cache.get(cacheKey);
+  const cached = getCache(cacheKey);
   if (cached && Date.now() < cached.expiresAt) {
     return cached.data;
   }
@@ -628,12 +684,13 @@ export async function fetchClarityInsights(numOfDays = 3): Promise<ClarityData> 
       techBreakdown,
     };
 
-    // Cache for 24h
-    _cache.set(cacheKey, { data, expiresAt: Date.now() + CACHE_TTL_MS });
+    // Cache for 24h (file + memory)
+    setCache(cacheKey, { data, expiresAt: Date.now() + CACHE_TTL_MS });
 
     return data;
   } catch (err) {
     const errMsg = String(err);
+    const isRateLimit = errMsg.includes("429");
     console.error("Clarity API error:", errMsg);
 
     // On rate limit (429) or any error, return expired cache if available
@@ -642,10 +699,10 @@ export async function fetchClarityInsights(numOfDays = 3): Promise<ClarityData> 
       return cached.data;
     }
 
-    // No cache available — return empty structure (sections render but with zeros)
-    console.log("Clarity: no cache available, returning empty data");
+    // No cache available — return informative source
+    console.log(`Clarity: no cache available, ${isRateLimit ? "rate limited" : "error"}`);
     return {
-      source: "not_configured",
+      source: isRateLimit ? "rate_limited" : "not_configured",
       numDaysCovered: numOfDays,
       behavioral: emptyBehavioral(),
       pageAnalysis: [],
@@ -679,73 +736,3 @@ function emptyBehavioral(): ClarityBehavioralMetrics {
   };
 }
 
-function generateMockClarityData(): ClarityData {
-  const pages: ClarityPageAnalysis[] = [
-    { url: "/produto/27290BR-CP", pageTitle: "Casanova Pro - Produto", deadClicks: 245, rageClicks: 89, scrollDepth: 42, traffic: 1820, engagementTime: 45, errorClicks: 12, uxScore: 0, deadClickRate: 13.5, rageClickRate: 4.9, quickbacks: 15, excessiveScrolls: 8, impactScore: 0 },
-    { url: "/checkout", pageTitle: "Checkout", deadClicks: 180, rageClicks: 156, scrollDepth: 65, traffic: 890, engagementTime: 120, errorClicks: 8, uxScore: 0, deadClickRate: 20.2, rageClickRate: 17.5, quickbacks: 22, excessiveScrolls: 3, impactScore: 0 },
-    { url: "/carrinho", pageTitle: "Carrinho", deadClicks: 95, rageClicks: 42, scrollDepth: 78, traffic: 1240, engagementTime: 55, errorClicks: 3, uxScore: 0, deadClickRate: 7.7, rageClickRate: 3.4, quickbacks: 8, excessiveScrolls: 2, impactScore: 0 },
-    { url: "/", pageTitle: "Home", deadClicks: 320, rageClicks: 28, scrollDepth: 35, traffic: 4500, engagementTime: 22, errorClicks: 1, uxScore: 0, deadClickRate: 7.1, rageClickRate: 0.6, quickbacks: 45, excessiveScrolls: 18, impactScore: 0 },
-    { url: "/colecao/lancamentos", pageTitle: "Lancamentos", deadClicks: 68, rageClicks: 15, scrollDepth: 55, traffic: 980, engagementTime: 38, errorClicks: 0, uxScore: 0, deadClickRate: 6.9, rageClickRate: 1.5, quickbacks: 5, excessiveScrolls: 4, impactScore: 0 },
-    { url: "/busca", pageTitle: "Busca", deadClicks: 142, rageClicks: 67, scrollDepth: 48, traffic: 760, engagementTime: 32, errorClicks: 5, uxScore: 0, deadClickRate: 18.7, rageClickRate: 8.8, quickbacks: 12, excessiveScrolls: 6, impactScore: 0 },
-    { url: "/conta/pedidos", pageTitle: "Meus Pedidos", deadClicks: 35, rageClicks: 8, scrollDepth: 82, traffic: 340, engagementTime: 95, errorClicks: 0, uxScore: 0, deadClickRate: 10.3, rageClickRate: 2.4, quickbacks: 2, excessiveScrolls: 0, impactScore: 0 },
-    { url: "/produto/31450BR-LX", pageTitle: "Casanova Luxo - Produto", deadClicks: 198, rageClicks: 72, scrollDepth: 38, traffic: 1560, engagementTime: 40, errorClicks: 9, uxScore: 0, deadClickRate: 12.7, rageClickRate: 4.6, quickbacks: 11, excessiveScrolls: 5, impactScore: 0 },
-  ];
-
-  for (const p of pages) {
-    p.uxScore = computeUxScore(p);
-    p.impactScore = computeImpactScore(p.uxScore, p.traffic);
-  }
-  pages.sort((a, b) => b.impactScore - a.impactScore);
-
-  return {
-    source: "not_configured",
-    numDaysCovered: 3,
-    behavioral: {
-      deadClicks: 1283,
-      rageClicks: 477,
-      avgScrollDepth: 48.2,
-      avgEngagementTime: 52,
-      totalTraffic: 12090,
-      pagesPerSession: 3.2,
-      quickbackClicks: 89,
-      scriptErrors: 1030,
-      errorClicks: 38,
-      excessiveScrolls: 124,
-      botSessions: 245,
-      distinctUsers: 8750,
-      activeTimeRatio: 0.42,
-    },
-    pageAnalysis: pages,
-    deviceBreakdown: [
-      { device: "Desktop", deadClicks: 520, rageClicks: 145, scrollDepth: 55.8, traffic: 5800, quickbacks: 28, scriptErrors: 380, errorClicks: 12, engagementTime: 68, botSessions: 120, distinctUsers: 4200 },
-      { device: "Mobile", deadClicks: 680, rageClicks: 298, scrollDepth: 38.4, traffic: 5490, quickbacks: 52, scriptErrors: 580, errorClicks: 22, engagementTime: 38, botSessions: 95, distinctUsers: 3950 },
-      { device: "Tablet", deadClicks: 83, rageClicks: 34, scrollDepth: 52.1, traffic: 800, quickbacks: 9, scriptErrors: 70, errorClicks: 4, engagementTime: 55, botSessions: 30, distinctUsers: 600 },
-    ],
-    channelBreakdown: [
-      { channel: "Organic Search", deadClicks: 320, deadClickRate: 8.5, rageClicks: 95, rageClickRate: 2.5, scrollDepth: 52.3, traffic: 3800, engagementTime: 58, quickbacks: 25, scriptErrors: 280 },
-      { channel: "Paid Search", deadClicks: 280, deadClickRate: 12.7, rageClicks: 120, rageClickRate: 5.5, scrollDepth: 44.1, traffic: 2200, engagementTime: 42, quickbacks: 22, scriptErrors: 210 },
-      { channel: "Paid Shopping", deadClicks: 350, deadClickRate: 14.2, rageClicks: 155, rageClickRate: 6.3, scrollDepth: 40.8, traffic: 2500, engagementTime: 35, quickbacks: 18, scriptErrors: 320 },
-      { channel: "Direct", deadClicks: 180, deadClickRate: 9.0, rageClicks: 58, rageClickRate: 2.9, scrollDepth: 55.6, traffic: 2000, engagementTime: 65, quickbacks: 12, scriptErrors: 120 },
-      { channel: "Social", deadClicks: 95, deadClickRate: 15.8, rageClicks: 32, rageClickRate: 5.3, scrollDepth: 38.2, traffic: 600, engagementTime: 28, quickbacks: 8, scriptErrors: 65 },
-      { channel: "Email", deadClicks: 58, deadClickRate: 5.8, rageClicks: 17, rageClickRate: 1.7, scrollDepth: 62.5, traffic: 990, engagementTime: 72, quickbacks: 4, scriptErrors: 35 },
-    ],
-    campaignBreakdown: [
-      { campaign: "Shopping - Casanova Pro", deadClicks: 185, deadClickRate: 14.8, rageClicks: 82, rageClickRate: 6.6, traffic: 1250, engagementTime: 38, scriptErrors: 165 },
-      { campaign: "Shopping - Lancamentos", deadClicks: 95, deadClickRate: 11.2, rageClicks: 45, rageClickRate: 5.3, traffic: 850, engagementTime: 42, scriptErrors: 95 },
-      { campaign: "Search - Brand", deadClicks: 120, deadClickRate: 8.6, rageClicks: 38, rageClickRate: 2.7, traffic: 1400, engagementTime: 55, scriptErrors: 110 },
-      { campaign: "Search - Generic", deadClicks: 160, deadClickRate: 20.0, rageClicks: 82, rageClickRate: 10.3, traffic: 800, engagementTime: 28, scriptErrors: 85 },
-      { campaign: "Display - Retargeting", deadClicks: 68, deadClickRate: 17.0, rageClicks: 28, rageClickRate: 7.0, traffic: 400, engagementTime: 22, scriptErrors: 45 },
-    ],
-    techBreakdown: [
-      { name: "iOS", type: "os", traffic: 3200, scriptErrors: 420, scriptErrorRate: 13.1, deadClicks: 380, rageClicks: 165, scrollDepth: 39.2 },
-      { name: "Android", type: "os", traffic: 2800, scriptErrors: 210, scriptErrorRate: 7.5, deadClicks: 310, rageClicks: 140, scrollDepth: 42.1 },
-      { name: "Windows", type: "os", traffic: 4200, scriptErrors: 280, scriptErrorRate: 6.7, deadClicks: 420, rageClicks: 118, scrollDepth: 54.8 },
-      { name: "macOS", type: "os", traffic: 1500, scriptErrors: 85, scriptErrorRate: 5.7, deadClicks: 95, rageClicks: 32, scrollDepth: 58.3 },
-      { name: "Chrome", type: "browser", traffic: 5800, scriptErrors: 310, scriptErrorRate: 5.3, deadClicks: 520, rageClicks: 195, scrollDepth: 48.5 },
-      { name: "Safari", type: "browser", traffic: 3500, scriptErrors: 480, scriptErrorRate: 13.7, deadClicks: 410, rageClicks: 178, scrollDepth: 40.2 },
-      { name: "Firefox", type: "browser", traffic: 1200, scriptErrors: 120, scriptErrorRate: 10.0, deadClicks: 145, rageClicks: 52, scrollDepth: 52.1 },
-      { name: "Edge", type: "browser", traffic: 1100, scriptErrors: 80, scriptErrorRate: 7.3, deadClicks: 130, rageClicks: 38, scrollDepth: 55.4 },
-      { name: "Samsung Internet", type: "browser", traffic: 490, scriptErrors: 40, scriptErrorRate: 8.2, deadClicks: 78, rageClicks: 14, scrollDepth: 41.8 },
-    ],
-  };
-}

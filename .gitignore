@@ -2,6 +2,9 @@
 
 # dependencies
 /node_modules
+
+# local cache
+/.cache
 /.pnp
 .pnp.*
 .yarn/*
