@@ -104,6 +104,8 @@ export default function InstagramPage() {
   }, []);
 
   const notConfigured = data?.source === "not_configured";
+  const discoveryFailed = data?.source === "discovery_failed";
+  const hasData = data?.source === "instagram";
   const account = data?.account;
   const daily = data?.dailyInsights ?? [];
 
@@ -194,6 +196,29 @@ export default function InstagramPage() {
         </div>
       )}
 
+      {/* ─── DISCOVERY FAILED ─── */}
+      {discoveryFailed && !loading && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+          <div className="flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-amber-900">Conta do Instagram não encontrada</h3>
+              <p className="text-sm text-amber-700 mt-1">
+                O token Meta existe, mas não foi possível descobrir a conta do Instagram automaticamente.
+                Configure o ID manualmente:
+              </p>
+              <ul className="text-sm text-amber-700 mt-2 space-y-1 list-disc list-inside">
+                <li><code className="bg-amber-100 px-1.5 py-0.5 rounded text-xs font-mono">INSTAGRAM_BUSINESS_ACCOUNT_ID</code> — ID numérico da conta Instagram Business</li>
+              </ul>
+              <p className="text-xs text-amber-600 mt-3">
+                Para encontrar o ID: acesse o Graph API Explorer, faça GET em <code className="bg-amber-100 px-1 rounded text-xs">/me/accounts?fields=instagram_business_account</code> com o token.
+                Ou verifique se o token tem a permissão <code className="bg-amber-100 px-1 rounded text-xs">pages_show_list</code>.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ─── LOADING ─── */}
       {loading && !data && (
         <>
@@ -217,7 +242,7 @@ export default function InstagramPage() {
       )}
 
       {/* ─── SEÇÃO 1: HEADER DA CONTA ─── */}
-      {account && !notConfigured && (
+      {account && hasData && (
         <div className="rounded-2xl border border-zinc-200 bg-white p-5">
           <div className="flex items-center gap-4">
             {account.profilePictureUrl ? (
@@ -251,7 +276,7 @@ export default function InstagramPage() {
       )}
 
       {/* ─── SEÇÃO 2: KPIs ─── */}
-      {account && !notConfigured && !loading && (
+      {account && hasData && !loading && (
         <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
           <Kpi
             title="Seguidores"
@@ -351,7 +376,7 @@ export default function InstagramPage() {
       )}
 
       {/* ─── SEÇÃO 4: TABELA DE PUBLICAÇÕES ─── */}
-      {data && !notConfigured && mediaRows.length > 0 && (
+      {data && hasData && mediaRows.length > 0 && (
         <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden">
           <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <h2 className="text-sm font-semibold text-zinc-800">
@@ -471,7 +496,7 @@ export default function InstagramPage() {
       )}
 
       {/* ─── SEÇÃO 5: AUDIÊNCIA ─── */}
-      {data && !notConfigured && (data.audienceGenderAge?.length || data.audienceCountries?.length || data.audienceCities?.length) && (
+      {data && hasData && (data.audienceGenderAge?.length || data.audienceCountries?.length || data.audienceCities?.length) && (
         <div className="rounded-2xl border border-zinc-200 bg-white p-5">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-sm font-semibold text-zinc-800">Audiência</h3>
@@ -610,7 +635,7 @@ export default function InstagramPage() {
       )}
 
       {/* ─── DISCLAIMER ─── */}
-      {data && !notConfigured && (
+      {data && hasData && (
         <p className="text-xs text-zinc-400 text-center">
           Dados obtidos via Instagram Graph API. Atualizado em {data.updatedAt ? new Date(data.updatedAt).toLocaleString("pt-BR") : "—"}.
         </p>

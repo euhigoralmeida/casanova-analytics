@@ -67,7 +67,7 @@ export type IGOnlineFollowers = {
 };
 
 export type IGInsightsResponse = {
-  source: "instagram" | "not_configured";
+  source: "instagram" | "not_configured" | "discovery_failed";
   updatedAt: string;
   account?: IGAccount;
   media?: IGMedia[];
@@ -128,29 +128,46 @@ async function graphFetch(path: string, params: Record<string, string> = {}): Pr
 
 let cachedIGAccountId: { id: string; ts: number } | null = null;
 
+/**
+ * Get the IG Business Account ID.
+ * Priority: INSTAGRAM_BUSINESS_ACCOUNT_ID env var > auto-discover via /me/accounts.
+ */
 export async function discoverIGAccountId(): Promise<string | null> {
+  // 1. Direct env var (most reliable)
+  const envId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
+  if (envId) {
+    return envId;
+  }
+
+  // 2. Cached result
   if (cachedIGAccountId && Date.now() - cachedIGAccountId.ts < ACCOUNT_CACHE_TTL) {
     return cachedIGAccountId.id;
   }
 
+  // 3. Auto-discover via Pages API (requires pages_show_list permission)
   try {
+    console.log("[Instagram] Attempting auto-discovery via /me/accounts...");
     const data = await graphFetch("/me/accounts", {
-      fields: "instagram_business_account{id,username}",
+      fields: "instagram_business_account{id,username},name",
       limit: "100",
     });
+
+    console.log(`[Instagram] Found ${data.data?.length ?? 0} pages`);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const page of (data.data || []) as any[]) {
       if (page.instagram_business_account?.id) {
-        cachedIGAccountId = { id: page.instagram_business_account.id, ts: Date.now() };
-        return page.instagram_business_account.id;
+        const igId = page.instagram_business_account.id;
+        console.log(`[Instagram] Found IG account ${igId} (${page.instagram_business_account.username}) on page "${page.name}"`);
+        cachedIGAccountId = { id: igId, ts: Date.now() };
+        return igId;
       }
     }
 
-    console.warn("No Instagram Business Account found linked to any page.");
+    console.warn("[Instagram] No Instagram Business Account found linked to any page. Set INSTAGRAM_BUSINESS_ACCOUNT_ID env var as fallback.");
     return null;
   } catch (err) {
-    console.error("Failed to discover IG account:", err);
+    console.error("[Instagram] Failed to discover IG account (may need pages_show_list permission). Set INSTAGRAM_BUSINESS_ACCOUNT_ID env var instead:", err);
     return null;
   }
 }

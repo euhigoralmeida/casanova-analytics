@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     const igUserId = await discoverIGAccountId();
     if (!igUserId) {
       return NextResponse.json({
-        source: "not_configured",
+        source: "discovery_failed",
         updatedAt: new Date().toISOString(),
       } satisfies IGInsightsResponse);
     }
