@@ -89,3 +89,90 @@ model MetricSnapshot {
   @@unique([tenantId, date, scope])
   @@index([tenantId, scope, date])
 }
+
+model Influencer {
+  id                     String   @id @default(cuid())
+  tenantId               String   @default("default")
+  name                   String
+  handle                 String
+  platform               String   @default("instagram")
+  profilePictureUrl      String?
+  bio                    String?
+  niche                  String   @default("geral")
+  tags                   String[] @default([])
+  location               String?
+  tier                   String   @default("micro")
+  status                 String   @default("ativo")
+
+  followersCount         Int      @default(0)
+  followingCount         Int      @default(0)
+  mediaCount             Int      @default(0)
+  followersGrowthPct30d  Float    @default(0)
+  followersGrowthPct90d  Float    @default(0)
+
+  igAccountId            String?
+
+  iqs                    Float    @default(0)
+  iqsBreakdown           Json     @default("{}")
+  iqsUpdatedAt           DateTime?
+
+  totalInvested          Float    @default(0)
+  totalRevenue           Float    @default(0)
+  collaborationsCount    Int      @default(0)
+
+  realFollowersPct         Float?
+  massFollowersPct         Float?
+  suspiciousFollowersPct   Float?
+  nicheRelevanceScore      Float?
+
+  targetGeo              String   @default("BR")
+  targetAgeRanges        String[] @default(["25-34", "35-44"])
+  targetGender           String?
+
+  updatedAt              DateTime @updatedAt
+  createdAt              DateTime @default(now())
+
+  collaborations         InfluencerCollaboration[]
+
+  @@unique([tenantId, handle, platform])
+  @@index([tenantId])
+  @@index([tenantId, iqs])
+}
+
+model InfluencerCollaboration {
+  id               String   @id @default(cuid())
+  tenantId         String   @default("default")
+  influencerId     String
+  influencer       Influencer @relation(fields: [influencerId], references: [id], onDelete: Cascade)
+
+  title            String
+  type             String   @default("post_feed")
+  status           String   @default("planejada")
+
+  startDate        String
+  endDate          String?
+
+  investedAmount   Float    @default(0)
+  couponCode       String?
+  utmSource        String?
+  utmMedium        String?
+  utmCampaign      String?
+
+  postUrls         String[] @default([])
+  briefDescription String?
+
+  impressions      Int      @default(0)
+  reach            Int      @default(0)
+  engagement       Int      @default(0)
+  clicks           Int      @default(0)
+  conversions      Int      @default(0)
+  revenue          Float    @default(0)
+
+  notes            String?
+
+  updatedAt        DateTime @updatedAt
+  createdAt        DateTime @default(now())
+
+  @@index([tenantId, influencerId])
+  @@index([tenantId, status])
+}

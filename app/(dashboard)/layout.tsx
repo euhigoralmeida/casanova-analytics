@@ -17,6 +17,9 @@ const pageTitles: Record<string, string> = {
   "/retention": "Retenção",
   "/funnel": "CRO & Funil",
   "/instagram": "Instagram",
+  "/influencers": "Influenciadores",
+  "/influencers/comparar": "Comparar Influenciadores",
+  "/influencers/consultor": "Consultor Estratégico",
   "/alerts": "Alertas",
   "/settings": "Configurações",
 };
@@ -48,7 +51,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [tenantName] = useState(readTenantName);
   const dateRange = useMemo(() => defaultRange(), []);
 
-  const title = pageTitles[pathname] ?? "Dashboard";
+  const title = pageTitles[pathname]
+    ?? (pathname.startsWith("/influencers/") && !pathname.includes("/comparar") && !pathname.includes("/consultor")
+      ? "Perfil do Influenciador"
+      : "Dashboard");
 
   function toggleCollapse() {
     setSidebarCollapsed((prev) => {

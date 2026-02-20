@@ -254,7 +254,6 @@ export async function fetchIGMediaInsights(mediaId: string): Promise<IGMediaInsi
     metric: "reach,saved,likes,comments,shares,total_interactions",
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const metrics: Record<string, number> = {};
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const entry of (data.data || []) as any[]) {
@@ -371,7 +370,6 @@ export async function fetchIGPeriodTotals(
     until: String(until),
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const values: Record<string, number> = {};
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const metric of (data.data || []) as any[]) {
@@ -466,6 +464,106 @@ export async function fetchIGAudienceDemographics(
   cities.sort((a, b) => b.value - a.value);
 
   const result = { genderAge, countries, cities };
+  setCache(cacheKey, result);
+  return result;
+}
+
+// ---------- Business Discovery (fetch OTHER accounts by @handle) ----------
+
+export type IGDiscoveryProfile = {
+  username: string;
+  name?: string;
+  biography?: string;
+  followersCount: number;
+  followsCount: number;
+  mediaCount: number;
+  profilePictureUrl?: string;
+};
+
+export type IGDiscoveryMedia = {
+  id: string;
+  caption?: string;
+  likeCount: number;
+  commentsCount: number;
+  mediaType: "IMAGE" | "VIDEO" | "CAROUSEL_ALBUM";
+  mediaUrl?: string;
+  permalink: string;
+  timestamp: string;
+};
+
+export type IGDiscoveryResult = {
+  profile: IGDiscoveryProfile;
+  media: IGDiscoveryMedia[];
+};
+
+const DISCOVERY_CACHE_TTL = 30 * 60 * 1000; // 30 min
+
+/**
+ * Fetch another IG Business/Creator account's public data via business_discovery.
+ * Requires our own IG Business Account ID as pivot.
+ */
+export async function fetchIGBusinessDiscovery(handle: string): Promise<IGDiscoveryResult> {
+  const cleanHandle = handle.replace(/^@/, "").trim().toLowerCase();
+  if (!cleanHandle) throw new Error("Handle vazio");
+
+  const cacheKey = `ig_discovery_${cleanHandle}`;
+  const cached = getCached<IGDiscoveryResult>(cacheKey, DISCOVERY_CACHE_TTL);
+  if (cached) return cached;
+
+  const ownAccountId = await discoverIGAccountId();
+  if (!ownAccountId) {
+    throw new Error("Instagram não configurado. Configure META_ADS_ACCESS_TOKEN e INSTAGRAM_BUSINESS_ACCOUNT_ID.");
+  }
+
+  const fields = [
+    "username", "name", "biography", "website",
+    "followers_count", "follows_count", "media_count",
+    "profile_picture_url",
+    "media.limit(30){id,caption,like_count,comments_count,media_type,media_url,permalink,timestamp}",
+  ].join(",");
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let data: any;
+  try {
+    data = await graphFetch(`/${ownAccountId}`, {
+      fields: `business_discovery.fields(${fields}).username(${cleanHandle})`,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes("803") || msg.includes("not found") || msg.includes("Cannot query")) {
+      throw new Error("Conta não encontrada. Verifique se é uma conta Business ou Creator pública.");
+    }
+    throw err;
+  }
+
+  const bd = data.business_discovery;
+  if (!bd) {
+    throw new Error("Conta não encontrada. Verifique se é uma conta Business ou Creator pública.");
+  }
+
+  const profile: IGDiscoveryProfile = {
+    username: bd.username ?? cleanHandle,
+    name: bd.name,
+    biography: bd.biography,
+    followersCount: bd.followers_count ?? 0,
+    followsCount: bd.follows_count ?? 0,
+    mediaCount: bd.media_count ?? 0,
+    profilePictureUrl: bd.profile_picture_url,
+  };
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const media: IGDiscoveryMedia[] = (bd.media?.data || []).map((m: any) => ({
+    id: m.id,
+    caption: m.caption,
+    likeCount: m.like_count ?? 0,
+    commentsCount: m.comments_count ?? 0,
+    mediaType: m.media_type ?? "IMAGE",
+    mediaUrl: m.media_url,
+    permalink: m.permalink ?? "",
+    timestamp: m.timestamp ?? "",
+  }));
+
+  const result: IGDiscoveryResult = { profile, media };
   setCache(cacheKey, result);
   return result;
 }

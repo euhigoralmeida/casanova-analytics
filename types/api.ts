@@ -136,6 +136,7 @@ export type { CohortRetentionData, RetentionSummary, ChannelLTV, RetentionData }
 export type { ClarityBehavioralMetrics, ClarityPageAnalysis, ClarityDeviceBreakdown, ClarityData, ClarityChannelBreakdown, ClarityCampaignBreakdown, ClarityTechBreakdown } from "@/lib/clarity";
 export type { MetaAdsCampaign, MetaAccountTotals, MetaTimeSeriesPoint, MetaAdsResponse } from "@/lib/meta-ads";
 export type { IGAccount, IGMedia, IGMediaInsights, IGDailyInsight, IGPeriodTotals, IGAudienceGenderAge, IGAudienceGeo, IGOnlineFollowers, IGInsightsResponse } from "@/lib/instagram";
+export type { InfluencerProfile, IQSBreakdown, IQSComponent, IQSSubMetric, InfluencerEngagementMetrics, Collaboration, ROIEstimate, InfluencerRecommendation, BudgetAllocation, InfluencerDashboardResponse, InfluencerDetailResponse, InfluencerComparisonResponse, InfluencerAdvisorResponse, InfluencerLookupResponse, InfluencerLookupProfile, InfluencerLookupMetrics, InfluencerLookupPost, InfluencerTier, InfluencerStatus, InfluencerPlatform, CollabType, CollabStatus, RecommendationAction, RecommendationPriority } from "@/lib/influencer-types";
 
 /* =========================
    CRO Data Response (combined GA4 + Clarity)
