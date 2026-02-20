@@ -1,9 +1,16 @@
 /**
- * Instagram Organic Integration — Graph API client
+ * Instagram Organic Integration — Graph API client (v21.0+)
  *
  * Fetches organic Instagram data (profile, posts, insights, audience).
  * Reuses META_ADS_ACCESS_TOKEN (same token, requires instagram_basic + instagram_manage_insights).
- * Auto-discovers the IG Business Account ID via the Pages API.
+ *
+ * API v21.0 changes:
+ * - `impressions` removed → use `views` (metric_type=total_value)
+ * - `engagement` removed → use `total_interactions`
+ * - Daily metrics: `reach` + `follower_count` (metric_type=time_series)
+ * - Totals: `views`, `total_interactions`, `follows_and_unfollows` (metric_type=total_value)
+ * - Demographics: `follower_demographics` with breakdown param
+ * - Media insights: `reach,saved,likes,comments,shares,total_interactions`
  */
 
 const GRAPH_API_VERSION = "v21.0";
@@ -38,17 +45,25 @@ export type IGMedia = {
 
 export type IGMediaInsights = {
   mediaId: string;
-  impressions: number;
   reach: number;
-  engagement: number;
   saved: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  totalInteractions: number;
 };
 
 export type IGDailyInsight = {
   date: string;
-  impressions: number;
   reach: number;
   followerCount: number;
+};
+
+export type IGPeriodTotals = {
+  views: number;
+  totalInteractions: number;
+  accountsEngaged: number;
+  followsAndUnfollows: number;
 };
 
 export type IGAudienceGenderAge = {
@@ -73,6 +88,7 @@ export type IGInsightsResponse = {
   media?: IGMedia[];
   mediaInsights?: IGMediaInsights[];
   dailyInsights?: IGDailyInsight[];
+  periodTotals?: IGPeriodTotals;
   audienceGenderAge?: IGAudienceGenderAge[];
   audienceCountries?: IGAudienceGeo[];
   audienceCities?: IGAudienceGeo[];
@@ -225,13 +241,17 @@ export async function fetchIGMedia(igUserId: string, limit = 50): Promise<IGMedi
   return media;
 }
 
+/**
+ * Fetch per-media insights. v21.0 uses: reach, saved, likes, comments, shares, total_interactions.
+ * `engagement` and `impressions` are deprecated.
+ */
 export async function fetchIGMediaInsights(mediaId: string): Promise<IGMediaInsights> {
   const cacheKey = `ig_media_insights_${mediaId}`;
   const cached = getCached<IGMediaInsights>(cacheKey);
   if (cached) return cached;
 
   const data = await graphFetch(`/${mediaId}/insights`, {
-    metric: "impressions,reach,engagement,saved",
+    metric: "reach,saved,likes,comments,shares,total_interactions",
   });
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -243,10 +263,12 @@ export async function fetchIGMediaInsights(mediaId: string): Promise<IGMediaInsi
 
   const insights: IGMediaInsights = {
     mediaId,
-    impressions: metrics.impressions ?? 0,
     reach: metrics.reach ?? 0,
-    engagement: metrics.engagement ?? 0,
     saved: metrics.saved ?? 0,
+    likes: metrics.likes ?? 0,
+    comments: metrics.comments ?? 0,
+    shares: metrics.shares ?? 0,
+    totalInteractions: metrics.total_interactions ?? 0,
   };
 
   setCache(cacheKey, insights);
@@ -254,9 +276,9 @@ export async function fetchIGMediaInsights(mediaId: string): Promise<IGMediaInsi
 }
 
 /**
- * Fetch daily insights for a date range.
- * The IG Insights API limits to 30-day windows, so we chunk accordingly.
- * `since`/`until` must be Unix timestamps.
+ * Fetch daily insights (time_series) for a date range.
+ * v21.0: `reach` and `follower_count` support metric_type=time_series.
+ * Chunks in 30-day windows (API limitation).
  */
 export async function fetchIGDailyInsights(
   igUserId: string,
@@ -288,8 +310,9 @@ export async function fetchIGDailyInsights(
   const allResults = await Promise.all(
     chunks.map((chunk) =>
       graphFetch(`/${igUserId}/insights`, {
-        metric: "impressions,reach,follower_count",
+        metric: "reach,follower_count",
         period: "day",
+        metric_type: "time_series",
         since: String(chunk.since),
         until: String(chunk.until),
       }).catch((err) => {
@@ -299,7 +322,6 @@ export async function fetchIGDailyInsights(
     ),
   );
 
-  // Parse: each metric has its own entry with values array
   const dateMap = new Map<string, IGDailyInsight>();
 
   for (const result of allResults) {
@@ -310,10 +332,9 @@ export async function fetchIGDailyInsights(
       for (const point of (metric.values || []) as any[]) {
         const dateStr = (point.end_time as string).slice(0, 10);
         if (!dateMap.has(dateStr)) {
-          dateMap.set(dateStr, { date: dateStr, impressions: 0, reach: 0, followerCount: 0 });
+          dateMap.set(dateStr, { date: dateStr, reach: 0, followerCount: 0 });
         }
         const entry = dateMap.get(dateStr)!;
-        if (metricName === "impressions") entry.impressions = point.value ?? 0;
         if (metricName === "reach") entry.reach = point.value ?? 0;
         if (metricName === "follower_count") entry.followerCount = point.value ?? 0;
       }
@@ -327,7 +348,49 @@ export async function fetchIGDailyInsights(
 }
 
 /**
- * Fetch audience demographics (lifetime snapshot — no date range).
+ * Fetch period totals (total_value metrics) for a date range.
+ * v21.0: views, total_interactions, accounts_engaged, follows_and_unfollows.
+ */
+export async function fetchIGPeriodTotals(
+  igUserId: string,
+  startDate: string,
+  endDate: string,
+): Promise<IGPeriodTotals> {
+  const cacheKey = `ig_totals_${igUserId}_${startDate}_${endDate}`;
+  const cached = getCached<IGPeriodTotals>(cacheKey);
+  if (cached) return cached;
+
+  const since = Math.floor(new Date(startDate + "T00:00:00").getTime() / 1000);
+  const until = Math.floor(new Date(endDate + "T23:59:59").getTime() / 1000);
+
+  const data = await graphFetch(`/${igUserId}/insights`, {
+    metric: "views,total_interactions,accounts_engaged,follows_and_unfollows",
+    period: "day",
+    metric_type: "total_value",
+    since: String(since),
+    until: String(until),
+  });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const values: Record<string, number> = {};
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const metric of (data.data || []) as any[]) {
+    values[metric.name] = metric.total_value?.value ?? 0;
+  }
+
+  const totals: IGPeriodTotals = {
+    views: values.views ?? 0,
+    totalInteractions: values.total_interactions ?? 0,
+    accountsEngaged: values.accounts_engaged ?? 0,
+    followsAndUnfollows: values.follows_and_unfollows ?? 0,
+  };
+
+  setCache(cacheKey, totals);
+  return totals;
+}
+
+/**
+ * Fetch audience demographics using v21.0 `follower_demographics` with breakdown.
  */
 export async function fetchIGAudienceDemographics(
   igUserId: string,
@@ -340,32 +403,60 @@ export async function fetchIGAudienceDemographics(
   const cached = getCached<{ genderAge: IGAudienceGenderAge[]; countries: IGAudienceGeo[]; cities: IGAudienceGeo[] }>(cacheKey);
   if (cached) return cached;
 
-  const data = await graphFetch(`/${igUserId}/insights`, {
-    metric: "audience_gender_age,audience_country,audience_city",
-    period: "lifetime",
-  });
+  const [genderAgeData, countryData, cityData] = await Promise.all([
+    graphFetch(`/${igUserId}/insights`, {
+      metric: "follower_demographics",
+      period: "lifetime",
+      metric_type: "total_value",
+      timeframe: "this_month",
+      breakdown: "age,gender",
+    }).catch(() => ({ data: [] })),
+    graphFetch(`/${igUserId}/insights`, {
+      metric: "follower_demographics",
+      period: "lifetime",
+      metric_type: "total_value",
+      timeframe: "this_month",
+      breakdown: "country",
+    }).catch(() => ({ data: [] })),
+    graphFetch(`/${igUserId}/insights`, {
+      metric: "follower_demographics",
+      period: "lifetime",
+      metric_type: "total_value",
+      timeframe: "this_month",
+      breakdown: "city",
+    }).catch(() => ({ data: [] })),
+  ]);
 
   const genderAge: IGAudienceGenderAge[] = [];
   const countries: IGAudienceGeo[] = [];
   const cities: IGAudienceGeo[] = [];
 
+  // Parse gender+age breakdown
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  for (const metric of (data.data || []) as any[]) {
-    const values = metric.values?.[0]?.value;
-    if (!values || typeof values !== "object") continue;
+  const gaResults = genderAgeData.data?.[0]?.total_value?.breakdowns?.[0]?.results as any[] | undefined;
+  if (gaResults) {
+    for (const r of gaResults) {
+      const age = r.dimension_values[0];
+      const gender = r.dimension_values[1];
+      genderAge.push({ label: `${gender}.${age}`, value: r.value });
+    }
+  }
 
-    if (metric.name === "audience_gender_age") {
-      for (const [label, value] of Object.entries(values)) {
-        genderAge.push({ label, value: value as number });
-      }
-    } else if (metric.name === "audience_country") {
-      for (const [name, value] of Object.entries(values)) {
-        countries.push({ name, value: value as number });
-      }
-    } else if (metric.name === "audience_city") {
-      for (const [name, value] of Object.entries(values)) {
-        cities.push({ name, value: value as number });
-      }
+  // Parse country breakdown
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const countryResults = countryData.data?.[0]?.total_value?.breakdowns?.[0]?.results as any[] | undefined;
+  if (countryResults) {
+    for (const r of countryResults) {
+      countries.push({ name: r.dimension_values[0], value: r.value });
+    }
+  }
+
+  // Parse city breakdown
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cityResults = cityData.data?.[0]?.total_value?.breakdowns?.[0]?.results as any[] | undefined;
+  if (cityResults) {
+    for (const r of cityResults) {
+      cities.push({ name: r.dimension_values[0], value: r.value });
     }
   }
 
@@ -380,7 +471,7 @@ export async function fetchIGAudienceDemographics(
 }
 
 /**
- * Fetch online followers by hour (lifetime snapshot — no date range).
+ * Fetch online followers by hour (lifetime snapshot).
  */
 export async function fetchIGOnlineFollowers(igUserId: string): Promise<IGOnlineFollowers[]> {
   const cacheKey = `ig_online_${igUserId}`;

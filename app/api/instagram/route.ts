@@ -7,6 +7,7 @@ import {
   fetchIGMedia,
   fetchIGMediaInsights,
   fetchIGDailyInsights,
+  fetchIGPeriodTotals,
   fetchIGAudienceDemographics,
   fetchIGOnlineFollowers,
 } from "@/lib/instagram";
@@ -42,10 +43,13 @@ export async function GET(request: NextRequest) {
     }
 
     // Fetch all data in parallel
-    const [account, media, dailyInsights, audience, onlineFollowers] = await Promise.all([
+    const [account, media, dailyInsights, periodTotals, audience, onlineFollowers] = await Promise.all([
       fetchIGAccount(igUserId),
       fetchIGMedia(igUserId, 50),
       fetchIGDailyInsights(igUserId, startDate, endDate).catch(() => []),
+      fetchIGPeriodTotals(igUserId, startDate, endDate).catch(() => ({
+        views: 0, totalInteractions: 0, accountsEngaged: 0, followsAndUnfollows: 0,
+      })),
       fetchIGAudienceDemographics(igUserId).catch(() => ({ genderAge: [], countries: [], cities: [] })),
       fetchIGOnlineFollowers(igUserId).catch(() => []),
     ]);
@@ -59,10 +63,12 @@ export async function GET(request: NextRequest) {
       sortedMedia.map((m) =>
         fetchIGMediaInsights(m.id).catch(() => ({
           mediaId: m.id,
-          impressions: 0,
           reach: 0,
-          engagement: 0,
           saved: 0,
+          likes: 0,
+          comments: 0,
+          shares: 0,
+          totalInteractions: 0,
         })),
       ),
     );
@@ -74,6 +80,7 @@ export async function GET(request: NextRequest) {
       media: sortedMedia,
       mediaInsights,
       dailyInsights,
+      periodTotals,
       audienceGenderAge: audience.genderAge,
       audienceCountries: audience.countries,
       audienceCities: audience.cities,

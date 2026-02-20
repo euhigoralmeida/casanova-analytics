@@ -22,7 +22,7 @@ import {
   BarChart,
   Bar,
   Cell,
-  ComposedChart,
+
 } from "recharts";
 
 // ---------- Merged media type for table ----------
@@ -108,24 +108,22 @@ export default function InstagramPage() {
   const hasData = data?.source === "instagram";
   const account = data?.account;
   const daily = data?.dailyInsights ?? [];
+  const totals = data?.periodTotals;
 
   // KPI computations
   const totalReach = daily.reduce((s, d) => s + d.reach, 0);
-  const totalImpressions = daily.reduce((s, d) => s + d.impressions, 0);
+  const totalViews = totals?.views ?? 0;
   const avgReach = daily.length > 0 ? Math.round(totalReach / daily.length) : 0;
-  const avgImpressions = daily.length > 0 ? Math.round(totalImpressions / daily.length) : 0;
 
-  const totalLikes = mediaRows.reduce((s, m) => s + m.likeCount, 0);
-  const totalComments = mediaRows.reduce((s, m) => s + m.commentsCount, 0);
   const engagementRate = account && account.followersCount > 0
-    ? Math.round(((totalLikes + totalComments) / account.followersCount) * 10000) / 100
+    ? Math.round(((totals?.totalInteractions ?? 0) / account.followersCount) * 10000) / 100
     : 0;
 
-  // Follower growth from daily data
-  const followerStart = daily.length > 0 ? daily[0].followerCount : 0;
-  const followerEnd = daily.length > 0 ? daily[daily.length - 1].followerCount : 0;
-  const followerDelta = followerEnd - followerStart;
-  const followerGrowthPct = followerStart > 0 ? Math.round((followerDelta / followerStart) * 10000) / 100 : 0;
+  // Follower growth: follower_count in daily is the NET CHANGE per day
+  const followerDelta = daily.reduce((s, d) => s + d.followerCount, 0);
+  const followerGrowthPct = account && account.followersCount > 0
+    ? Math.round((followerDelta / account.followersCount) * 10000) / 100
+    : 0;
 
   // Online followers (best hours)
   const onlineFollowers = data?.onlineFollowers ?? [];
@@ -291,14 +289,14 @@ export default function InstagramPage() {
             subtitle={`Média diária: ${avgReach.toLocaleString("pt-BR")}`}
           />
           <Kpi
-            title="Impressões"
-            value={totalImpressions.toLocaleString("pt-BR")}
-            subtitle={`Média diária: ${avgImpressions.toLocaleString("pt-BR")}`}
+            title="Visualizações"
+            value={totalViews.toLocaleString("pt-BR")}
+            subtitle={`${(totals?.accountsEngaged ?? 0).toLocaleString("pt-BR")} contas engajadas`}
           />
           <Kpi
             title="Engajamento"
             value={`${engagementRate.toFixed(2).replace(".", ",")}%`}
-            subtitle={`${(totalLikes + totalComments).toLocaleString("pt-BR")} interações`}
+            subtitle={`${(totals?.totalInteractions ?? 0).toLocaleString("pt-BR")} interações`}
           />
           <Kpi
             title="Crescimento"
@@ -312,9 +310,42 @@ export default function InstagramPage() {
       {/* ─── SEÇÃO 3: GRÁFICOS ─── */}
       {daily.length > 0 && !loading && (
         <div className="grid gap-4 grid-cols-1 lg:grid-cols-2">
-          {/* Crescimento de Seguidores */}
+          {/* Novos Seguidores por Dia */}
           <div className="rounded-2xl border border-zinc-200 bg-white p-5">
-            <h3 className="text-sm font-semibold text-zinc-800 mb-4">Crescimento de Seguidores</h3>
+            <h3 className="text-sm font-semibold text-zinc-800 mb-4">Novos Seguidores por Dia</h3>
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart data={daily}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(v: string) => {
+                    const d = new Date(v + "T12:00:00");
+                    return `${d.getDate()}/${d.getMonth() + 1}`;
+                  }}
+                />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  formatter={(value: any) => [Number(value).toLocaleString("pt-BR"), "Novos seguidores"]}
+                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                  labelFormatter={(label: any) => fmtDateSlash(String(label))}
+                />
+                <Bar dataKey="followerCount" radius={[4, 4, 0, 0]}>
+                  {daily.map((entry, index) => (
+                    <Cell
+                      key={index}
+                      fill={entry.followerCount > 0 ? "#8b5cf6" : entry.followerCount < 0 ? "#ef4444" : "#d4d4d8"}
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Alcance Diário */}
+          <div className="rounded-2xl border border-zinc-200 bg-white p-5">
+            <h3 className="text-sm font-semibold text-zinc-800 mb-4">Alcance Diário</h3>
             <ResponsiveContainer width="100%" height={280}>
               <AreaChart data={daily}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" />
@@ -329,47 +360,12 @@ export default function InstagramPage() {
                 <YAxis tick={{ fontSize: 11 }} />
                 <Tooltip
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  formatter={(value: any) => [Number(value).toLocaleString("pt-BR"), "Seguidores"]}
+                  formatter={(value: any) => [Number(value).toLocaleString("pt-BR"), "Alcance"]}
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   labelFormatter={(label: any) => fmtDateSlash(String(label))}
                 />
-                <Area
-                  type="monotone"
-                  dataKey="followerCount"
-                  stroke="#8b5cf6"
-                  fill="#8b5cf6"
-                  fillOpacity={0.1}
-                  strokeWidth={2}
-                  name="Seguidores"
-                />
+                <Area type="monotone" dataKey="reach" stroke="#10b981" fill="#10b981" fillOpacity={0.1} strokeWidth={2} name="Alcance" />
               </AreaChart>
-            </ResponsiveContainer>
-          </div>
-
-          {/* Alcance e Impressões */}
-          <div className="rounded-2xl border border-zinc-200 bg-white p-5">
-            <h3 className="text-sm font-semibold text-zinc-800 mb-4">Alcance e Impressões</h3>
-            <ResponsiveContainer width="100%" height={280}>
-              <ComposedChart data={daily}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f4f4f5" />
-                <XAxis
-                  dataKey="date"
-                  tick={{ fontSize: 11 }}
-                  tickFormatter={(v: string) => {
-                    const d = new Date(v + "T12:00:00");
-                    return `${d.getDate()}/${d.getMonth() + 1}`;
-                  }}
-                />
-                <YAxis tick={{ fontSize: 11 }} />
-                <Tooltip
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  formatter={(value: any, name: any) => [Number(value).toLocaleString("pt-BR"), name === "reach" ? "Alcance" : "Impressões"]}
-                  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                  labelFormatter={(label: any) => fmtDateSlash(String(label))}
-                />
-                <Area type="monotone" dataKey="reach" stroke="#10b981" fill="#10b981" fillOpacity={0.1} strokeWidth={2} name="reach" />
-                <Area type="monotone" dataKey="impressions" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.1} strokeWidth={2} name="impressions" />
-              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
@@ -395,8 +391,8 @@ export default function InstagramPage() {
                     likeCount: m.likeCount,
                     commentsCount: m.commentsCount,
                     saved: m.saved ?? 0,
+                    shares: m.shares ?? 0,
                     reach: m.reach ?? 0,
-                    impressions: m.impressions ?? 0,
                     permalink: m.permalink,
                   })),
                   [
@@ -406,8 +402,8 @@ export default function InstagramPage() {
                     { key: "likeCount", label: "Curtidas" },
                     { key: "commentsCount", label: "Comentários" },
                     { key: "saved", label: "Salvos" },
+                    { key: "shares", label: "Compart." },
                     { key: "reach", label: "Alcance" },
-                    { key: "impressions", label: "Impressões" },
                     { key: "permalink", label: "Link" },
                   ],
                   "instagram-publicacoes.csv",
@@ -438,13 +434,14 @@ export default function InstagramPage() {
                   <SortableHeader label="Curtidas" field="likeCount" current={sortField} dir={sortDir} onSort={handleSort} className="text-right" />
                   <SortableHeader label="Coment." field="commentsCount" current={sortField} dir={sortDir} onSort={handleSort} className="text-right" />
                   <SortableHeader label="Salvos" field="saved" current={sortField} dir={sortDir} onSort={handleSort} className="text-right" />
+                  <SortableHeader label="Compart." field="shares" current={sortField} dir={sortDir} onSort={handleSort} className="text-right" />
                   <SortableHeader label="Alcance" field="reach" current={sortField} dir={sortDir} onSort={handleSort} className="text-right" />
                   <th className="py-2.5 px-5 text-center w-10">Link</th>
                 </tr>
               </thead>
               <tbody>
                 {pageMedia.length === 0 && (
-                  <tr><td colSpan={9} className="py-8 text-center text-zinc-400 text-sm">
+                  <tr><td colSpan={10} className="py-8 text-center text-zinc-400 text-sm">
                     Nenhuma publicação encontrada.
                   </td></tr>
                 )}
@@ -473,6 +470,7 @@ export default function InstagramPage() {
                     <td className="py-2 px-2 text-right tabular-nums">{m.likeCount.toLocaleString("pt-BR")}</td>
                     <td className="py-2 px-2 text-right tabular-nums">{m.commentsCount.toLocaleString("pt-BR")}</td>
                     <td className="py-2 px-2 text-right tabular-nums">{(m.saved ?? 0).toLocaleString("pt-BR")}</td>
+                    <td className="py-2 px-2 text-right tabular-nums">{(m.shares ?? 0).toLocaleString("pt-BR")}</td>
                     <td className="py-2 px-2 text-right tabular-nums">{(m.reach ?? 0).toLocaleString("pt-BR")}</td>
                     <td className="py-2 px-5 text-center">
                       <a href={m.permalink} target="_blank" rel="noopener noreferrer" className="text-zinc-400 hover:text-zinc-700">
