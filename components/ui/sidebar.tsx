@@ -9,6 +9,7 @@ import {
   Megaphone,
   Heart,
   MousePointerClick,
+  Instagram,
   Bell,
   Settings,
   LogOut,
@@ -43,6 +44,7 @@ const navItems: NavItem[] = [
   },
   { label: "Retenção", href: "/retention", icon: Heart },
   { label: "CRO", href: "/funnel", icon: MousePointerClick },
+  { label: "Instagram", href: "/instagram", icon: Instagram },
   { label: "Alertas", href: "/alerts", icon: Bell },
   { label: "Configurações", href: "/settings", icon: Settings },
 ];

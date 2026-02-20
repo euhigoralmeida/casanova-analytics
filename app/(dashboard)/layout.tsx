@@ -16,6 +16,7 @@ const pageTitles: Record<string, string> = {
   "/acquisition/segments": "Segmentação",
   "/retention": "Retenção",
   "/funnel": "CRO & Funil",
+  "/instagram": "Instagram",
   "/alerts": "Alertas",
   "/settings": "Configurações",
 };

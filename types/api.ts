@@ -135,6 +135,7 @@ export type { GA4FunnelStep, GA4SummaryData, GA4DailyPoint, ChannelAcquisition, 
 export type { CohortRetentionData, RetentionSummary, ChannelLTV, RetentionData } from "@/lib/ga4-queries";
 export type { ClarityBehavioralMetrics, ClarityPageAnalysis, ClarityDeviceBreakdown, ClarityData, ClarityChannelBreakdown, ClarityCampaignBreakdown, ClarityTechBreakdown } from "@/lib/clarity";
 export type { MetaAdsCampaign, MetaAccountTotals, MetaTimeSeriesPoint, MetaAdsResponse } from "@/lib/meta-ads";
+export type { IGAccount, IGMedia, IGMediaInsights, IGDailyInsight, IGAudienceGenderAge, IGAudienceGeo, IGOnlineFollowers, IGInsightsResponse } from "@/lib/instagram";
 
 /* =========================
    CRO Data Response (combined GA4 + Clarity)
