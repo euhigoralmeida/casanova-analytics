@@ -14,7 +14,9 @@ import { KpiSkeleton, AlertsSkeleton, ChartSkeleton } from "@/components/ui/skel
 import { BudgetPlanCard } from "@/components/intelligence/budget-plan-card";
 import { SegmentationSummary } from "@/components/intelligence/segmentation-summary";
 import { StrategicAdvisorCard } from "@/components/intelligence/strategic-advisor-card";
-import { RefreshCw } from "lucide-react";
+import { useLastUpdated } from "@/hooks/use-last-updated";
+import { exportToCSV } from "@/lib/export-csv";
+import { RefreshCw, Download } from "lucide-react";
 
 export default function VisaoGeralPage() {
   const { dateRange, setDateRange, buildParams } = useDateRange();
@@ -26,12 +28,16 @@ export default function VisaoGeralPage() {
   const [retention, setRetention] = useState<RetentionData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sectionErrors, setSectionErrors] = useState<string[]>([]);
+  const { label: updatedLabel, markUpdated } = useLastUpdated();
 
   const loadData = useCallback(async (range: DateRange) => {
     setLoading(true);
     setError(null);
+    setSectionErrors([]);
     try {
       const base = buildParams(range);
+      const errors: string[] = [];
 
       const [overviewRes, alertsRes, tsRes, ga4Res, intelRes, retentionRes] = await Promise.all([
         fetch(`/api/overview?${base}`),
@@ -44,17 +50,19 @@ export default function VisaoGeralPage() {
 
       if (!overviewRes.ok) throw new Error("Erro ao carregar dados");
       setOverview(await overviewRes.json());
-      if (alertsRes?.ok) setSmartAlerts(await alertsRes.json());
-      if (tsRes?.ok) setTimeseries(await tsRes.json());
-      if (ga4Res?.ok) setGa4Data(await ga4Res.json());
-      if (intelRes?.ok) setIntelligence(await intelRes.json());
-      if (retentionRes?.ok) setRetention(await retentionRes.json());
+      if (alertsRes?.ok) setSmartAlerts(await alertsRes.json()); else if (alertsRes) errors.push("Alertas");
+      if (tsRes?.ok) setTimeseries(await tsRes.json()); else if (tsRes) errors.push("Gráficos");
+      if (ga4Res?.ok) setGa4Data(await ga4Res.json()); else if (ga4Res) errors.push("GA4");
+      if (intelRes?.ok) setIntelligence(await intelRes.json()); else if (intelRes) errors.push("Inteligência");
+      if (retentionRes?.ok) setRetention(await retentionRes.json()); else if (retentionRes) errors.push("Retenção");
+      if (errors.length > 0) setSectionErrors(errors);
+      markUpdated();
     } catch {
       setError("Erro ao carregar dados. Tente novamente ou aguarde alguns minutos.");
     } finally {
       setLoading(false);
     }
-  }, [buildParams]);
+  }, [buildParams, markUpdated]);
 
   useEffect(() => {
     loadData(defaultRange());
@@ -80,9 +88,39 @@ export default function VisaoGeralPage() {
             {overview && overview.source !== "google-ads" && (
               <span className="ml-2 text-zinc-400">Dados mock</span>
             )}
+            {updatedLabel && !loading && (
+              <span className="ml-2 text-zinc-400">· {updatedLabel}</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {overview && acct && (
+            <button
+              onClick={() => {
+                const kpis = [{
+                  metrica: "Receita",
+                  valor: acct.revenue,
+                  conversoes: Math.round(acct.conversions * 100) / 100,
+                  investimento: acct.ads,
+                  roas: overview.meta.roasActual,
+                  cliques: acct.clicks,
+                }];
+                exportToCSV(kpis, [
+                  { key: "metrica", label: "Métrica" },
+                  { key: "valor", label: "Receita" },
+                  { key: "conversoes", label: "Conversões" },
+                  { key: "investimento", label: "Investimento" },
+                  { key: "roas", label: "ROAS" },
+                  { key: "cliques", label: "Cliques" },
+                ], `overview-${dateRange.startDate}-${dateRange.endDate}.csv`);
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg hover:bg-white transition-colors"
+              title="Exportar CSV"
+            >
+              <Download className="h-3.5 w-3.5" />
+              CSV
+            </button>
+          )}
           <button
             onClick={() => loadData(dateRange)}
             disabled={loading}
@@ -105,6 +143,16 @@ export default function VisaoGeralPage() {
           <button onClick={() => loadData(dateRange)} className="px-3 py-1.5 text-sm bg-red-100 text-red-800 rounded-lg hover:bg-red-200 font-medium flex-shrink-0">
             Tentar novamente
           </button>
+        </div>
+      )}
+
+      {/* ─── ERROS PARCIAIS ─── */}
+      {sectionErrors.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-3">
+          <div className="h-2 w-2 rounded-full bg-amber-400 flex-shrink-0" />
+          <p className="text-sm text-amber-800">
+            Alguns dados não carregaram: <strong>{sectionErrors.join(", ")}</strong>. As demais seções estão disponíveis.
+          </p>
         </div>
       )}
 

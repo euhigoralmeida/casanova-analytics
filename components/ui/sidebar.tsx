@@ -45,12 +45,20 @@ const navItems: NavItem[] = [
     ],
   },
   { label: "Retenção", href: "/retention", icon: Heart },
-  { label: "CRO (Beta)", href: "/funnel", icon: MousePointerClick },
-  { label: "SEO (Beta)", href: "/organic", icon: Search },
+  { label: "CRO", href: "/funnel", icon: MousePointerClick },
+  { label: "SEO", href: "/organic", icon: Search },
   { label: "Instagram", href: "/instagram", icon: Instagram },
   { label: "Influenciadores (Beta)", href: "/influencers", icon: Users },
   { label: "Alertas", href: "/alerts", icon: Bell },
-  { label: "Configurações", href: "/settings", icon: Settings },
+  {
+    label: "Configurações",
+    icon: Settings,
+    children: [
+      { label: "Geral", href: "/settings" },
+      { label: "Integrações", href: "/settings/integrations" },
+      { label: "Equipe", href: "/settings/team" },
+    ],
+  },
 ];
 
 function ComingSoonBadge() {

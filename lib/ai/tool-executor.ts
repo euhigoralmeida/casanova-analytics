@@ -345,9 +345,11 @@ async function executeToolInternal(
     }
 
     case "get_cro_clarity": {
-      const { isClarityConfigured, fetchClarityInsights } = await import("@/lib/clarity");
+      const { isClarityConfigured, getClarityFromDB } = await import("@/lib/clarity");
       if (!isClarityConfigured()) return { error: "Microsoft Clarity não configurado" };
-      const clarityData = await fetchClarityInsights(3);
+      const snapshot = await getClarityFromDB("default", 3);
+      if (!snapshot) return { error: "Dados do Clarity ainda não disponíveis. Aguarde o próximo sync automático." };
+      const clarityData = snapshot.data;
       if (clarityData.source !== "clarity") return { error: "Erro ao buscar dados do Clarity" };
       const b = clarityData.behavioral;
       const top5Pages = clarityData.pageAnalysis.slice(0, 5).map((p) => ({

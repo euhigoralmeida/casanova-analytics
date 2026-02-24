@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/clarity",
+      "schedule": "0 9 * * *"
+    }
+  ]
+}

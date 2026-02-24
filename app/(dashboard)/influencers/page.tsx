@@ -18,10 +18,12 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis,
 } from "recharts";
+import { exportToCSV } from "@/lib/export-csv";
 import {
   Search,
   Loader2,
   AlertTriangle,
+  Download,
   Users,
   HelpCircle,
 } from "lucide-react";
@@ -144,11 +146,48 @@ export default function InfluencersPage() {
   }
 
   return (
-    <div className="px-6 pb-8 space-y-6">
+    <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6 space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="text-lg font-bold text-zinc-900">Influenciadores <span className="text-xs font-medium text-zinc-400 ml-1">(Beta)</span></h2>
-        <p className="text-xs text-zinc-500">Busque um perfil do Instagram para analisar métricas públicas</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-zinc-900">Influenciadores <span className="text-xs font-medium text-zinc-400 ml-1">(Beta)</span></h2>
+          <p className="text-xs text-zinc-500">Busque um perfil do Instagram para analisar métricas públicas</p>
+        </div>
+        {data && (
+          <button
+            onClick={() => {
+              const rows = [{
+                perfil: data.profile.handle,
+                nome: data.profile.name,
+                seguidores: data.profile.followersCount,
+                seguindo: data.profile.followingCount,
+                publicacoes: data.profile.mediaCount,
+                engajamento: data.metrics.engagementRate,
+                avgLikes: data.metrics.avgLikes,
+                avgComentarios: data.metrics.avgComments,
+                iqs: data.iqs,
+                tier: data.profile.tier,
+              }];
+              exportToCSV(rows, [
+                { key: "perfil", label: "Perfil" },
+                { key: "nome", label: "Nome" },
+                { key: "seguidores", label: "Seguidores" },
+                { key: "seguindo", label: "Seguindo" },
+                { key: "publicacoes", label: "Publicações" },
+                { key: "engajamento", label: "Eng. Rate %" },
+                { key: "avgLikes", label: "Avg Likes" },
+                { key: "avgComentarios", label: "Avg Comentários" },
+                { key: "iqs", label: "IQS" },
+                { key: "tier", label: "Tier" },
+              ], `influenciador-${data.profile.handle.replace("@", "")}.csv`);
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg hover:bg-white transition-colors"
+            title="Exportar CSV"
+          >
+            <Download className="h-3.5 w-3.5" />
+            CSV
+          </button>
+        )}
       </div>
 
       {/* Search bar */}

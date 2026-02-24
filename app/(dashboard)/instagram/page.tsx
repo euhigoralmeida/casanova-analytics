@@ -10,6 +10,7 @@ import Kpi from "@/components/ui/kpi-card";
 import SortableHeader from "@/components/ui/sortable-header";
 import { KpiSkeleton, ChartSkeleton, TableSkeleton } from "@/components/ui/skeleton";
 import { exportToCSV } from "@/lib/export-csv";
+import { useLastUpdated } from "@/hooks/use-last-updated";
 import { Download, RefreshCw, AlertTriangle, ExternalLink } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -38,6 +39,7 @@ export default function InstagramPage() {
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(0);
   const [audienceTab, setAudienceTab] = useState<"gender" | "cities" | "countries">("gender");
+  const { label: updatedLabel, markUpdated } = useLastUpdated();
   const PER_PAGE = 20;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -83,6 +85,7 @@ export default function InstagramPage() {
       const res = await fetch(`/api/instagram?startDate=${range.startDate}&endDate=${range.endDate}`);
       if (!res.ok) throw new Error("Erro ao carregar dados");
       setData(await res.json());
+      markUpdated();
     } catch {
       setError("Erro ao carregar dados do Instagram. Tente novamente.");
     } finally {
@@ -144,6 +147,9 @@ export default function InstagramPage() {
               <span className="ml-2 text-zinc-400">@{account.username}</span>
             )}
             {loading && <span className="ml-2 text-zinc-400">Carregando...</span>}
+            {updatedLabel && !loading && (
+              <span className="ml-2 text-zinc-400">· {updatedLabel}</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">

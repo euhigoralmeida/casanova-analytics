@@ -14,7 +14,7 @@ import { buildContextSummary, buildPeriodContext } from "./context-builder";
 import { prisma } from "@/lib/db";
 import { computeTargetMonth } from "@/lib/planning-target-calc";
 import { formatBRL } from "@/lib/format";
-import { isClarityConfigured, fetchClarityInsights } from "@/lib/clarity";
+import { isClarityConfigured, getClarityFromDB } from "@/lib/clarity";
 import { isGSCConfigured } from "@/lib/google-search-console";
 import { fetchKeywordMetrics, fetchPageMetrics } from "@/lib/gsc-queries";
 import { isConfigured as isAdsConfigured, getCustomer, computeComparisonDates } from "@/lib/google-ads";
@@ -38,7 +38,7 @@ export async function buildStrategicBrief(
     fetchGA4Extras(startDate, endDate),
     fetchPlanningTargets(tenantId),
     fetchRecentActions(tenantId),
-    isClarityConfigured() ? fetchClarityInsights(3).catch(() => null) : Promise.resolve(null),
+    isClarityConfigured() ? getClarityFromDB("default", 3).then(s => s?.data ?? null).catch(() => null) : Promise.resolve(null),
     fetchOrganicSection(startDate, endDate),
   ]);
 

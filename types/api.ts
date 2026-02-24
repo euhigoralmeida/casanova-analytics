@@ -155,6 +155,8 @@ export type CRODataResponse = {
   // Clarity data
   clarity?: import("@/lib/clarity").ClarityData;
   clarityDashboardUrl?: string;
+  clarityFetchedAt?: string; // ISO timestamp of last Clarity data refresh
+  clarityConfigured?: boolean; // true when Clarity env vars are set (even if no data yet)
 };
 
 export type KpiStatus = "ok" | "warn" | "danger" | undefined;

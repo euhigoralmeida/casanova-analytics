@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Sessão expirada" }, { status: 401 });
   }
 
-  const tenant = getTenant(session.tenantId);
+  const tenant = await getTenant(session.tenantId);
   if (!tenant) {
     return NextResponse.json({ error: "Tenant não encontrado" }, { status: 404 });
   }

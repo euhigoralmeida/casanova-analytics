@@ -3,7 +3,10 @@
  *
  * Uses fetch against the Meta Marketing API (Graph API).
  * Env vars: META_ADS_ACCESS_TOKEN, META_ADS_ACCOUNT_ID
+ * Multi-tenant: can also load from DB via getTenantCredentials.
  */
+
+import { getTenantCredentials } from "@/lib/tenant-credentials";
 
 const GRAPH_API_VERSION = "v21.0";
 const BASE_URL = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
@@ -73,6 +76,16 @@ function getAccountId(): string {
 
 function getAccessToken(): string {
   return process.env.META_ADS_ACCESS_TOKEN!;
+}
+
+/** Async credential lookup — DB first, env fallback. */
+export async function getMetaCredentials(tenantId?: string): Promise<{ accessToken: string; accountId: string } | null> {
+  const creds = await getTenantCredentials(tenantId, "meta_ads");
+  if (!creds) return null;
+  return {
+    accessToken: creds.access_token,
+    accountId: creds.account_id,
+  };
 }
 
 // ---------- Cache ----------

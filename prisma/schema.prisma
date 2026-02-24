@@ -6,6 +6,59 @@ datasource db {
   provider = "postgresql"
 }
 
+// ─── Multi-Tenant Models ───
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  plan      String   @default("starter") // "starter" | "pro" | "enterprise"
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users        User[]
+  integrations Integration[]
+
+  @@index([slug])
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String
+  name         String
+  passwordHash String
+  role         String   @default("viewer") // "admin" | "editor" | "viewer"
+  tenantId     String
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  active       Boolean  @default(true)
+  lastLoginAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([tenantId, email])
+  @@index([email])
+}
+
+model Integration {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  platform    String   // "google_ads" | "ga4" | "meta_ads" | "google_search_console" | "clarity" | "instagram"
+  label       String?  // optional display label
+  credentials String   // AES-256 encrypted JSON
+  active      Boolean  @default(true)
+  lastSyncAt  DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([tenantId, platform])
+  @@index([tenantId])
+}
+
+// ─── Existing Models ───
+
 model PlanningEntry {
   id        String   @id @default(cuid())
   tenantId  String   @default("default")
@@ -137,6 +190,20 @@ model Influencer {
   @@unique([tenantId, handle, platform])
   @@index([tenantId])
   @@index([tenantId, iqs])
+}
+
+model ClaritySnapshot {
+  id        String   @id @default(cuid())
+  tenantId  String   @default("default")
+  numDays   Int      @default(3)
+  data      Json                        // ClarityData completo
+  fetchedAt DateTime @default(now())
+  apiCalls  Int      @default(0)
+  status    String   @default("success") // success | error
+  errorMsg  String?
+
+  @@unique([tenantId, numDays])
+  @@index([tenantId])
 }
 
 model InfluencerCollaboration {

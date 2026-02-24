@@ -1,4 +1,5 @@
 import { google, searchconsole_v1 } from "googleapis";
+import { getTenantCredentials } from "@/lib/tenant-credentials";
 
 /* =========================
    Configuracao GSC
@@ -9,7 +10,6 @@ export function isGSCConfigured(): boolean {
     process.env.GSC_CLIENT_EMAIL &&
     (process.env.GSC_PRIVATE_KEY || process.env.GSC_PRIVATE_KEY_BASE64)
   );
-  // Fallback: use GA4 service account credentials if GSC-specific ones are missing
   const hasGA4Creds = !!(
     process.env.GA4_CLIENT_EMAIL &&
     (process.env.GA4_PRIVATE_KEY || process.env.GA4_PRIVATE_KEY_BASE64)
@@ -21,15 +21,12 @@ export function isGSCConfigured(): boolean {
 const _clients = new Map<string, searchconsole_v1.Searchconsole>();
 
 function getPrivateKey(): string {
-  // Option 1: GSC-specific Base64 key
   if (process.env.GSC_PRIVATE_KEY_BASE64) {
     return Buffer.from(process.env.GSC_PRIVATE_KEY_BASE64, "base64").toString("utf-8");
   }
-  // Option 2: GSC-specific raw key
   if (process.env.GSC_PRIVATE_KEY) {
     return process.env.GSC_PRIVATE_KEY.replace(/\\n/g, "\n").trim();
   }
-  // Option 3: Fallback to GA4 key (same GCP project)
   if (process.env.GA4_PRIVATE_KEY_BASE64) {
     return Buffer.from(process.env.GA4_PRIVATE_KEY_BASE64, "base64").toString("utf-8");
   }
@@ -43,6 +40,7 @@ function getClientEmail(): string {
   return process.env.GSC_CLIENT_EMAIL ?? process.env.GA4_CLIENT_EMAIL ?? "";
 }
 
+/** Sync version (env vars only). */
 export function getGSCClient(tenantId?: string): searchconsole_v1.Searchconsole {
   const key = tenantId ?? "default";
   let client = _clients.get(key);
@@ -55,6 +53,26 @@ export function getGSCClient(tenantId?: string): searchconsole_v1.Searchconsole 
     client = google.searchconsole({ version: "v1", auth });
     _clients.set(key, client);
   }
+  return client;
+}
+
+/** Async version — checks DB credentials first. */
+export async function getGSCClientAsync(tenantId?: string): Promise<searchconsole_v1.Searchconsole> {
+  const key = tenantId ?? "default";
+  let client = _clients.get(key);
+  if (client) return client;
+
+  const creds = await getTenantCredentials(tenantId, "google_search_console");
+  const email = creds?.client_email ?? getClientEmail();
+  const pk = creds?.private_key ?? getPrivateKey();
+
+  const auth = new google.auth.JWT({
+    email,
+    key: pk,
+    scopes: ["https://www.googleapis.com/auth/webmasters.readonly"],
+  });
+  client = google.searchconsole({ version: "v1", auth });
+  _clients.set(key, client);
   return client;
 }
 

@@ -2,8 +2,12 @@
 // API: https://learn.microsoft.com/en-us/clarity/setup-and-installation/clarity-data-export-api
 // Endpoint: GET https://www.clarity.ms/export-data/api/v1/project-live-insights
 // Limits: 10 requests/day, max 3 days of data, 1000 rows per response
-// We use 6 of 10: URL, Device, Channel, Campaign, OS, Browser
-// Cache: 24h TTL (separate from GA4's 2min TTL)
+//
+// Optimized: 3 calls with dimension2 (URL+Device, Channel+Campaign, OS+Browser)
+// = 30% of daily limit per refresh, allowing up to 3 refreshes/day
+//
+// Persistence: PostgreSQL via Prisma (ClaritySnapshot model)
+// Cron: daily auto-refresh via /api/cron/clarity
 //
 // Response format: array of { metricName, information[] }
 // Metrics: DeadClickCount, RageClickCount, QuickbackClick, ScriptErrorCount,
@@ -13,6 +17,8 @@
 //   - ScrollDepth: averageScrollDepth, <dimension>
 //   - Traffic: totalSessionCount, totalBotSessionCount, distinctUserCount, pagesPerSessionPercentage, <dimension>
 //   - EngagementTime: totalTime, activeTime, <dimension>
+
+import { prisma } from "@/lib/db";
 
 /* =========================
    Types
@@ -29,7 +35,6 @@ export type ClarityBehavioralMetrics = {
   scriptErrors: number;
   errorClicks: number;
   excessiveScrolls: number;
-  // New: extracted from API response
   botSessions: number;
   distinctUsers: number;
   activeTimeRatio: number;      // activeTime / totalTime (0-1), indicates page responsiveness
@@ -45,7 +50,6 @@ export type ClarityPageAnalysis = {
   engagementTime: number;       // seconds
   errorClicks: number;
   uxScore: number;              // 0-100 computed score
-  // New fields
   deadClickRate: number;        // sessionsWithMetricPercentage for dead clicks
   rageClickRate: number;        // sessionsWithMetricPercentage for rage clicks
   quickbacks: number;
@@ -59,7 +63,6 @@ export type ClarityDeviceBreakdown = {
   rageClicks: number;
   scrollDepth: number;
   traffic: number;
-  // New fields
   quickbacks: number;
   scriptErrors: number;
   errorClicks: number;
@@ -109,7 +112,6 @@ export type ClarityData = {
   behavioral: ClarityBehavioralMetrics;
   pageAnalysis: ClarityPageAnalysis[];
   deviceBreakdown: ClarityDeviceBreakdown[];
-  // New breakdowns
   channelBreakdown: ClarityChannelBreakdown[];
   campaignBreakdown: ClarityCampaignBreakdown[];
   techBreakdown: ClarityTechBreakdown[];
@@ -129,66 +131,45 @@ export function getClarityDashboardUrl(): string {
 }
 
 /* =========================
-   Cache (24h TTL) — file-based for persistence across restarts/cold starts
+   Database persistence (PostgreSQL via Prisma)
 ========================= */
 
-import * as fs from "fs";
-import * as path from "path";
-
-type CacheEntry = {
-  data: ClarityData;
-  expiresAt: number;
-};
-
-const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
-const _memCache = new Map<string, CacheEntry>();
-
-// File-based cache dir: /tmp on Vercel, .cache locally
-const CACHE_DIR = process.env.VERCEL ? "/tmp" : path.join(process.cwd(), ".cache");
-
-function getCacheKey(numOfDays: number): string {
-  return `clarity_${numOfDays}d`;
-}
-
-function getCacheFilePath(key: string): string {
-  return path.join(CACHE_DIR, `${key}.json`);
-}
-
-function readFileCache(key: string): CacheEntry | null {
+export async function getClarityFromDB(
+  tenantId: string,
+  numDays: number,
+): Promise<{ data: ClarityData; fetchedAt: Date } | null> {
   try {
-    const filePath = getCacheFilePath(key);
-    if (!fs.existsSync(filePath)) return null;
-    const raw = fs.readFileSync(filePath, "utf-8");
-    return JSON.parse(raw) as CacheEntry;
-  } catch {
+    const snapshot = await prisma.claritySnapshot.findUnique({
+      where: { tenantId_numDays: { tenantId, numDays } },
+    });
+    if (!snapshot || snapshot.status !== "success") return null;
+    return {
+      data: snapshot.data as unknown as ClarityData,
+      fetchedAt: snapshot.fetchedAt,
+    };
+  } catch (err) {
+    console.error("Clarity DB read error:", err);
     return null;
   }
 }
 
-function writeFileCache(key: string, entry: CacheEntry): void {
+export async function saveClarityToDB(
+  data: ClarityData,
+  tenantId: string,
+  numDays: number,
+  apiCalls: number,
+): Promise<void> {
   try {
-    if (!fs.existsSync(CACHE_DIR)) fs.mkdirSync(CACHE_DIR, { recursive: true });
-    fs.writeFileSync(getCacheFilePath(key), JSON.stringify(entry));
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const jsonData = data as any;
+    await prisma.claritySnapshot.upsert({
+      where: { tenantId_numDays: { tenantId, numDays } },
+      update: { data: jsonData, fetchedAt: new Date(), apiCalls, status: "success", errorMsg: null },
+      create: { tenantId, numDays, data: jsonData, apiCalls, status: "success" },
+    });
   } catch (err) {
-    console.error("Clarity cache write error:", err);
+    console.error("Clarity DB write error:", err);
   }
-}
-
-function getCache(key: string): CacheEntry | null {
-  // Memory first, then file
-  const mem = _memCache.get(key);
-  if (mem) return mem;
-  const file = readFileCache(key);
-  if (file) {
-    _memCache.set(key, file); // hydrate memory
-    return file;
-  }
-  return null;
-}
-
-function setCache(key: string, entry: CacheEntry): void {
-  _memCache.set(key, entry);
-  writeFileCache(key, entry);
 }
 
 /* =========================
@@ -211,7 +192,6 @@ export function computeUxScore(page: {
   const deadRate = page.deadClickRate ?? 0;
 
   if (rageRate > 0 || deadRate > 0) {
-    // Rate-based: sessionsWithMetricPercentage (%)
     if (rageRate > 15) score -= 30;
     else if (rageRate > 10) score -= 20;
     else if (rageRate > 5) score -= 10;
@@ -222,7 +202,6 @@ export function computeUxScore(page: {
     else if (deadRate > 8) score -= 10;
     else if (deadRate > 3) score -= 5;
   } else {
-    // Fallback: count-based (for mock data)
     if (page.rageClicks > 100) score -= 30;
     else if (page.rageClicks > 50) score -= 20;
     else if (page.rageClicks > 20) score -= 10;
@@ -234,17 +213,14 @@ export function computeUxScore(page: {
     else if (page.deadClicks > 20) score -= 5;
   }
 
-  // Penalize low scroll depth
   if (page.scrollDepth < 20) score -= 20;
   else if (page.scrollDepth < 40) score -= 15;
   else if (page.scrollDepth < 60) score -= 10;
 
-  // Penalize low engagement time (< 30s is very low)
   if (page.engagementTime < 10) score -= 15;
   else if (page.engagementTime < 30) score -= 10;
   else if (page.engagementTime < 60) score -= 5;
 
-  // Penalize error clicks
   if (page.errorClicks > 10) score -= 15;
   else if (page.errorClicks > 5) score -= 10;
   else if (page.errorClicks > 0) score -= 5;
@@ -271,20 +247,18 @@ type ClarityMetricBlock = {
 };
 
 /* =========================
-   API Fetch
+   API Fetch (single call)
 ========================= */
 
 async function fetchClarityApi(
   numOfDays: number,
   dimension1: string,
   dimension2?: string,
-  dimension3?: string,
 ): Promise<ClarityMetricBlock[]> {
   const token = process.env.CLARITY_API_TOKEN!;
 
   let url = `https://www.clarity.ms/export-data/api/v1/project-live-insights?numOfDays=${numOfDays}&dimension1=${dimension1}`;
   if (dimension2) url += `&dimension2=${dimension2}`;
-  if (dimension3) url += `&dimension3=${dimension3}`;
 
   const res = await fetch(url, {
     headers: {
@@ -301,6 +275,71 @@ async function fetchClarityApi(
   const data = await res.json();
   if (!Array.isArray(data)) throw new Error("Clarity API: unexpected response format");
   return data;
+}
+
+/* =========================
+   Multi-dimension aggregation
+   When calling with dimension2, each row has both dimension fields.
+   This helper groups by one dimension and aggregates numeric fields.
+========================= */
+
+function aggregateBlocksByDimension(
+  blocks: ClarityMetricBlock[],
+  groupByDim: string,
+): ClarityMetricBlock[] {
+  return blocks.map(block => {
+    // Group rows by the target dimension
+    const groups = new Map<string, Record<string, unknown>[]>();
+    for (const row of block.information) {
+      const key = String(row[groupByDim] ?? "");
+      if (!key) continue;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(row);
+    }
+
+    const aggregatedInfo: Record<string, unknown>[] = [];
+    for (const [key, rows] of groups) {
+      const agg: Record<string, unknown> = { [groupByDim]: key };
+
+      // Sum numeric fields
+      const sumFields = ["subTotal", "sessionsCount", "totalSessionCount", "totalBotSessionCount", "distinctUserCount", "totalTime", "activeTime", "pagesViews"];
+      for (const field of sumFields) {
+        const sum = rows.reduce((s, r) => s + Number(r[field] ?? 0), 0);
+        if (sum > 0) agg[field] = sum;
+      }
+
+      // Weighted average by totalSessionCount (traffic-related fields)
+      const totalSessions = Number(agg.totalSessionCount ?? 0);
+      if (totalSessions > 0) {
+        for (const field of ["averageScrollDepth", "pagesPerSessionPercentage"]) {
+          agg[field] = rows.reduce((s, r) =>
+            s + Number(r[field] ?? 0) * Number(r.totalSessionCount ?? 0), 0,
+          ) / totalSessions;
+        }
+      }
+
+      // Weighted average by sessionsCount (click-rate fields)
+      const totalClickSessions = Number(agg.sessionsCount ?? 0);
+      if (totalClickSessions > 0) {
+        agg.sessionsWithMetricPercentage = rows.reduce((s, r) =>
+          s + Number(r.sessionsWithMetricPercentage ?? 0) * Number(r.sessionsCount ?? 0), 0,
+        ) / totalClickSessions;
+      }
+
+      aggregatedInfo.push(agg);
+    }
+
+    return { metricName: block.metricName, information: aggregatedInfo };
+  });
+}
+
+// Check if multi-dimension response contains the expected second dimension
+function hasSecondDimension(blocks: ClarityMetricBlock[], dim2Key: string): boolean {
+  for (const block of blocks) {
+    if (block.information.length === 0) continue;
+    return dim2Key in block.information[0];
+  }
+  return false;
 }
 
 /* =========================
@@ -330,7 +369,6 @@ function parsePageData(blocks: ClarityMetricBlock[]): {
 } {
   const dim = "Url";
 
-  // Build lookups per metric
   const deadMap = buildLookup(blocks, "DeadClickCount", dim);
   const rageMap = buildLookup(blocks, "RageClickCount", dim);
   const quickMap = buildLookup(blocks, "QuickbackClick", dim);
@@ -341,13 +379,11 @@ function parsePageData(blocks: ClarityMetricBlock[]): {
   const trafficMap = buildLookup(blocks, "Traffic", dim);
   const engageMap = buildLookup(blocks, "EngagementTime", dim);
 
-  // Collect all unique URLs
   const allUrls = new Set<string>();
   for (const map of [deadMap, rageMap, scrollMap, trafficMap, engageMap]) {
     for (const key of map.keys()) allUrls.add(key);
   }
 
-  // Behavioral totals
   let totalDeadClicks = 0;
   let totalRageClicks = 0;
   let totalQuickbacks = 0;
@@ -380,7 +416,6 @@ function parsePageData(blocks: ClarityMetricBlock[]): {
     const engagement = Number(engageMap.get(url)?.activeTime ?? 0);
     const totalTime = Number(engageMap.get(url)?.totalTime ?? 0);
 
-    // Extract rates (sessionsWithMetricPercentage)
     const deadClickRate = Number(deadMap.get(url)?.sessionsWithMetricPercentage ?? 0);
     const rageClickRate = Number(rageMap.get(url)?.sessionsWithMetricPercentage ?? 0);
 
@@ -399,7 +434,6 @@ function parsePageData(blocks: ClarityMetricBlock[]): {
     totalTotalTime += totalTime;
     totalActiveTime += engagement;
 
-    // Extract readable page title from URL
     const pageTitle = extractPageTitle(url);
 
     const uxScore = computeUxScore({
@@ -412,7 +446,7 @@ function parsePageData(blocks: ClarityMetricBlock[]): {
       rageClickRate,
     });
 
-    const pa: ClarityPageAnalysis = {
+    pages.push({
       url,
       pageTitle,
       deadClicks: dead,
@@ -427,11 +461,9 @@ function parsePageData(blocks: ClarityMetricBlock[]): {
       quickbacks: quickback,
       excessiveScrolls: excessive,
       impactScore: computeImpactScore(uxScore, traffic),
-    };
-    pages.push(pa);
+    });
   }
 
-  // Sort by impact score descending (highest impact first)
   pages.sort((a, b) => b.impactScore - a.impactScore);
 
   const activeTimeRatio = totalTotalTime > 0 ? Math.round((totalActiveTime / totalTotalTime) * 100) / 100 : 0;
@@ -467,7 +499,6 @@ function parseDeviceData(blocks: ClarityMetricBlock[]): ClarityDeviceBreakdown[]
   const trafficMap = buildLookup(blocks, "Traffic", dim);
   const engageMap = buildLookup(blocks, "EngagementTime", dim);
 
-  // Collect unique devices (exclude "Other" with 0 real sessions)
   const devices = new Set<string>();
   for (const map of [deadMap, trafficMap, scrollMap]) {
     for (const key of map.keys()) {
@@ -492,7 +523,6 @@ function parseDeviceData(blocks: ClarityMetricBlock[]): ClarityDeviceBreakdown[]
     });
   }
 
-  // Sort by traffic descending
   result.sort((a, b) => b.traffic - a.traffic);
   return result;
 }
@@ -608,17 +638,15 @@ function parseTechData(blocks: ClarityMetricBlock[], type: "os" | "browser", dim
 function extractPageTitle(url: string): string {
   try {
     const u = new URL(url);
-    const path = u.pathname;
+    const p = u.pathname;
 
-    if (path === "/" || path === "") return "Home";
+    if (p === "/" || p === "") return "Home";
 
-    // Remove query params and trailing slashes for display
-    const clean = path.replace(/\/$/, "");
+    const clean = p.replace(/\/$/, "");
     const segments = clean.split("/").filter(Boolean);
 
     if (segments.length === 0) return "Home";
 
-    // Try to make a human-readable title from the last segment
     const last = segments[segments.length - 1];
     return decodeURIComponent(last)
       .replace(/-/g, " ")
@@ -630,92 +658,101 @@ function extractPageTitle(url: string): string {
 }
 
 /* =========================
-   Main fetch function
+   Main API fetch — optimized 3 calls (from 6)
+   Used by cron job and manual refresh.
 ========================= */
 
-export async function fetchClarityInsights(numOfDays = 3): Promise<ClarityData> {
+export async function fetchClarityFromApi(
+  numDays = 3,
+): Promise<{ data: ClarityData; apiCalls: number }> {
   if (!isClarityConfigured()) {
     return {
-      source: "not_configured",
-      numDaysCovered: numOfDays,
-      behavioral: emptyBehavioral(),
-      pageAnalysis: [],
-      deviceBreakdown: [],
-      channelBreakdown: [],
-      campaignBreakdown: [],
-      techBreakdown: [],
+      data: {
+        source: "not_configured",
+        numDaysCovered: numDays,
+        behavioral: emptyBehavioral(),
+        pageAnalysis: [],
+        deviceBreakdown: [],
+        channelBreakdown: [],
+        campaignBreakdown: [],
+        techBreakdown: [],
+      },
+      apiCalls: 0,
     };
   }
 
-  // Check cache (use even if expired as fallback for rate limits)
-  const cacheKey = getCacheKey(numOfDays);
-  const cached = getCache(cacheKey);
-  if (cached && Date.now() < cached.expiresAt) {
-    return cached.data;
-  }
+  // 3 optimized calls using dimension2
+  const [urlDeviceBlocks, channelCampaignBlocks, osBrowserBlocks] = await Promise.all([
+    fetchClarityApi(numDays, "URL", "Device"),
+    fetchClarityApi(numDays, "Channel", "Campaign"),
+    fetchClarityApi(numDays, "OS", "Browser"),
+  ]);
 
-  try {
-    // 6 parallel API calls (of 10 daily limit)
-    const [urlBlocks, deviceBlocks, channelBlocks, campaignBlocks, osBlocks, browserBlocks] = await Promise.all([
-      fetchClarityApi(numOfDays, "URL"),
-      fetchClarityApi(numOfDays, "Device"),
-      fetchClarityApi(numOfDays, "Channel"),
-      fetchClarityApi(numOfDays, "Campaign"),
-      fetchClarityApi(numOfDays, "OS"),
-      fetchClarityApi(numOfDays, "Browser"),
+  let apiCalls = 3;
+
+  // Check if dimension2 was returned — if not, fallback to individual calls
+  const hasDevice = hasSecondDimension(urlDeviceBlocks, "Device");
+  const hasCampaign = hasSecondDimension(channelCampaignBlocks, "Campaign");
+  const hasBrowser = hasSecondDimension(osBrowserBlocks, "Browser");
+
+  let urlBlocks: ClarityMetricBlock[];
+  let deviceBlocks: ClarityMetricBlock[];
+  let channelBlocks: ClarityMetricBlock[];
+  let campaignBlocks: ClarityMetricBlock[];
+  let osBlocks: ClarityMetricBlock[];
+  let browserBlocks: ClarityMetricBlock[];
+
+  if (hasDevice && hasCampaign && hasBrowser) {
+    // Multi-dimension: aggregate each combined response into single-dimension blocks
+    urlBlocks = aggregateBlocksByDimension(urlDeviceBlocks, "Url");
+    deviceBlocks = aggregateBlocksByDimension(urlDeviceBlocks, "Device");
+    channelBlocks = aggregateBlocksByDimension(channelCampaignBlocks, "Channel");
+    campaignBlocks = aggregateBlocksByDimension(channelCampaignBlocks, "Campaign");
+    osBlocks = aggregateBlocksByDimension(osBrowserBlocks, "Os");
+    browserBlocks = aggregateBlocksByDimension(osBrowserBlocks, "Browser");
+  } else {
+    // Fallback: dimension2 not supported, make 3 more individual calls
+    console.log("Clarity: dimension2 not returned, falling back to individual calls");
+    urlBlocks = urlDeviceBlocks; // These are already single-dimension (URL only)
+    const [devB, chanB, campB, osB, browB] = await Promise.all([
+      fetchClarityApi(numDays, "Device"),
+      fetchClarityApi(numDays, "Channel"),
+      fetchClarityApi(numDays, "Campaign"),
+      fetchClarityApi(numDays, "OS"),
+      fetchClarityApi(numDays, "Browser"),
     ]);
-
-    const { pages, behavioral } = parsePageData(urlBlocks);
-    const deviceBreakdown = parseDeviceData(deviceBlocks);
-    const channelBreakdown = parseChannelData(channelBlocks);
-    const campaignBreakdown = parseCampaignData(campaignBlocks);
-    const osTech = parseTechData(osBlocks, "os", "Os");
-    const browserTech = parseTechData(browserBlocks, "browser", "Browser");
-    const techBreakdown = [...osTech, ...browserTech];
-
-    const data: ClarityData = {
-      source: "clarity",
-      numDaysCovered: numOfDays,
-      behavioral,
-      pageAnalysis: pages,
-      deviceBreakdown,
-      channelBreakdown,
-      campaignBreakdown,
-      techBreakdown,
-    };
-
-    // Cache for 24h (file + memory)
-    setCache(cacheKey, { data, expiresAt: Date.now() + CACHE_TTL_MS });
-
-    return data;
-  } catch (err) {
-    const errMsg = String(err);
-    const isRateLimit = errMsg.includes("429");
-    console.error("Clarity API error:", errMsg);
-
-    // On rate limit (429) or any error, return expired cache if available
-    if (cached) {
-      console.log("Clarity: using expired cache as fallback");
-      return cached.data;
-    }
-
-    // No cache available — return informative source
-    console.log(`Clarity: no cache available, ${isRateLimit ? "rate limited" : "error"}`);
-    return {
-      source: isRateLimit ? "rate_limited" : "not_configured",
-      numDaysCovered: numOfDays,
-      behavioral: emptyBehavioral(),
-      pageAnalysis: [],
-      deviceBreakdown: [],
-      channelBreakdown: [],
-      campaignBreakdown: [],
-      techBreakdown: [],
-    };
+    deviceBlocks = devB;
+    channelBlocks = chanB;
+    campaignBlocks = campB;
+    osBlocks = osB;
+    browserBlocks = browB;
+    apiCalls = 8; // 3 initial + 5 fallback
   }
+
+  const { pages, behavioral } = parsePageData(urlBlocks);
+  const deviceBreakdown = parseDeviceData(deviceBlocks);
+  const channelBreakdown = parseChannelData(channelBlocks);
+  const campaignBreakdown = parseCampaignData(campaignBlocks);
+  const osTech = parseTechData(osBlocks, "os", "Os");
+  const browserTech = parseTechData(browserBlocks, "browser", "Browser");
+  const techBreakdown = [...osTech, ...browserTech];
+
+  const data: ClarityData = {
+    source: "clarity",
+    numDaysCovered: numDays,
+    behavioral,
+    pageAnalysis: pages,
+    deviceBreakdown,
+    channelBreakdown,
+    campaignBreakdown,
+    techBreakdown,
+  };
+
+  return { data, apiCalls };
 }
 
 /* =========================
-   Mock data (when Clarity not configured)
+   Empty behavioral (when not configured)
 ========================= */
 
 function emptyBehavioral(): ClarityBehavioralMetrics {
@@ -735,4 +772,3 @@ function emptyBehavioral(): ClarityBehavioralMetrics {
     activeTimeRatio: 0,
   };
 }
-

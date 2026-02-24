@@ -14,6 +14,7 @@ import SortableHeader from "@/components/ui/sortable-header";
 import ChartsSection from "@/components/charts/charts-section";
 import { TableSkeleton, KpiSkeleton, ChartSkeleton } from "@/components/ui/skeleton";
 import { exportToCSV } from "@/lib/export-csv";
+import { useLastUpdated } from "@/hooks/use-last-updated";
 import { Download, RefreshCw } from "lucide-react";
 
 export default function AquisicaoPage() {
@@ -26,6 +27,8 @@ export default function AquisicaoPage() {
   const [ga4Data, setGa4Data] = useState<GA4DataResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sectionErrors, setSectionErrors] = useState<string[]>([]);
+  const { label: updatedLabel, markUpdated } = useLastUpdated();
   const [skuPage, setSkuPage] = useState(0);
   const [viewMode, setViewMode] = useState<"skus" | "campaigns">("skus");
   const [selectedCampaign, setSelectedCampaign] = useState<string | null>(null);
@@ -96,7 +99,9 @@ export default function AquisicaoPage() {
   const loadData = useCallback(async (range: DateRange, s: string) => {
     setLoading(true);
     setError(null);
+    setSectionErrors([]);
     try {
+      const errors: string[] = [];
       const tsParams = buildParams(range, { scope: "account" });
       const [metricsRes, overviewRes, tsRes, campsRes, ga4Res] = await Promise.all([
         fetch(`/api/metrics?${buildParams(range, s ? { sku: s } : {})}`),
@@ -105,18 +110,20 @@ export default function AquisicaoPage() {
         fetch(`/api/campaigns?${buildParams(range)}`).catch(() => null),
         fetch(`/api/ga4?startDate=${range.startDate}&endDate=${range.endDate}`).catch(() => null),
       ]);
-      if (!metricsRes.ok || !overviewRes.ok) throw new Error("Erro ao carregar dados");
-      setData(await metricsRes.json());
+      if (!overviewRes.ok) throw new Error("Erro ao carregar dados");
       setOverview(await overviewRes.json());
-      if (tsRes?.ok) setTimeseries(await tsRes.json());
-      if (campsRes?.ok) setCampaigns(await campsRes.json());
-      if (ga4Res?.ok) setGa4Data(await ga4Res.json());
+      if (metricsRes.ok) setData(await metricsRes.json()); else errors.push("Métricas SKU");
+      if (tsRes?.ok) setTimeseries(await tsRes.json()); else if (tsRes) errors.push("Gráficos");
+      if (campsRes?.ok) setCampaigns(await campsRes.json()); else if (campsRes) errors.push("Campanhas");
+      if (ga4Res?.ok) setGa4Data(await ga4Res.json()); else if (ga4Res) errors.push("GA4");
+      if (errors.length > 0) setSectionErrors(errors);
+      markUpdated();
     } catch {
       setError("Erro ao carregar dados. Tente novamente ou aguarde alguns minutos.");
     } finally {
       setLoading(false);
     }
-  }, [buildParams]);
+  }, [buildParams, markUpdated]);
 
   function selectSku(s: string) {
     setSku(s);
@@ -165,6 +172,7 @@ export default function AquisicaoPage() {
         if (tsRes?.ok) setTimeseries(await tsRes.json());
         if (campsRes?.ok) setCampaigns(await campsRes.json());
         if (ga4Res?.ok) setGa4Data(await ga4Res.json());
+        markUpdated();
       })
       .catch(() => setError("Não foi possível carregar os dados."))
       .finally(() => setLoading(false));
@@ -190,6 +198,9 @@ export default function AquisicaoPage() {
               </span>
             )}
             {loading && <span className="ml-2 text-zinc-400">Carregando...</span>}
+            {updatedLabel && !loading && (
+              <span className="ml-2 text-zinc-400">· {updatedLabel}</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -226,6 +237,16 @@ export default function AquisicaoPage() {
           <button onClick={() => loadData(dateRange, sku)} className="px-3 py-1.5 text-sm bg-red-100 text-red-800 rounded-lg hover:bg-red-200 font-medium flex-shrink-0">
             Tentar novamente
           </button>
+        </div>
+      )}
+
+      {/* ─── ERROS PARCIAIS ─── */}
+      {sectionErrors.length > 0 && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 flex items-center gap-3">
+          <div className="h-2 w-2 rounded-full bg-amber-400 flex-shrink-0" />
+          <p className="text-sm text-amber-800">
+            Alguns dados não carregaram: <strong>{sectionErrors.join(", ")}</strong>. As demais seções estão disponíveis.
+          </p>
         </div>
       )}
 

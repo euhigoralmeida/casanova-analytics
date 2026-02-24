@@ -8,6 +8,7 @@ import DateRangePicker from "@/components/ui/date-range-picker";
 import CohortHeatmap from "@/components/charts/cohort-heatmap";
 import RetentionCurveChart from "@/components/charts/retention-curve-chart";
 import { exportToCSV } from "@/lib/export-csv";
+import { useLastUpdated } from "@/hooks/use-last-updated";
 import { RefreshCw, Download, Users, UserCheck, Repeat, DollarSign } from "lucide-react";
 
 export default function RetentionPage() {
@@ -15,6 +16,7 @@ export default function RetentionPage() {
   const [data, setData] = useState<RetentionData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { label: updatedLabel, markUpdated } = useLastUpdated();
 
   const loadData = useCallback(async (range: DateRange) => {
     setLoading(true);
@@ -23,12 +25,13 @@ export default function RetentionPage() {
       const res = await fetch(`/api/retention?startDate=${range.startDate}&endDate=${range.endDate}`);
       if (!res.ok) throw new Error("Erro ao carregar dados de retenção");
       setData(await res.json());
+      markUpdated();
     } catch {
       setError("Erro ao carregar dados. Tente novamente ou aguarde alguns minutos.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [markUpdated]);
 
   useEffect(() => {
     loadData(defaultRange());
@@ -72,6 +75,9 @@ export default function RetentionPage() {
             {data?.source === "ga4" && <span className="ml-2 text-zinc-400">GA4</span>}
             {data?.source === "not_configured" && <span className="ml-2 text-zinc-400">Mock</span>}
             {loading && <span className="ml-2 text-zinc-400">Atualizando...</span>}
+            {updatedLabel && !loading && (
+              <span className="ml-2 text-zinc-400">· {updatedLabel}</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">

@@ -8,8 +8,11 @@ import { formatBRL, fmtDateSlash } from "@/lib/format";
 import DateRangePicker from "@/components/ui/date-range-picker";
 import GA4FunnelChart from "@/components/charts/ga4-funnel-chart";
 import { KpiSkeleton, ChartSkeleton, TableSkeleton } from "@/components/ui/skeleton";
+import { useLastUpdated } from "@/hooks/use-last-updated";
+import { exportToCSV } from "@/lib/export-csv";
 import {
   RefreshCw,
+  Download,
   MousePointerClick,
   ChevronDown,
   ChevronUp,
@@ -20,6 +23,7 @@ import {
   Globe,
   Megaphone,
   Cpu,
+  ExternalLink,
 } from "lucide-react";
 
 /* =========================
@@ -265,6 +269,18 @@ function rateStatus(v: number): "ok" | "warn" | "danger" {
   return "ok";
 }
 
+function errorClickStatus(v: number): "ok" | "warn" | "danger" {
+  if (v > 100) return "danger";
+  if (v >= 20) return "warn";
+  return "ok";
+}
+
+function excessiveScrollStatus(v: number): "ok" | "warn" | "danger" {
+  if (v > 100) return "danger";
+  if (v >= 30) return "warn";
+  return "ok";
+}
+
 const statusColors = {
   ok: "text-emerald-700 bg-emerald-50 border-emerald-200",
   warn: "text-amber-700 bg-amber-50 border-amber-200",
@@ -297,6 +313,18 @@ const severityConfig = {
    Device icon helper
 ========================= */
 
+function formatDataAge(isoDate: string | undefined): string | null {
+  if (!isoDate) return null;
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "Agora";
+  if (mins < 60) return `Ha ${mins} min`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `Ha ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `Ha ${days}d`;
+}
+
 function DeviceIcon({ device }: { device: string }) {
   if (device === "Mobile") return <Smartphone className="h-5 w-5" />;
   if (device === "Tablet") return <Tablet className="h-5 w-5" />;
@@ -313,6 +341,7 @@ export default function CROPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showAllPages, setShowAllPages] = useState(false);
+  const { label: updatedLabel, markUpdated } = useLastUpdated();
 
   const loadData = useCallback(async (range: DateRange) => {
     setLoading(true);
@@ -321,12 +350,13 @@ export default function CROPage() {
       const res = await fetch(`/api/cro?startDate=${range.startDate}&endDate=${range.endDate}`);
       if (!res.ok) throw new Error("Erro ao carregar dados CRO");
       setData(await res.json());
+      markUpdated();
     } catch {
       setError("Erro ao carregar dados. Tente novamente ou aguarde alguns minutos.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [markUpdated]);
 
   useEffect(() => {
     loadData(defaultRange());
@@ -346,6 +376,8 @@ export default function CROPage() {
   const clarity = data?.clarity;
   const hasGA4Data = data?.source === "full" || data?.source === "ga4_only";
   const clarityLive = clarity && clarity.source === "clarity" && clarity.behavioral.totalTraffic > 0;
+  const clarityConfigured = data?.clarityConfigured ?? false;
+  const clarityAge = formatDataAge(data?.clarityFetchedAt);
   const recommendations = data ? generateCRORecommendations(data) : [];
 
   // Detect bottleneck (step with highest dropoff)
@@ -383,9 +415,33 @@ export default function CROPage() {
             {data?.source === "ga4_only" && <span className="ml-2 text-zinc-400">GA4</span>}
             {data?.source === "clarity_only" && <span className="ml-2 text-zinc-400">Clarity</span>}
             {loading && <span className="ml-2 text-zinc-400">Atualizando...</span>}
+            {updatedLabel && !loading && (
+              <span className="ml-2 text-zinc-400">· {updatedLabel}</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
+          {data && funnel && funnel.length > 0 && (
+            <button
+              onClick={() => {
+                const rows = funnel.map((step) => ({
+                  etapa: step.step,
+                  quantidade: step.count,
+                  dropoff: step.dropoff,
+                }));
+                exportToCSV(rows, [
+                  { key: "etapa", label: "Etapa" },
+                  { key: "quantidade", label: "Quantidade" },
+                  { key: "dropoff", label: "Dropoff %" },
+                ], `cro-funil-${dateRange.startDate}-${dateRange.endDate}.csv`);
+              }}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-zinc-600 border border-zinc-200 rounded-lg hover:bg-white transition-colors"
+              title="Exportar CSV"
+            >
+              <Download className="h-3.5 w-3.5" />
+              CSV
+            </button>
+          )}
           <button
             onClick={() => loadData(dateRange)}
             disabled={loading}
@@ -427,7 +483,7 @@ export default function CROPage() {
             <div className="mx-auto w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center mb-4">
               <MousePointerClick className="h-6 w-6 text-purple-600" />
             </div>
-            <p className="text-lg font-semibold text-zinc-700 mb-2">Configuracao necessaria</p>
+            <p className="text-lg font-semibold text-zinc-700 mb-2">Configuração necessária</p>
             <p className="text-sm text-zinc-500 mb-6">Para visualizar dados reais de CRO, configure as credenciais no <code className="text-xs bg-zinc-100 px-1.5 py-0.5 rounded">.env.local</code></p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-left">
               <div className="rounded-xl border border-zinc-200 p-4">
@@ -463,6 +519,17 @@ export default function CROPage() {
         </div>
       )}
 
+      {/* --- CLARITY FIRST-TIME STATE (cron hasn't run yet) --- */}
+      {data && clarityConfigured && !clarityLive && !loading && data.source !== "not_configured" && (
+        <div className="rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 flex items-center gap-3">
+          <div className="h-2 w-2 rounded-full bg-purple-400 flex-shrink-0 animate-pulse" />
+          <div>
+            <p className="text-sm font-medium text-purple-800">Dados Clarity em preparacao</p>
+            <p className="text-xs text-purple-600">A primeira atualizacao sera automatica. Os dados comportamentais estarao disponiveis em breve.</p>
+          </div>
+        </div>
+      )}
+
       {/* --- KPIs GA4 --- */}
       {summary && (
         <div>
@@ -490,8 +557,8 @@ export default function CROPage() {
         </div>
       )}
 
-      {/* --- CLARITY NOT CONFIGURED (when GA4 works but Clarity doesn't) --- */}
-      {data?.source === "ga4_only" && !clarity?.source?.includes("rate") && (
+      {/* --- CLARITY NOT CONFIGURED (when GA4 works but Clarity env vars are missing) --- */}
+      {data?.source === "ga4_only" && !clarityConfigured && (
         <div className="rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 flex items-center gap-3">
           <div className="h-2 w-2 rounded-full bg-purple-400 flex-shrink-0" />
           <div>
@@ -507,6 +574,11 @@ export default function CROPage() {
         <div>
           <div className="flex items-center gap-2 mb-3">
             <h2 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Comportamento (Clarity)</h2>
+            {clarityAge && (
+              <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500">
+                Dados de {clarityAge.toLowerCase()}
+              </span>
+            )}
           </div>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Dead Clicks */}
@@ -561,7 +633,50 @@ export default function CROPage() {
                 <p className="text-[11px] text-zinc-400 mt-0.5">Tempo ativo / tempo total</p>
               </div>
             )}
+            {/* Error Clicks */}
+            <div className={`rounded-xl border bg-white p-4 ${statusBorder[errorClickStatus(clarity.behavioral.errorClicks)]}`}>
+              <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wide">Error Clicks</p>
+              <p className="text-2xl font-bold text-zinc-900 mt-1">{clarity.behavioral.errorClicks.toLocaleString("pt-BR")}</p>
+              <p className="text-[11px] text-zinc-400 mt-0.5">Cliques em elementos com erro</p>
+            </div>
+            {/* Excessive Scrolls */}
+            <div className={`rounded-xl border bg-white p-4 ${statusBorder[excessiveScrollStatus(clarity.behavioral.excessiveScrolls)]}`}>
+              <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wide">Scroll Excessivo</p>
+              <p className="text-2xl font-bold text-zinc-900 mt-1">{clarity.behavioral.excessiveScrolls.toLocaleString("pt-BR")}</p>
+              <p className="text-[11px] text-zinc-400 mt-0.5">Rolagem repetitiva (ida e volta)</p>
+            </div>
+            {/* Pages Per Session */}
+            {clarity.behavioral.pagesPerSession > 0 && (
+              <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wide">Paginas/Sessao</p>
+                <p className="text-2xl font-bold text-zinc-900 mt-1">{clarity.behavioral.pagesPerSession.toFixed(1).replace(".", ",")}</p>
+                <p className="text-[11px] text-zinc-400 mt-0.5">Media de paginas por sessao</p>
+              </div>
+            )}
+            {/* Distinct Users */}
+            {clarity.behavioral.distinctUsers > 0 && (
+              <div className="rounded-xl border border-zinc-200 bg-white p-4">
+                <p className="text-[11px] font-medium text-zinc-400 uppercase tracking-wide">Usuarios Unicos</p>
+                <p className="text-2xl font-bold text-zinc-900 mt-1">{clarity.behavioral.distinctUsers.toLocaleString("pt-BR")}</p>
+                <p className="text-[11px] text-zinc-400 mt-0.5">Visitantes distintos ({clarity.numDaysCovered} dias)</p>
+              </div>
+            )}
           </div>
+          {/* Clarity Dashboard link */}
+          {data?.clarityDashboardUrl && (
+            <div className="mt-3 flex items-center gap-2">
+              <a
+                href={data.clarityDashboardUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-800 font-medium"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                Abrir Clarity Dashboard (heatmaps e gravacoes)
+              </a>
+              <span className="text-[10px] text-zinc-400">Dados dos ultimos {clarity.numDaysCovered} dias</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -656,6 +771,8 @@ export default function CROPage() {
                   <th className="px-3 py-3 font-medium text-right">Dead Clicks</th>
                   <th className="px-3 py-3 font-medium text-right">Rage Clicks</th>
                   <th className="px-3 py-3 font-medium text-right">Quickbacks</th>
+                  <th className="px-3 py-3 font-medium text-right">Error Clicks</th>
+                  <th className="px-3 py-3 font-medium text-right">Scroll Exc.</th>
                   <th className="px-3 py-3 font-medium text-right">Scroll</th>
                   <th className="px-3 py-3 font-medium text-right">Trafego</th>
                   <th className="px-5 py-3 font-medium text-right">Engajamento</th>
@@ -693,6 +810,12 @@ export default function CROPage() {
                         )}
                       </td>
                       <td className="px-3 py-2.5 text-right text-xs text-zinc-600">{page.quickbacks}</td>
+                      <td className="px-3 py-2.5 text-right">
+                        <span className={`text-xs font-medium ${statusColors[errorClickStatus(page.errorClicks)].split(" ")[0]}`}>{page.errorClicks.toLocaleString("pt-BR")}</span>
+                      </td>
+                      <td className="px-3 py-2.5 text-right">
+                        <span className={`text-xs font-medium ${statusColors[excessiveScrollStatus(page.excessiveScrolls)].split(" ")[0]}`}>{page.excessiveScrolls}</span>
+                      </td>
                       <td className="px-3 py-2.5 text-right text-xs text-zinc-600">{page.scrollDepth.toFixed(0)}%</td>
                       <td className="px-3 py-2.5 text-right text-xs text-zinc-600">{page.traffic.toLocaleString("pt-BR")}</td>
                       <td className="px-5 py-2.5 text-right text-xs text-zinc-600">{formatEngagementTime(page.engagementTime)}</td>
@@ -825,18 +948,26 @@ export default function CROPage() {
                   const totalErrors = osTech.reduce((s, x) => s + x.scriptErrors, 0);
                   const errPct = totalErrors > 0 ? Math.round((t.scriptErrors / totalErrors) * 100) : 0;
                   return (
-                    <div key={t.name} className="flex items-center justify-between py-1.5 border-b border-zinc-50 last:border-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-zinc-700">{t.name}</span>
-                        <span className="text-[10px] text-zinc-400">{t.traffic.toLocaleString("pt-BR")} sess.</span>
-                      </div>
-                      <div className="flex items-center gap-3">
+                    <div key={t.name} className="py-1.5 border-b border-zinc-50 last:border-0">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-zinc-700">{t.name}</span>
+                          <span className="text-[10px] text-zinc-400">{t.traffic.toLocaleString("pt-BR")} sess.</span>
+                        </div>
                         <span className={`text-xs font-medium ${statusColors[scriptErrorStatus(t.scriptErrors)].split(" ")[0]}`}>
-                          {t.scriptErrors.toLocaleString("pt-BR")} erros ({errPct}%)
+                          {t.scriptErrors.toLocaleString("pt-BR")} erros JS ({errPct}%)
                         </span>
-                        {t.scriptErrorRate > 0 && (
-                          <span className="text-[10px] text-zinc-400">{t.scriptErrorRate}% sess.</span>
-                        )}
+                      </div>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className={`text-[10px] ${statusColors[deadClickStatus(t.deadClicks)].split(" ")[0]}`}>
+                          {t.deadClicks.toLocaleString("pt-BR")} dead clicks
+                        </span>
+                        <span className={`text-[10px] ${statusColors[rageClickStatus(t.rageClicks)].split(" ")[0]}`}>
+                          {t.rageClicks.toLocaleString("pt-BR")} rage clicks
+                        </span>
+                        <span className="text-[10px] text-zinc-400">
+                          Scroll {t.scrollDepth.toFixed(0)}%
+                        </span>
                       </div>
                     </div>
                   );
@@ -851,18 +982,26 @@ export default function CROPage() {
                   const totalErrors = browserTech.reduce((s, x) => s + x.scriptErrors, 0);
                   const errPct = totalErrors > 0 ? Math.round((t.scriptErrors / totalErrors) * 100) : 0;
                   return (
-                    <div key={t.name} className="flex items-center justify-between py-1.5 border-b border-zinc-50 last:border-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-zinc-700">{t.name}</span>
-                        <span className="text-[10px] text-zinc-400">{t.traffic.toLocaleString("pt-BR")} sess.</span>
-                      </div>
-                      <div className="flex items-center gap-3">
+                    <div key={t.name} className="py-1.5 border-b border-zinc-50 last:border-0">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-zinc-700">{t.name}</span>
+                          <span className="text-[10px] text-zinc-400">{t.traffic.toLocaleString("pt-BR")} sess.</span>
+                        </div>
                         <span className={`text-xs font-medium ${statusColors[scriptErrorStatus(t.scriptErrors)].split(" ")[0]}`}>
-                          {t.scriptErrors.toLocaleString("pt-BR")} erros ({errPct}%)
+                          {t.scriptErrors.toLocaleString("pt-BR")} erros JS ({errPct}%)
                         </span>
-                        {t.scriptErrorRate > 0 && (
-                          <span className="text-[10px] text-zinc-400">{t.scriptErrorRate}% sess.</span>
-                        )}
+                      </div>
+                      <div className="flex items-center gap-3 mt-1">
+                        <span className={`text-[10px] ${statusColors[deadClickStatus(t.deadClicks)].split(" ")[0]}`}>
+                          {t.deadClicks.toLocaleString("pt-BR")} dead clicks
+                        </span>
+                        <span className={`text-[10px] ${statusColors[rageClickStatus(t.rageClicks)].split(" ")[0]}`}>
+                          {t.rageClicks.toLocaleString("pt-BR")} rage clicks
+                        </span>
+                        <span className="text-[10px] text-zinc-400">
+                          Scroll {t.scrollDepth.toFixed(0)}%
+                        </span>
                       </div>
                     </div>
                   );
@@ -927,6 +1066,18 @@ export default function CROPage() {
                       <span className="text-zinc-500">Engajamento</span>
                       <span className="font-medium text-zinc-700">{formatEngagementTime(dev.engagementTime)}</span>
                     </div>
+                    {dev.distinctUsers > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-zinc-500">Usuarios Unicos</span>
+                        <span className="font-medium text-zinc-700">{dev.distinctUsers.toLocaleString("pt-BR")}</span>
+                      </div>
+                    )}
+                    {dev.errorClicks > 0 && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-zinc-500">Error Clicks</span>
+                        <span className={`font-medium ${statusColors[errorClickStatus(dev.errorClicks)].split(" ")[0]}`}>{dev.errorClicks.toLocaleString("pt-BR")}</span>
+                      </div>
+                    )}
                     {botPct > 0 && (
                       <div className="flex justify-between text-xs">
                         <span className="text-zinc-500">Bots</span>

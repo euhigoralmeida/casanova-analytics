@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
 import { fetchEcommerceFunnel, fetchGA4Summary, fetchGA4FunnelTimeSeries, fetchChannelAcquisition } from "@/lib/ga4-queries";
-import { isClarityConfigured, getClarityDashboardUrl, fetchClarityInsights } from "@/lib/clarity";
+import { isClarityConfigured, getClarityDashboardUrl, getClarityFromDB } from "@/lib/clarity";
 import { requireAuth } from "@/lib/api-helpers";
 import type { CRODataResponse } from "@/types/api";
 
@@ -35,14 +35,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    // Parallel fetch: GA4 + Clarity
-    const [ga4Result, clarityResult] = await Promise.all([
+    // Parallel fetch: GA4 (live) + Clarity (from DB snapshot)
+    const [ga4Result, claritySnapshot] = await Promise.all([
       ga4Ready ? fetchGA4Data(startDate, endDate) : Promise.resolve(null),
-      clarityReady ? fetchClarityInsights(3) : Promise.resolve(null),
+      clarityReady ? getClarityFromDB("default", 3) : Promise.resolve(null),
     ]);
 
-    // Clarity with real data?
-    const clarityHasData = clarityResult && clarityResult.source === "clarity";
+    // Clarity has data in DB?
+    const clarityHasData = !!claritySnapshot;
+    const clarityResult = claritySnapshot?.data ?? null;
 
     const source: CRODataResponse["source"] =
       ga4Result && clarityHasData ? "full" :
@@ -63,10 +64,13 @@ export async function GET(request: NextRequest) {
       response.channelAcquisition = ga4Result.channelAcquisition;
     }
 
-    // Always pass clarity result so frontend can show rate_limited/not_configured message
+    if (clarityReady) {
+      response.clarityConfigured = true;
+    }
     if (clarityResult) {
       response.clarity = clarityResult;
       response.clarityDashboardUrl = getClarityDashboardUrl();
+      response.clarityFetchedAt = claritySnapshot!.fetchedAt.toISOString();
     }
 
     return NextResponse.json(response);
