@@ -229,7 +229,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json(buildMockOverview(period, targets));
 }
 
-function buildMockOverview(period: string, targets: { revenueTarget: number; roasTarget: number; marginTarget: number }) {
+function buildMockOverview(period: string, targets: PlanningTargets) {
   const m = periodMultiplier[period] ?? 1;
 
   let totalRevenue = 0;
@@ -278,18 +278,35 @@ function buildMockOverview(period: string, targets: { revenueTarget: number; roa
   const roasActual = +(totalRevenue / totalAds).toFixed(2);
   const marginActual = +(marginSum / skuCount).toFixed(1);
 
+  const totalImpressions = skus.reduce((s, sk) => s + sk.impressions, 0);
+  const totalClicks = skus.reduce((s, sk) => s + sk.clicks, 0);
+  const totalConversions = skus.reduce((s, sk) => s + sk.conversions, 0);
+
   return {
     period,
     source: "mock",
     updatedAt: new Date().toISOString(),
     totalSkus: skuCount,
+    accountTotals: {
+      ads: totalAds,
+      impressions: totalImpressions,
+      clicks: totalClicks,
+      conversions: totalConversions,
+      revenue: totalRevenue,
+    },
     meta: {
       revenueTarget: targets.revenueTarget,
+      revenueCaptadaTarget: targets.revenueCaptadaTarget,
       revenueActual: totalRevenue,
+      adsTarget: targets.adsTarget,
+      adsActual: totalAds,
       roasTarget: targets.roasTarget,
       roasActual,
       marginTarget: targets.marginTarget,
       marginActual,
+      approvalRate: targets.approvalRate,
+      pedidosCaptadosTarget: targets.pedidosCaptadosTarget,
+      ticketMedioTarget: targets.ticketMedioTarget,
     },
     skus,
   };

@@ -448,6 +448,62 @@ export async function fetchGA4Geographic(
 }
 
 /* =========================
+   Device Category Query (GA4)
+========================= */
+
+export type GA4DeviceRow = {
+  device: string;
+  users: number;
+  sessions: number;
+  conversions: number;
+  revenue: number;
+};
+
+const GA4_DEVICE_LABELS: Record<string, string> = {
+  desktop: "DESKTOP",
+  mobile: "MOBILE",
+  tablet: "TABLET",
+};
+
+export async function fetchGA4Devices(
+  client: BetaAnalyticsDataClient,
+  startDate: string,
+  endDate: string,
+): Promise<GA4DeviceRow[]> {
+  const cacheKey = `ga4dev:${startDate}:${endDate}`;
+  const cached = getGA4Cached<GA4DeviceRow[]>(cacheKey);
+  if (cached) return cached;
+
+  const [response] = await client.runReport({
+    property: getPropertyId(),
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: "deviceCategory" }],
+    metrics: [
+      { name: "totalUsers" },
+      { name: "sessions" },
+      { name: "ecommercePurchases" },
+      { name: "purchaseRevenue" },
+    ],
+    orderBys: [{ metric: { metricName: "purchaseRevenue" }, desc: true }],
+  });
+
+  const rows: GA4DeviceRow[] = (response.rows ?? []).map((row) => {
+    const rawDevice = row.dimensionValues?.[0]?.value ?? "unknown";
+    const vals = (row.metricValues ?? []).map((v) => parseFloat(v.value ?? "0"));
+    return {
+      device: GA4_DEVICE_LABELS[rawDevice] ?? rawDevice.toUpperCase(),
+      users: Math.round(vals[0] ?? 0),
+      sessions: Math.round(vals[1] ?? 0),
+      conversions: Math.round(vals[2] ?? 0),
+      revenue: Math.round((vals[3] ?? 0) * 100) / 100,
+    };
+  });
+
+  setGA4Cache(cacheKey, rows);
+  return rows;
+}
+
+/* =========================
    Channel Acquisition Query
 ========================= */
 

@@ -66,7 +66,9 @@ export function SegmentationSummary({ segmentation, compact }: SegmentationSumma
   if (!hasDevices && !hasDemographics && !hasGeographic) return null;
 
   // Device analysis
-  const sortedDevices = [...devices].sort((a, b) => b.roas - a.roas);
+  const deviceHasCost = devices.some((d) => d.costBRL > 0);
+  const deviceSorter = deviceHasCost ? (a: DeviceSlice, b: DeviceSlice) => b.roas - a.roas : (a: DeviceSlice, b: DeviceSlice) => b.revenue - a.revenue;
+  const sortedDevices = [...devices].sort(deviceSorter);
   const bestDevice = sortedDevices[0];
   const totalDeviceRevenue = devices.reduce((s, d) => s + d.revenue, 0);
 
@@ -110,9 +112,15 @@ export function SegmentationSummary({ segmentation, compact }: SegmentationSumma
                   <span className="text-sm font-semibold text-zinc-900">
                     {DEVICE_LABELS[bestDevice.device] ?? bestDevice.device}
                   </span>
-                  <span className={`text-sm font-bold ${roasColor(bestDevice.roas)}`}>
-                    ROAS {bestDevice.roas.toFixed(1)}
-                  </span>
+                  {deviceHasCost ? (
+                    <span className={`text-sm font-bold ${roasColor(bestDevice.roas)}`}>
+                      ROAS {bestDevice.roas.toFixed(1)}
+                    </span>
+                  ) : (
+                    <span className="text-sm font-bold text-blue-600">
+                      {formatBRL(bestDevice.revenue)}
+                    </span>
+                  )}
                 </div>
                 <p className="text-[10px] text-zinc-400 mt-0.5">
                   {formatBRL(bestDevice.revenue)} ({bestDevice.revenueShare.toFixed(0)}% da receita)

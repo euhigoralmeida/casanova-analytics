@@ -15,6 +15,11 @@ import { prisma } from "@/lib/db";
 import { computeTargetMonth } from "@/lib/planning-target-calc";
 import { formatBRL } from "@/lib/format";
 import { isClarityConfigured, fetchClarityInsights } from "@/lib/clarity";
+import { isGSCConfigured } from "@/lib/google-search-console";
+import { fetchKeywordMetrics, fetchPageMetrics } from "@/lib/gsc-queries";
+import { isConfigured as isAdsConfigured, getCustomer, computeComparisonDates } from "@/lib/google-ads";
+import { fetchSearchTerms } from "@/lib/queries";
+import { detectCannibalization } from "@/lib/organic-cannibalization";
 
 export async function buildStrategicBrief(
   tenantId: string,
@@ -27,13 +32,14 @@ export async function buildStrategicBrief(
   sections.push(buildPeriodContext(startDate, endDate));
   sections.push("");
 
-  // Parallel fetches: cognitive + GA4 + planning + action history + clarity
-  const [cognitive, ga4Extras, planningSection, actionsSection, clarityData] = await Promise.all([
+  // Parallel fetches: cognitive + GA4 + planning + action history + clarity + organic
+  const [cognitive, ga4Extras, planningSection, actionsSection, clarityData, organicSection] = await Promise.all([
     fetchCognitiveDirectly(tenantId, startDate, endDate).catch(() => null),
     fetchGA4Extras(startDate, endDate),
     fetchPlanningTargets(tenantId),
     fetchRecentActions(tenantId),
     isClarityConfigured() ? fetchClarityInsights(3).catch(() => null) : Promise.resolve(null),
+    fetchOrganicSection(startDate, endDate),
   ]);
 
   // 1. AQUISICAO — from cognitive engine
@@ -164,6 +170,12 @@ export async function buildStrategicBrief(
     sections.push("");
   }
 
+  // 5.5 ORGANICO (SEO)
+  if (organicSection) {
+    sections.push(organicSection);
+    sections.push("");
+  }
+
   // 6. METAS vs REAL
   if (planningSection) {
     sections.push(planningSection);
@@ -270,6 +282,73 @@ async function fetchMetaAdsSection(startDate: string, endDate: string): Promise<
     return lines.join("\n");
   } catch (err) {
     console.error("Error fetching Meta Ads for brief:", err);
+    return null;
+  }
+}
+
+async function fetchOrganicSection(startDate: string, endDate: string): Promise<string | null> {
+  try {
+    if (!isGSCConfigured()) return null;
+
+    const [keywords, pages] = await Promise.all([
+      fetchKeywordMetrics(startDate, endDate).catch(() => []),
+      fetchPageMetrics(startDate, endDate).catch(() => []),
+    ]);
+
+    if (keywords.length === 0 && pages.length === 0) return null;
+
+    const totalClicks = keywords.reduce((s, k) => s + k.clicks, 0);
+    const totalImpressions = keywords.reduce((s, k) => s + k.impressions, 0);
+    const avgPosition = keywords.length > 0
+      ? keywords.reduce((s, k) => s + k.position * k.impressions, 0) / Math.max(1, totalImpressions)
+      : 0;
+
+    const lines: string[] = ["## ORGANICO (SEO)"];
+    lines.push(`Total cliques organicos: ${totalClicks.toLocaleString("pt-BR")} | Impressoes: ${totalImpressions.toLocaleString("pt-BR")} | Posicao media: ${avgPosition.toFixed(1)}`);
+
+    // Top keywords
+    const topKw = [...keywords].sort((a, b) => b.clicks - a.clicks).slice(0, 10);
+    if (topKw.length > 0) {
+      lines.push("Top keywords por cliques:");
+      for (const k of topKw) {
+        lines.push(`- "${k.query}": pos ${k.position.toFixed(1)}, ${k.clicks} cliques, ${k.impressions} impressoes, CTR ${(k.ctr * 100).toFixed(1)}%`);
+      }
+    }
+
+    // Top pages
+    const topPages = [...pages].sort((a, b) => b.clicks - a.clicks).slice(0, 5);
+    if (topPages.length > 0) {
+      lines.push("Top paginas organicas:");
+      for (const p of topPages) {
+        let path = p.page;
+        try { path = new URL(p.page).pathname; } catch { /* ignore */ }
+        lines.push(`- ${path}: pos ${p.position.toFixed(1)}, ${p.clicks} cliques, ${p.impressions} impressoes`);
+      }
+    }
+
+    // Cannibalization summary
+    if (isAdsConfigured()) {
+      try {
+        const { prevStart, prevEnd } = computeComparisonDates(startDate, endDate);
+        void prevStart;
+        void prevEnd;
+        const customer = getCustomer();
+        const adsTerms = await fetchSearchTerms(customer, startDate, endDate);
+        const cannibal = detectCannibalization(keywords, adsTerms);
+        if (cannibal.length > 0) {
+          const totalSavings = cannibal.reduce((s, c) => s + c.estimatedSavingsBRL, 0);
+          const fullCount = cannibal.filter((c) => c.type === "full_cannibal").length;
+          lines.push(`Canibalizacao SEO x Ads: ${cannibal.length} overlaps detectados (${fullCount} canibalizacao total), economia potencial: ${formatBRL(totalSavings)}`);
+          for (const c of cannibal.slice(0, 3)) {
+            lines.push(`- "${c.keyword}": pos org ${c.organicPosition.toFixed(0)}, custo pago ${formatBRL(c.paidCostBRL)}, tipo ${c.type}, economia ${formatBRL(c.estimatedSavingsBRL)}`);
+          }
+        }
+      } catch { /* ignore ads errors */ }
+    }
+
+    return lines.join("\n");
+  } catch (err) {
+    console.error("Error fetching organic section for brief:", err);
     return null;
   }
 }

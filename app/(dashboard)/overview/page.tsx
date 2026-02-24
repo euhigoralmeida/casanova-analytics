@@ -5,7 +5,7 @@ import type { DateRange, OverviewResponse, SmartAlertsResponse, TimeSeriesRespon
 import { useDateRange } from "@/hooks/use-date-range";
 import type { IntelligenceResponse } from "@/lib/intelligence/types";
 import type { CognitiveResponse } from "@/lib/intelligence/communication/types";
-import { defaultRange, smartAlertStyles } from "@/lib/constants";
+import { defaultRange } from "@/lib/constants";
 import { formatBRL, fmtDateSlash } from "@/lib/format";
 import DateRangePicker from "@/components/ui/date-range-picker";
 import ChartsSection from "@/components/charts/charts-section";
@@ -14,13 +14,13 @@ import { KpiSkeleton, AlertsSkeleton, ChartSkeleton } from "@/components/ui/skel
 import { BudgetPlanCard } from "@/components/intelligence/budget-plan-card";
 import { SegmentationSummary } from "@/components/intelligence/segmentation-summary";
 import { StrategicAdvisorCard } from "@/components/intelligence/strategic-advisor-card";
-import { RefreshCw, ChevronRight } from "lucide-react";
-import Link from "next/link";
+import AiInsights from "@/components/intelligence/ai-insights";
+import { RefreshCw } from "lucide-react";
 
 export default function VisaoGeralPage() {
   const { dateRange, setDateRange, buildParams } = useDateRange();
   const [overview, setOverview] = useState<OverviewResponse | null>(null);
-  const [smartAlerts, setSmartAlerts] = useState<SmartAlertsResponse | null>(null);
+  const [, setSmartAlerts] = useState<SmartAlertsResponse | null>(null);
   const [timeseries, setTimeseries] = useState<TimeSeriesResponse | null>(null);
   const [ga4Data, setGa4Data] = useState<GA4DataResponse | null>(null);
   const [intelligence, setIntelligence] = useState<IntelligenceResponse & Partial<CognitiveResponse> | null>(null);
@@ -68,11 +68,6 @@ export default function VisaoGeralPage() {
   }
 
   const acct = overview?.accountTotals;
-  // Top 5 alerts sorted by severity
-  const severityOrder: Record<string, number> = { danger: 0, warn: 1, info: 2, success: 3 };
-  const topAlerts = smartAlerts
-    ? [...smartAlerts.alerts].sort((a, b) => (severityOrder[a.severity] ?? 2) - (severityOrder[b.severity] ?? 2)).slice(0, 5)
-    : [];
 
   return (
     <div className="px-4 sm:px-6 py-6 space-y-6">
@@ -125,7 +120,7 @@ export default function VisaoGeralPage() {
         </>
       )}
 
-      {/* ─── ROW 2: KPI Cards — cores unificadas via progress bar ─── */}
+      {/* ─── ROW 2: KPI Cards ─── */}
       {overview && acct && !loading && (() => {
         const ltvValue = retention?.summary
           ? (retention.summary.purchasers > 0 ? retention.summary.revenue / retention.summary.purchasers : 0)
@@ -189,61 +184,21 @@ export default function VisaoGeralPage() {
               title="LTV Médio"
               value={ltvValue !== null ? formatBRL(ltvValue) : "—"}
               subtitle={retention?.summary
-                ? <>Taxa retorno: {returnRate.toFixed(1).replace(".", ",")}%<br />{retention.summary.purchasers.toLocaleString("pt-BR")} compradores</>
+                ? `Taxa retorno: ${returnRate.toFixed(1).replace(".", ",")}% · ${retention.summary.purchasers.toLocaleString("pt-BR")} compradores`
                 : "Carregando..."}
             />
           </div>
         );
       })()}
 
-      {/* ─── ROW 3: Consultor Estratégico (IA proativa cross-domain) ─── */}
+      {/* ─── ROW 3: Consultor Estratégico ─── */}
       {!loading && (
         <StrategicAdvisorCard startDate={dateRange.startDate} endDate={dateRange.endDate} />
       )}
 
-      {/* ─── ROW 4: Alertas compactos ─── */}
-      {overview && !loading && (
-        <div className="rounded-2xl border border-zinc-200 bg-white overflow-hidden">
-          <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-100 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-zinc-800">Alertas</h3>
-            {smartAlerts && smartAlerts.summary.danger > 0 && (
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-semibold">
-                {smartAlerts.summary.danger} crítico{smartAlerts.summary.danger > 1 ? "s" : ""}
-              </span>
-            )}
-          </div>
-          {topAlerts.length > 0 ? (
-            <div className="divide-y divide-zinc-50">
-              {topAlerts.map((alert) => {
-                const sc = smartAlertStyles[alert.severity];
-                return (
-                  <div key={alert.id} className="flex items-center gap-2.5 px-5 py-2.5">
-                    <span className="flex-shrink-0 text-sm">{sc.icon}</span>
-                    <span className={`text-sm font-medium truncate flex-1 ${sc.text}`}>
-                      {alert.title}
-                    </span>
-                    {alert.deltaPct !== 0 && (
-                      <span className={`flex-shrink-0 text-[11px] font-mono px-2 py-0.5 rounded-md ${alert.deltaPct < 0 ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"}`}>
-                        {alert.deltaPct < 0 ? "↓" : "↑"} {Math.abs(alert.deltaPct)}%
-                      </span>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="px-5 py-4">
-              <p className="text-sm text-zinc-400">Nenhum alerta no período</p>
-            </div>
-          )}
-          {smartAlerts && smartAlerts.alerts.length > 5 && (
-            <div className="px-5 py-2.5 border-t border-zinc-100">
-              <Link href="/alerts" className="text-xs text-blue-600 hover:text-blue-700 font-medium flex items-center gap-0.5">
-                Ver todos os {smartAlerts.alerts.length} alertas <ChevronRight className="h-3 w-3" />
-              </Link>
-            </div>
-          )}
-        </div>
+      {/* ─── ROW 4: Resumo IA ─── */}
+      {!loading && (
+        <AiInsights startDate={dateRange.startDate} endDate={dateRange.endDate} />
       )}
 
       {/* ─── ROW 5: Gráficos (7 abas) ─── */}
@@ -251,20 +206,15 @@ export default function VisaoGeralPage() {
         <ChartsSection data={timeseries} ga4Data={ga4Data} />
       )}
 
-      {/* ─── ROW 6: Segmentação + Budget lado a lado ─── */}
-      {(intelligence?.segmentation || intelligence?.budgetPlan) && !loading && (() => {
-        const hasBothBottomPanels = !!intelligence?.segmentation && !!intelligence?.budgetPlan;
-        return (
-          <div className={`grid gap-6 ${hasBothBottomPanels ? "lg:grid-cols-2" : ""}`}>
-            {intelligence.segmentation && (
-              <SegmentationSummary segmentation={intelligence.segmentation} compact={hasBothBottomPanels} />
-            )}
-            {intelligence.budgetPlan && (
-              <BudgetPlanCard plan={intelligence.budgetPlan} />
-            )}
-          </div>
-        );
-      })()}
+      {/* ─── ROW 6: Segmentação (Dispositivo, Demografia, Geografia) ─── */}
+      {intelligence?.segmentation && !loading && (
+        <SegmentationSummary segmentation={intelligence.segmentation} />
+      )}
+
+      {/* ─── ROW 7: Budget Optimization ─── */}
+      {intelligence?.budgetPlan && !loading && (
+        <BudgetPlanCard plan={intelligence.budgetPlan} />
+      )}
     </div>
   );
 }

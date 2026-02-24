@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db";
 import { isConfigured, getCustomer } from "@/lib/google-ads";
 import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
 import { fetchAllSkuMetrics, fetchAccountTotals, fetchAllCampaignMetrics, fetchDeviceMetrics } from "@/lib/queries";
-import { fetchGA4Summary, fetchChannelAcquisition, fetchGA4Demographics, fetchGA4Geographic } from "@/lib/ga4-queries";
+import { fetchGA4Summary, fetchChannelAcquisition, fetchGA4Demographics, fetchGA4Geographic, fetchGA4Devices } from "@/lib/ga4-queries";
 import { computeTargetMonth } from "@/lib/planning-target-calc";
 import { analyzeCognitive } from "@/lib/intelligence/cognitive-engine";
 import { loadSkuExtras } from "@/lib/sku-master";
@@ -158,11 +158,12 @@ export async function GET(req: NextRequest) {
   if (isGA4Configured()) {
     try {
       const ga4Client = getGA4Client();
-      const [summary, channelData, ga4Demo, ga4Geo] = await Promise.all([
+      const [summary, channelData, ga4Demo, ga4Geo, ga4Dev] = await Promise.all([
         fetchGA4Summary(ga4Client, startDate ?? "", endDate ?? ""),
         fetchChannelAcquisition(ga4Client, startDate ?? "", endDate ?? ""),
         fetchGA4Demographics(ga4Client, startDate ?? "", endDate ?? "").catch(() => []),
         fetchGA4Geographic(ga4Client, startDate ?? "", endDate ?? "").catch(() => []),
+        fetchGA4Devices(ga4Client, startDate ?? "", endDate ?? "").catch(() => []),
       ]);
 
       ga4 = {
@@ -195,6 +196,18 @@ export async function GET(req: NextRequest) {
           revenue: d.revenue,
           sessions: d.sessions,
           users: d.users,
+        }));
+      }
+
+      // Devices from GA4 (fallback when Google Ads device data is empty)
+      if (devices.length === 0 && ga4Dev.length > 0) {
+        devices = ga4Dev.map((d) => ({
+          device: d.device,
+          impressions: 0,
+          clicks: 0,
+          costBRL: 0,
+          conversions: d.conversions,
+          revenue: d.revenue,
         }));
       }
 

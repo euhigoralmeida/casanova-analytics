@@ -920,3 +920,68 @@ export async function fetchCampaignTimeSeries(
   setCache(cacheKey, resultCamp);
   return resultCamp;
 }
+
+/* =========================
+   Tipos: search terms (para canibalizacao organica)
+========================= */
+
+export type AdsSearchTerm = {
+  searchTerm: string;
+  campaignName: string;
+  impressions: number;
+  clicks: number;
+  costBRL: number;
+  conversions: number;
+  revenue: number;
+};
+
+/* =========================
+   Query: search terms (search_term_view)
+========================= */
+
+export async function fetchSearchTerms(
+  customer: Customer,
+  startDate: string,
+  endDate: string,
+): Promise<AdsSearchTerm[]> {
+  const cacheKey = `search-terms:${startDate}:${endDate}`;
+  const cached = getCached<AdsSearchTerm[]>(cacheKey);
+  if (cached) return cached;
+
+  const dateClause = buildDateClause("custom", startDate, endDate);
+
+  const rows = await customer.query(`
+    SELECT
+      search_term_view.search_term,
+      campaign.name,
+      metrics.impressions,
+      metrics.clicks,
+      metrics.cost_micros,
+      metrics.conversions,
+      metrics.conversions_value
+    FROM search_term_view
+    WHERE ${dateClause}
+      AND campaign.status != 'REMOVED'
+    ORDER BY metrics.impressions DESC
+    LIMIT 5000
+  `);
+
+  const result: AdsSearchTerm[] = [];
+
+  for (const row of rows) {
+    const r = row as Record<string, Record<string, unknown>>;
+    const costBRL = ((r.metrics?.cost_micros as number) || 0) / 1_000_000;
+    result.push({
+      searchTerm: (r.search_term_view?.search_term as string) || "",
+      campaignName: (r.campaign?.name as string) || "",
+      impressions: (r.metrics?.impressions as number) || 0,
+      clicks: (r.metrics?.clicks as number) || 0,
+      costBRL: Math.round(costBRL * 100) / 100,
+      conversions: (r.metrics?.conversions as number) || 0,
+      revenue: Math.round(((r.metrics?.conversions_value as number) || 0) * 100) / 100,
+    });
+  }
+
+  setCache(cacheKey, result);
+  return result;
+}

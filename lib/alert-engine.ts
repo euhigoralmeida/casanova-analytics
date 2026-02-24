@@ -580,6 +580,96 @@ function computeRetentionAlerts(summary: RetentionSummary): SmartAlert[] {
    Orquestrador
 ========================= */
 
+/* =========================
+   Alertas Organicos (SEO)
+========================= */
+
+export type OrganicAlertInput = {
+  totalClicks: number;
+  totalImpressions: number;
+  avgPosition: number;
+  prevTotalClicks?: number;
+  prevAvgPosition?: number;
+  cannibalizationSavings?: number;
+  cannibalizationCount?: number;
+};
+
+function computeOrganicAlerts(input: OrganicAlertInput): SmartAlert[] {
+  const alerts: SmartAlert[] = [];
+
+  // Organic traffic decline
+  if (input.prevTotalClicks && input.prevTotalClicks > 0) {
+    const clicksDelta = pctDelta(input.totalClicks, input.prevTotalClicks);
+    if (clicksDelta <= -20) {
+      alerts.push({
+        id: "organic-clicks-drop",
+        category: "trend",
+        severity: "danger",
+        title: `Trafego organico caiu ${fmtPct(clicksDelta)} vs periodo anterior`,
+        description: `Cliques organicos: ${input.totalClicks.toLocaleString("pt-BR")} vs anterior: ${input.prevTotalClicks.toLocaleString("pt-BR")}.`,
+        metric: "organic_clicks",
+        currentValue: input.totalClicks,
+        previousValue: input.prevTotalClicks,
+        deltaPct: Math.round(clicksDelta),
+        recommendation: "Verificar quedas de posicao em keywords de alto valor e mudancas no algoritmo do Google",
+      });
+    } else if (clicksDelta <= -10) {
+      alerts.push({
+        id: "organic-clicks-warn",
+        category: "trend",
+        severity: "warn",
+        title: `Trafego organico em queda: ${fmtPct(clicksDelta)}`,
+        description: `Cliques organicos caiu de ${input.prevTotalClicks.toLocaleString("pt-BR")} para ${input.totalClicks.toLocaleString("pt-BR")}.`,
+        metric: "organic_clicks",
+        currentValue: input.totalClicks,
+        previousValue: input.prevTotalClicks,
+        deltaPct: Math.round(clicksDelta),
+      });
+    }
+  }
+
+  // Position drop
+  if (input.prevAvgPosition && input.prevAvgPosition > 0) {
+    const posDrop = input.avgPosition - input.prevAvgPosition;
+    if (posDrop > 3) {
+      alerts.push({
+        id: "organic-position-drop",
+        category: "trend",
+        severity: "warn",
+        title: `Posicao media organica caiu ${posDrop.toFixed(1)} posicoes`,
+        description: `Posicao media: ${input.avgPosition.toFixed(1)} vs anterior: ${input.prevAvgPosition.toFixed(1)}.`,
+        metric: "organic_position",
+        currentValue: Math.round(input.avgPosition * 10) / 10,
+        previousValue: Math.round(input.prevAvgPosition * 10) / 10,
+        deltaPct: 0,
+        recommendation: "Investigar keywords com maior queda e verificar concorrentes novos",
+      });
+    }
+  }
+
+  // New cannibalization detected
+  if (input.cannibalizationCount && input.cannibalizationCount > 0 && input.cannibalizationSavings && input.cannibalizationSavings > 50) {
+    alerts.push({
+      id: "organic-cannibalization",
+      category: "account",
+      severity: "warn",
+      title: `Canibalizacao SEO x Ads: economia potencial de ${fmtBRL(input.cannibalizationSavings)}`,
+      description: `${input.cannibalizationCount} keywords competem organicamente e no Google Ads simultaneamente.`,
+      metric: "cannibalization",
+      currentValue: input.cannibalizationSavings,
+      previousValue: 0,
+      deltaPct: 0,
+      recommendation: "Revisar lances pagos em keywords com posicao organica <= 3",
+    });
+  }
+
+  return alerts;
+}
+
+/* =========================
+   Orquestrador
+========================= */
+
 const SEVERITY_ORDER: Record<string, number> = { danger: 0, warn: 1, info: 2, success: 3 };
 
 export function computeAllSmartAlerts(
@@ -591,6 +681,7 @@ export function computeAllSmartAlerts(
   previousSkus: SkuMetrics[],
   dailyTimeSeries: DailyMetrics[],
   retentionSummary?: RetentionSummary,
+  organicInput?: OrganicAlertInput,
 ): SmartAlert[] {
   const all = [
     ...computeAccountAlerts(currentAccount, previousAccount),
@@ -598,6 +689,7 @@ export function computeAllSmartAlerts(
     ...computeSkuAlerts(currentSkus, previousSkus),
     ...computeTrendAlerts(dailyTimeSeries),
     ...(retentionSummary ? computeRetentionAlerts(retentionSummary) : []),
+    ...(organicInput ? computeOrganicAlerts(organicInput) : []),
   ];
 
   all.sort((a, b) => (SEVERITY_ORDER[a.severity] ?? 2) - (SEVERITY_ORDER[b.severity] ?? 2));
