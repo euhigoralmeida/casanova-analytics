@@ -14,7 +14,6 @@ import { KpiSkeleton, AlertsSkeleton, ChartSkeleton } from "@/components/ui/skel
 import { BudgetPlanCard } from "@/components/intelligence/budget-plan-card";
 import { SegmentationSummary } from "@/components/intelligence/segmentation-summary";
 import { StrategicAdvisorCard } from "@/components/intelligence/strategic-advisor-card";
-import AiInsights from "@/components/intelligence/ai-insights";
 import { RefreshCw } from "lucide-react";
 
 export default function VisaoGeralPage() {
@@ -196,12 +195,7 @@ export default function VisaoGeralPage() {
         <StrategicAdvisorCard startDate={dateRange.startDate} endDate={dateRange.endDate} />
       )}
 
-      {/* ─── ROW 4: Resumo IA ─── */}
-      {!loading && (
-        <AiInsights startDate={dateRange.startDate} endDate={dateRange.endDate} />
-      )}
-
-      {/* ─── ROW 5: Gráficos (7 abas) ─── */}
+      {/* ─── ROW 4: Gráficos (7 abas) ─── */}
       {timeseries && timeseries.series.length > 1 && !loading && (
         <ChartsSection data={timeseries} ga4Data={ga4Data} />
       )}
