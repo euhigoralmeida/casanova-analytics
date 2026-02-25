@@ -30,6 +30,7 @@ export default function LoginPage() {
       }
 
       localStorage.setItem("ca_tenant", JSON.stringify(data.tenant));
+      localStorage.setItem("ca_user", JSON.stringify(data.user));
       router.push("/overview");
     } catch {
       setError("Erro de conexão");
@@ -45,11 +46,12 @@ export default function LoginPage() {
           {/* Logo */}
           <div className="flex justify-center mb-6">
             <Image
-              src="/logo-casanova.png"
-              alt="Casanova Analytics"
+              src="/logo-fivep.png"
+              alt="FiveP Analytics"
               width={180}
               height={48}
               priority
+              className="object-contain"
             />
           </div>
 
@@ -108,7 +110,7 @@ export default function LoginPage() {
         </div>
 
         <p className="text-xs text-zinc-400 text-center mt-4">
-          Casanova Analytics v1.0
+          FiveP Analytics
         </p>
       </div>
     </div>

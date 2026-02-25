@@ -1,5 +1,5 @@
 /**
- * Seed script: migrates the hardcoded "casanova" tenant to the database.
+ * Seed script: creates/updates tenants and users in the database.
  *
  * Run: npx tsx prisma/seed-tenant.ts
  *
@@ -63,6 +63,34 @@ async function main() {
       console.log(`  ✓ Migrated ${result.count} ${name} records from "default" to "${tenant.id}"`);
     }
   }
+
+  // ─── FiveP Agency (platform admin) ───
+  console.log("\n🌱 Seeding tenant: fivep...");
+
+  const fivepTenant = await prisma.tenant.upsert({
+    where: { slug: "fivep" },
+    update: { name: "FiveP Agency" },
+    create: {
+      name: "FiveP Agency",
+      slug: "fivep",
+      plan: "enterprise",
+    },
+  });
+  console.log(`  ✓ Tenant: ${fivepTenant.name} (${fivepTenant.id})`);
+
+  const fivepUser = await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: fivepTenant.id, email: "contato@fivep.com.br" } },
+    update: { name: "Higo Almeida", role: "admin", globalRole: "platform_admin" },
+    create: {
+      email: "contato@fivep.com.br",
+      name: "Higo Almeida",
+      role: "admin",
+      globalRole: "platform_admin",
+      passwordHash: "$2b$10$BP4iT6uj62HBkZ5COZ7IeuTVTsShRHW2T4ofZzIqv8GKy1lF1AEQG",
+      tenantId: fivepTenant.id,
+    },
+  });
+  console.log(`  ✓ User: ${fivepUser.email} (${fivepUser.role}, globalRole: platform_admin)`);
 
   console.log("\n✅ Seed completed successfully!");
 }

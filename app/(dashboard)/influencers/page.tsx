@@ -150,7 +150,7 @@ export default function InfluencersPage() {
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
-          <h2 className="text-lg font-bold text-zinc-900">Influenciadores <span className="text-xs font-medium text-zinc-400 ml-1">(Beta)</span></h2>
+          <h2 className="text-lg font-bold text-zinc-900">Influenciadores</h2>
           <p className="text-xs text-zinc-500">Busque um perfil do Instagram para analisar métricas públicas</p>
         </div>
         {data && (

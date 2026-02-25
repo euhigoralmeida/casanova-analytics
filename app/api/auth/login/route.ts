@@ -15,11 +15,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email ou senha inválidos" }, { status: 401 });
     }
 
-    const token = createSessionToken(result.tenant.id, result.user.email, result.user.role);
+    const token = createSessionToken(result.tenant.id, result.user.email, result.user.role, {
+      globalRole: result.user.globalRole,
+    });
 
     const response = NextResponse.json({
       ok: true,
-      user: { email: result.user.email, name: result.user.name, role: result.user.role },
+      user: {
+        email: result.user.email,
+        name: result.user.name,
+        role: result.user.role,
+        globalRole: result.user.globalRole ?? null,
+      },
       tenant: { id: result.tenant.id, name: result.tenant.name },
     });
 

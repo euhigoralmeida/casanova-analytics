@@ -25,14 +25,27 @@ const pageTitles: Record<string, string> = {
   "/settings": "Configurações",
 };
 
-function readTenantName(): string | undefined {
-  if (typeof window === "undefined") return undefined;
+type TenantData = { id?: string; name?: string };
+
+function readTenantData(): TenantData {
+  if (typeof window === "undefined") return {};
   try {
     const raw = localStorage.getItem("ca_tenant");
-    if (!raw) return undefined;
-    return JSON.parse(raw)?.name;
+    if (!raw) return {};
+    return JSON.parse(raw) as TenantData;
   } catch {
-    return undefined;
+    return {};
+  }
+}
+
+function readUserData(): { globalRole?: string } {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = localStorage.getItem("ca_user");
+    if (!raw) return {};
+    return JSON.parse(raw);
+  } catch {
+    return {};
   }
 }
 
@@ -49,7 +62,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
-  const [tenantName] = useState(readTenantName);
+  const [tenantData] = useState(readTenantData);
+  const [userData] = useState(readUserData);
   const dateRange = useMemo(() => defaultRange(), []);
 
   const title = pageTitles[pathname]
@@ -71,7 +85,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="hidden lg:block shrink-0">
         <div className="fixed inset-y-0 left-0 z-30">
           <Sidebar
-            tenantName={tenantName}
+            tenantName={tenantData.name}
+            globalRole={userData.globalRole}
             collapsed={sidebarCollapsed}
             onToggleCollapse={toggleCollapse}
           />
@@ -86,7 +101,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             onClick={() => setSidebarOpen(false)}
           />
           <div className="fixed inset-y-0 left-0 z-50 lg:hidden">
-            <Sidebar tenantName={tenantName} onClose={() => setSidebarOpen(false)} />
+            <Sidebar tenantName={tenantData.name} globalRole={userData.globalRole} onClose={() => setSidebarOpen(false)} />
           </div>
         </>
       )}
@@ -101,6 +116,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           title={title}
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
+          globalRole={userData.globalRole}
+          activeTenantId={tenantData.id}
+          activeTenantName={tenantData.name}
         />
         <main className="flex-1 overflow-auto">
           <div className="px-6 pt-4">

@@ -13,6 +13,7 @@ import { KpiSkeleton, ChartSkeleton } from "@/components/ui/skeleton";
 import DeviceChart from "@/components/charts/device-chart";
 import DemographicChart from "@/components/charts/demographic-chart";
 import GeographicChart from "@/components/charts/geographic-chart";
+import { useLastUpdated } from "@/hooks/use-last-updated";
 import { Monitor, Users, MapPin, RefreshCw } from "lucide-react";
 
 type Tab = "device" | "demographic" | "geographic";
@@ -56,6 +57,7 @@ export default function SegmentsPage() {
   const [geographic, setGeographic] = useState<GeographicSlice[]>([]);
   const [tab, setTab] = useState<Tab>("device");
   const [demoSubTab, setDemoSubTab] = useState<"age" | "gender">("age");
+  const { label: updatedLabel, markUpdated } = useLastUpdated();
 
   const loadData = useCallback(async (range: DateRange) => {
     setLoading(true);
@@ -72,12 +74,13 @@ export default function SegmentsPage() {
       setDevices(data.segmentation?.devices ?? []);
       setDemographics(data.segmentation?.demographics ?? []);
       setGeographic(data.segmentation?.geographic ?? []);
+      markUpdated();
     } catch {
       setError("Erro ao carregar dados. Tente novamente ou aguarde alguns minutos.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [markUpdated]);
 
   useEffect(() => {
     loadData(defaultRange());
@@ -116,6 +119,9 @@ export default function SegmentsPage() {
           <h1 className="text-xl font-bold text-zinc-900">Segmentação</h1>
           <p className="text-sm text-zinc-500 mt-0.5">
             Análise por dispositivo, demografia e geografia
+            {updatedLabel && !loading && (
+              <span className="ml-2 text-zinc-400">· {updatedLabel}</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">

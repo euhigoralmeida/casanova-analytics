@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 import { isConfigured, getCustomer } from "@/lib/google-ads";
 import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
@@ -31,6 +31,7 @@ export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
+  const tenantId = getEffectiveTenantId(session);
 
   const { searchParams } = req.nextUrl;
   const period = searchParams.get("period") ?? "30d";
@@ -50,7 +51,7 @@ export async function GET(req: NextRequest) {
   let planning: PlanningMetrics = {};
   try {
     const planRows = await prisma.planningEntry.findMany({
-      where: { tenantId: session.tenantId, year: currentYear, month: currentMonth, planType: "target" },
+      where: { tenantId: tenantId, year: currentYear, month: currentMonth, planType: "target" },
     });
     const inputs: Record<string, number> = {};
     for (const row of planRows) {
@@ -81,7 +82,7 @@ export async function GET(req: NextRequest) {
   }
 
   // 2. Load SKU extras from DB (margin, stock, cost)
-  const skuExtras = await loadSkuExtras(session.tenantId);
+  const skuExtras = await loadSkuExtras(tenantId);
 
   // 3. Fetch Google Ads data
   let account: AccountMetrics | undefined;
@@ -231,7 +232,7 @@ export async function GET(req: NextRequest) {
 
   // 5. Build context and run analysis
   const ctx: AnalysisContext = {
-    tenantId: session.tenantId,
+    tenantId: tenantId,
     periodStart: startDate ?? "",
     periodEnd: endDate ?? "",
     daysInPeriod: periodDays,
@@ -260,7 +261,7 @@ export async function GET(req: NextRequest) {
   if (result.insights.length > 0 && startDate && endDate) {
     prisma.insight.createMany({
       data: result.insights.map((i) => ({
-        tenantId: session.tenantId,
+        tenantId: tenantId,
         periodStart: startDate,
         periodEnd: endDate,
         category: i.category,
@@ -280,7 +281,7 @@ export async function GET(req: NextRequest) {
   if (account) {
     const today = new Date().toISOString().slice(0, 10);
     persistDailySnapshot(
-      session.tenantId,
+      tenantId,
       today,
       { revenue: account.revenue, ads: account.ads, roas: account.roas, cpa: account.cpa,
         impressions: account.impressions, clicks: account.clicks, conversions: account.conversions, ctr: account.ctr },
@@ -307,6 +308,7 @@ export async function POST(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
+  const tenantId = getEffectiveTenantId(session);
 
   const body = await req.json();
   const { insightId, actionType, description } = body as {
@@ -321,7 +323,7 @@ export async function POST(req: NextRequest) {
 
   const log = await prisma.actionLog.create({
     data: {
-      tenantId: session.tenantId,
+      tenantId,
       insightId: insightId ?? null,
       actionType,
       description,

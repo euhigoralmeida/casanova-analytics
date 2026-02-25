@@ -712,7 +712,6 @@ export async function fetchClarityFromApi(
     browserBlocks = aggregateBlocksByDimension(osBrowserBlocks, "Browser");
   } else {
     // Fallback: dimension2 not supported, make 3 more individual calls
-    console.log("Clarity: dimension2 not returned, falling back to individual calls");
     urlBlocks = urlDeviceBlocks; // These are already single-dimension (URL only)
     const [devB, chanB, campB, osB, browB] = await Promise.all([
       fetchClarityApi(numDays, "Device"),

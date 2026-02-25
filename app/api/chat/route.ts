@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 import { AI_CONFIG } from "@/lib/ai/config";
 import { createGeminiClient, withRetry } from "@/lib/ai/client";
 import { GEMINI_TOOLS } from "@/lib/ai/tools";
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
+  const tenantId = getEffectiveTenantId(session);
 
   if (!AI_CONFIG.enabled) {
     return new Response(JSON.stringify({ error: "IA desabilitada" }), {
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  if (!checkChatLimit(session.tenantId, AI_CONFIG.rateLimit.chatPerHour)) {
+  if (!checkChatLimit(tenantId, AI_CONFIG.rateLimit.chatPerHour)) {
     return new Response(JSON.stringify({ error: "Limite de mensagens atingido. Tente novamente em alguns minutos." }), {
       status: 429,
       headers: { "Content-Type": "application/json" },
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
       // Strategic mode: use full cross-domain brief
       let brief = "Dados de análise não disponíveis no momento.";
       try {
-        brief = await buildStrategicBrief(session.tenantId, context.startDate, context.endDate);
+        brief = await buildStrategicBrief(tenantId, context.startDate, context.endDate);
       } catch (ctxErr) {
         console.error("Chat: strategic brief error (non-fatal):", ctxErr);
       }
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
       // Standard mode: cognitive context only
       let contextSummary = "Dados de análise não disponíveis no momento.";
       try {
-        const cognitiveData = await fetchCognitiveDirectly(session.tenantId, context.startDate, context.endDate);
+        const cognitiveData = await fetchCognitiveDirectly(tenantId, context.startDate, context.endDate);
         if (cognitiveData) {
           contextSummary = buildContextSummary(cognitiveData);
         }
@@ -130,7 +131,7 @@ export async function POST(req: NextRequest) {
         const toolResult = await executeTool(
           fc.name,
           fc.args as Record<string, unknown>,
-          session.tenantId,
+          tenantId,
         );
         // Gemini requires response to be an object (Struct), not an array
         const parsed = JSON.parse(toolResult);

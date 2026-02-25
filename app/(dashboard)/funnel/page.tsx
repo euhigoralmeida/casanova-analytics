@@ -47,13 +47,13 @@ function generateCRORecommendations(data: CRODataResponse): CRORecommendation[] 
       recs.push({
         severity: "danger",
         title: "Abandono de carrinho elevado",
-        description: `${summary.cartAbandonmentRate.toFixed(1)}% dos usuarios abandonam o carrinho. Otimizar fluxo de checkout: simplificar etapas, mostrar custos antecipadamente, oferecer multiplos meios de pagamento.`,
+        description: `${summary.cartAbandonmentRate.toFixed(1)}% dos usuários abandonam o carrinho. Otimizar fluxo de checkout: simplificar etapas, mostrar custos antecipadamente, oferecer múltiplos meios de pagamento.`,
       });
     } else if (summary.cartAbandonmentRate > 50) {
       recs.push({
         severity: "warn",
-        title: "Abandono de carrinho acima da media",
-        description: `${summary.cartAbandonmentRate.toFixed(1)}% de abandono no carrinho. Considerar retargeting e e-mails de recuperacao.`,
+        title: "Abandono de carrinho acima da média",
+        description: `${summary.cartAbandonmentRate.toFixed(1)}% de abandono no carrinho. Considerar retargeting e e-mails de recuperação.`,
       });
     }
 
@@ -61,15 +61,15 @@ function generateCRORecommendations(data: CRODataResponse): CRORecommendation[] 
       recs.push({
         severity: "warn",
         title: "Abandono no checkout",
-        description: `${summary.checkoutAbandonmentRate.toFixed(1)}% abandonam durante o checkout. Verificar formularios, tempo de carregamento e opcoes de frete.`,
+        description: `${summary.checkoutAbandonmentRate.toFixed(1)}% abandonam durante o checkout. Verificar formulários, tempo de carregamento e opções de frete.`,
       });
     }
 
     if (summary.bounceRate > 60) {
       recs.push({
         severity: "warn",
-        title: "Taxa de rejeicao alta",
-        description: `${summary.bounceRate.toFixed(1)}% de bounce rate. Melhorar relevancia das landing pages e velocidade de carregamento.`,
+        title: "Taxa de rejeição alta",
+        description: `${summary.bounceRate.toFixed(1)}% de bounce rate. Melhorar relevância das landing pages e velocidade de carregamento.`,
       });
     }
   }
@@ -82,13 +82,13 @@ function generateCRORecommendations(data: CRODataResponse): CRORecommendation[] 
       recs.push({
         severity: "danger",
         title: "Rage clicks excessivos",
-        description: `${b.rageClicks.toLocaleString("pt-BR")} rage clicks detectados. Usuarios clicam repetidamente em elementos que nao respondem. Investigar botoes e links quebrados.`,
+        description: `${b.rageClicks.toLocaleString("pt-BR")} rage clicks detectados. Usuários clicam repetidamente em elementos que não respondem. Investigar botões e links quebrados.`,
       });
     } else if (b.rageClicks > 20) {
       recs.push({
         severity: "warn",
         title: "Rage clicks detectados",
-        description: `${b.rageClicks.toLocaleString("pt-BR")} rage clicks. Verificar elementos interativos que podem nao estar funcionando corretamente.`,
+        description: `${b.rageClicks.toLocaleString("pt-BR")} rage clicks. Verificar elementos interativos que podem não estar funcionando corretamente.`,
       });
     }
 
@@ -96,13 +96,13 @@ function generateCRORecommendations(data: CRODataResponse): CRORecommendation[] 
       recs.push({
         severity: "danger",
         title: "Quickbacks elevados",
-        description: `${b.quickbackClicks.toLocaleString("pt-BR")} quickbacks — usuarios saindo rapidamente. Verificar tempo de carregamento e relevancia do conteudo.`,
+        description: `${b.quickbackClicks.toLocaleString("pt-BR")} quickbacks — usuários saindo rapidamente. Verificar tempo de carregamento e relevância do conteúdo.`,
       });
     } else if (b.quickbackClicks > 30) {
       recs.push({
         severity: "warn",
         title: "Quickbacks acima do esperado",
-        description: `${b.quickbackClicks.toLocaleString("pt-BR")} quickbacks detectados. Paginas podem estar com carregamento lento ou conteudo irrelevante.`,
+        description: `${b.quickbackClicks.toLocaleString("pt-BR")} quickbacks detectados. Páginas podem estar com carregamento lento ou conteúdo irrelevante.`,
       });
     }
 
@@ -110,7 +110,7 @@ function generateCRORecommendations(data: CRODataResponse): CRORecommendation[] 
       recs.push({
         severity: "warn",
         title: "Scroll depth baixo",
-        description: `Media de ${b.avgScrollDepth.toFixed(0)}% de scroll. Conteudo abaixo da dobra nao esta sendo visto. Mover CTAs e informacoes importantes para o topo.`,
+        description: `Média de ${b.avgScrollDepth.toFixed(0)}% de scroll. Conteúdo abaixo da dobra não está sendo visto. Mover CTAs e informações importantes para o topo.`,
       });
     }
 
@@ -118,13 +118,13 @@ function generateCRORecommendations(data: CRODataResponse): CRORecommendation[] 
       recs.push({
         severity: "danger",
         title: "Erros JavaScript frequentes",
-        description: `${b.scriptErrors.toLocaleString("pt-BR")} erros JS detectados em ${clarity.numDaysCovered} dias. Podem estar impedindo funcionalidades criticas.`,
+        description: `${b.scriptErrors.toLocaleString("pt-BR")} erros JS detectados em ${clarity.numDaysCovered} dias. Podem estar impedindo funcionalidades críticas.`,
       });
     } else if (b.scriptErrors > 0) {
       recs.push({
         severity: "info",
         title: "Erros JavaScript detectados",
-        description: `${b.scriptErrors} erros JS. Monitorar para evitar impacto na experiencia.`,
+        description: `${b.scriptErrors} erros JS. Monitorar para evitar impacto na experiência.`,
       });
     }
 
@@ -135,7 +135,7 @@ function generateCRORecommendations(data: CRODataResponse): CRORecommendation[] 
         recs.push({
           severity: "warn",
           title: "Trafego de bots significativo",
-          description: `${botPct}% das sessoes sao de bots (${b.botSessions.toLocaleString("pt-BR")} sessoes). Isso pode distorcer metricas de UX e conversao.`,
+          description: `${botPct}% das sessões são de bots (${b.botSessions.toLocaleString("pt-BR")} sessões). Isso pode distorcer métricas de UX e conversão.`,
         });
       }
     }
@@ -147,7 +147,7 @@ function generateCRORecommendations(data: CRODataResponse): CRORecommendation[] 
         recs.push({
           severity: "warn",
           title: `Problemas de UX em "${page.pageTitle}"`,
-          description: `${page.rageClickRate}% de rage clicks e ${page.deadClickRate}% de dead clicks por sessao. UX Score: ${page.uxScore}/100, Impact Score: ${page.impactScore}. Investigar elementos interativos.`,
+          description: `${page.rageClickRate}% de rage clicks e ${page.deadClickRate}% de dead clicks por sessão. UX Score: ${page.uxScore}/100, Impact Score: ${page.impactScore}. Investigar elementos interativos.`,
         });
       }
     }
@@ -164,8 +164,8 @@ function generateCRORecommendations(data: CRODataResponse): CRORecommendation[] 
       if (mobileProblemPct > mobilePct + 10 && mobile.rageClicks > 30) {
         recs.push({
           severity: "warn",
-          title: "UX mobile precisa de atencao prioritaria",
-          description: `Mobile tem ${mobilePct}% do trafego mas ${mobileProblemPct}% dos problemas de UX. ${mobile.rageClicks} rage clicks, ${mobile.scriptErrors} erros JS.`,
+          title: "UX mobile precisa de atenção prioritária",
+          description: `Mobile tem ${mobilePct}% do tráfego mas ${mobileProblemPct}% dos problemas de UX. ${mobile.rageClicks} rage clicks, ${mobile.scriptErrors} erros JS.`,
         });
       }
     }
@@ -177,8 +177,8 @@ function generateCRORecommendations(data: CRODataResponse): CRORecommendation[] 
         if (ch.rageClickRate > avgRageRate * 3 && ch.traffic > 100) {
           recs.push({
             severity: "warn",
-            title: `Canal "${ch.channel}" com alta frustracao`,
-            description: `${ch.rageClickRate}% de rage clicks (media: ${avgRageRate.toFixed(1)}%). Verificar landing pages e experiencia deste canal.`,
+            title: `Canal "${ch.channel}" com alta frustração`,
+            description: `${ch.rageClickRate}% de rage clicks (média: ${avgRageRate.toFixed(1)}%). Verificar landing pages e experiência deste canal.`,
           });
         }
       }
@@ -192,7 +192,7 @@ function generateCRORecommendations(data: CRODataResponse): CRORecommendation[] 
           recs.push({
             severity: "warn",
             title: `Campanha "${camp.campaign}" com UX ruim`,
-            description: `${camp.deadClickRate}% de dead clicks e ${camp.rageClickRate}% de rage clicks. Investigar landing page antes de aumentar budget.`,
+            description: `${camp.deadClickRate}% de dead clicks e ${camp.rageClickRate}% de rage clicks. Investigar landing page antes de aumentar orçamento.`,
           });
         }
       }
@@ -208,7 +208,7 @@ function generateCRORecommendations(data: CRODataResponse): CRORecommendation[] 
           recs.push({
             severity: "danger",
             title: `${tech.type === "os" ? "SO" : "Navegador"} ${tech.name} concentra erros JS`,
-            description: `${tech.name} concentra ${errPct}% dos erros JS (${tech.scriptErrors.toLocaleString("pt-BR")} erros, taxa ${tech.scriptErrorRate}%). Priorizar correcao.`,
+            description: `${tech.name} concentra ${errPct}% dos erros JS (${tech.scriptErrors.toLocaleString("pt-BR")} erros, taxa ${tech.scriptErrorRate}%). Priorizar correção.`,
           });
           break; // Only show worst offender
         }

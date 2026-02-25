@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/api-helpers";
 import { isInstagramConfigured, fetchIGBusinessDiscovery } from "@/lib/instagram";
 import { buildLookupResponse } from "@/lib/influencer-discovery";
 
 export async function GET(req: NextRequest) {
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
+
   const handle = req.nextUrl.searchParams.get("handle")?.trim();
 
   if (!handle) {

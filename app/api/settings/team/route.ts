@@ -1,5 +1,7 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
+import { getEffectiveTenantId } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 
@@ -8,10 +10,11 @@ export async function GET(req: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
+  const tenantId = getEffectiveTenantId(session);
 
   try {
     const members = await prisma.user.findMany({
-      where: { tenant: { OR: [{ id: session.tenantId }, { slug: session.tenantId }] }, active: true },
+      where: { tenant: { OR: [{ id: tenantId }, { slug: tenantId }] }, active: true },
       select: { id: true, email: true, name: true, role: true, lastLoginAt: true, createdAt: true },
       orderBy: { createdAt: "asc" },
     });
@@ -27,6 +30,7 @@ export async function POST(req: NextRequest) {
   if (!session || session.role !== "admin") {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
+  const tenantId = getEffectiveTenantId(session);
 
   try {
     const { email, name, role } = await req.json();
@@ -36,7 +40,7 @@ export async function POST(req: NextRequest) {
 
     // Find the tenant
     const tenant = await prisma.tenant.findFirst({
-      where: { OR: [{ id: session.tenantId }, { slug: session.tenantId }] },
+      where: { OR: [{ id: tenantId }, { slug: tenantId }] },
     });
     if (!tenant) {
       return NextResponse.json({ error: "Tenant não encontrado" }, { status: 404 });
@@ -51,7 +55,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Create with a temporary password (user must reset)
-    const tempPassword = Math.random().toString(36).slice(2, 10);
+    const tempPassword = crypto.randomBytes(6).toString("hex");
     const passwordHash = await bcrypt.hash(tempPassword, 10);
 
     const user = await prisma.user.create({

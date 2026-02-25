@@ -162,19 +162,15 @@ export async function discoverIGAccountId(): Promise<string | null> {
 
   // 3. Auto-discover via Pages API (requires pages_show_list permission)
   try {
-    console.log("[Instagram] Attempting auto-discovery via /me/accounts...");
     const data = await graphFetch("/me/accounts", {
       fields: "instagram_business_account{id,username},name",
       limit: "100",
     });
 
-    console.log(`[Instagram] Found ${data.data?.length ?? 0} pages`);
-
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const page of (data.data || []) as any[]) {
       if (page.instagram_business_account?.id) {
         const igId = page.instagram_business_account.id;
-        console.log(`[Instagram] Found IG account ${igId} (${page.instagram_business_account.username}) on page "${page.name}"`);
         cachedIGAccountId = { id: igId, ts: Date.now() };
         return igId;
       }

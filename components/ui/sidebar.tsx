@@ -48,7 +48,7 @@ const navItems: NavItem[] = [
   { label: "CRO", href: "/funnel", icon: MousePointerClick },
   { label: "SEO", href: "/organic", icon: Search },
   { label: "Instagram", href: "/instagram", icon: Instagram },
-  { label: "Influenciadores (Beta)", href: "/influencers", icon: Users },
+  { label: "Influenciadores", href: "/influencers", icon: Users },
   { label: "Alertas", href: "/alerts", icon: Bell },
   {
     label: "Configurações",
@@ -71,15 +71,23 @@ function ComingSoonBadge() {
 
 export default function Sidebar({
   tenantName,
+  tenantLogo,
+  globalRole,
   onClose,
   collapsed = false,
   onToggleCollapse,
 }: {
   tenantName?: string;
+  tenantLogo?: string;
+  globalRole?: string | null;
   onClose?: () => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }) {
+  // Platform admin sees FiveP logo; clients see their tenant logo (or default Casanova)
+  const logoSrc = globalRole === "platform_admin"
+    ? "/logo-fivep.png"
+    : (tenantLogo || "/logo-casanova.png");
   const pathname = usePathname();
   const router = useRouter();
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>(() => {
@@ -99,6 +107,7 @@ export default function Sidebar({
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
     localStorage.removeItem("ca_tenant");
+    localStorage.removeItem("ca_user");
     router.push("/login");
   }
 
@@ -123,11 +132,11 @@ export default function Sidebar({
       <div className={`border-b border-zinc-100 ${collapsed ? "px-2 pt-5 pb-4" : "px-5 pt-5 pb-4"}`}>
         {collapsed ? (
           <div className="flex justify-center">
-            <Image src="/logo-casanova.png" alt="Casanova Analytics" width={32} height={32} priority className="object-contain" />
+            <Image src={logoSrc} alt="FiveP Analytics" width={32} height={32} priority className="object-contain" />
           </div>
         ) : (
           <>
-            <Image src="/logo-casanova.png" alt="Casanova Analytics" width={140} height={36} priority />
+            <Image src={logoSrc} alt="FiveP Analytics" width={140} height={36} priority className="object-contain" />
             {tenantName && (
               <p className="text-xs text-zinc-500 mt-2 truncate">{tenantName}</p>
             )}

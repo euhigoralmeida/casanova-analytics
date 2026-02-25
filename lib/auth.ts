@@ -13,6 +13,8 @@ export type SessionPayload = {
   tenantId: string;
   email: string;
   role: string;
+  globalRole?: string;       // "platform_admin" | undefined
+  activeTenantId?: string;   // tenant the admin is currently viewing
   exp: number;
 };
 
@@ -39,8 +41,16 @@ function verify(token: string): SessionPayload | null {
   }
 }
 
-export function createSessionToken(tenantId: string, email: string, role: string): string {
-  return sign({ tenantId, email, role, exp: Date.now() + MAX_AGE * 1000 });
+export function createSessionToken(
+  tenantId: string,
+  email: string,
+  role: string,
+  opts?: { globalRole?: string; activeTenantId?: string },
+): string {
+  const payload: SessionPayload = { tenantId, email, role, exp: Date.now() + MAX_AGE * 1000 };
+  if (opts?.globalRole) payload.globalRole = opts.globalRole;
+  if (opts?.activeTenantId) payload.activeTenantId = opts.activeTenantId;
+  return sign(payload);
 }
 
 export function verifySessionToken(token: string): SessionPayload | null {

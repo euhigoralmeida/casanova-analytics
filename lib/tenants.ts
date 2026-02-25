@@ -5,6 +5,7 @@ export type TenantUser = {
   email: string;
   passwordHash: string;
   role: "admin" | "viewer" | "editor";
+  globalRole?: string; // "platform_admin" | undefined
   name: string;
 };
 
@@ -31,6 +32,20 @@ const FALLBACK_TENANTS: Tenant[] = [
       },
     ],
   },
+  {
+    id: "fivep",
+    name: "FiveP Agency",
+    slug: "fivep",
+    users: [
+      {
+        email: "contato@fivep.com.br",
+        passwordHash: "$2b$10$BP4iT6uj62HBkZ5COZ7IeuTVTsShRHW2T4ofZzIqv8GKy1lF1AEQG",
+        role: "admin",
+        globalRole: "platform_admin",
+        name: "Higo Almeida",
+      },
+    ],
+  },
 ];
 
 export async function getTenant(tenantId: string): Promise<Tenant | undefined> {
@@ -49,6 +64,7 @@ export async function getTenant(tenantId: string): Promise<Tenant | undefined> {
           email: u.email,
           passwordHash: u.passwordHash,
           role: u.role as TenantUser["role"],
+          globalRole: u.globalRole ?? undefined,
           name: u.name,
         })),
       };
@@ -75,6 +91,7 @@ export async function getAllTenants(): Promise<Tenant[]> {
           email: u.email,
           passwordHash: u.passwordHash,
           role: u.role as TenantUser["role"],
+          globalRole: u.globalRole ?? undefined,
           name: u.name,
         })),
       }));
@@ -115,6 +132,7 @@ export async function authenticateUser(
           email: dbUser.email,
           passwordHash: dbUser.passwordHash,
           role: dbUser.role as TenantUser["role"],
+          globalRole: dbUser.globalRole ?? undefined,
           name: dbUser.name,
         };
         return { tenant, user };

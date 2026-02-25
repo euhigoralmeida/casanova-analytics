@@ -10,6 +10,7 @@ import Kpi from "@/components/ui/kpi-card";
 import SortableHeader from "@/components/ui/sortable-header";
 import { TableSkeleton, KpiSkeleton } from "@/components/ui/skeleton";
 import { exportToCSV } from "@/lib/export-csv";
+import { useLastUpdated } from "@/hooks/use-last-updated";
 import { Download, RefreshCw, AlertTriangle } from "lucide-react";
 import type { DateRange } from "@/types/api";
 
@@ -23,6 +24,7 @@ export default function MetaAdsPage() {
   const [sortField, setSortField] = useState("");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [page, setPage] = useState(0);
+  const { label: updatedLabel, markUpdated } = useLastUpdated();
   const PER_PAGE = 20;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -71,12 +73,13 @@ export default function MetaAdsPage() {
       const res = await fetch(`/api/meta?startDate=${range.startDate}&endDate=${range.endDate}`);
       if (!res.ok) throw new Error("Erro ao carregar dados");
       setData(await res.json());
+      markUpdated();
     } catch {
       setError("Erro ao carregar dados do Meta Ads. Tente novamente.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [markUpdated]);
 
   function applyDateRange(range: DateRange) {
     setDateRange(range);
@@ -122,6 +125,9 @@ export default function MetaAdsPage() {
               </span>
             )}
             {loading && <span className="ml-2 text-zinc-400">Carregando...</span>}
+            {updatedLabel && !loading && (
+              <span className="ml-2 text-zinc-400">· {updatedLabel}</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-3">

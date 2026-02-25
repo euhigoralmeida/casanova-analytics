@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 import { isConfigured, getCustomer } from "@/lib/google-ads";
 import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
@@ -105,6 +105,7 @@ export async function POST(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
+  const tenantId = getEffectiveTenantId(session);
 
   const body = await req.json();
   const year = body.year as number;
@@ -139,7 +140,7 @@ export async function POST(req: NextRequest) {
     await prisma.planningEntry.upsert({
       where: {
         tenantId_year_month_metric_planType: {
-          tenantId: session.tenantId,
+          tenantId: tenantId,
           year,
           month: e.month,
           metric: e.metric,
@@ -148,7 +149,7 @@ export async function POST(req: NextRequest) {
       },
       update: { value: e.value, source: "sync" },
       create: {
-        tenantId: session.tenantId,
+        tenantId: tenantId,
         year,
         month: e.month,
         metric: e.metric,
@@ -162,7 +163,7 @@ export async function POST(req: NextRequest) {
   // Log the sync
   await prisma.planningSyncLog.create({
     data: {
-      tenantId: session.tenantId,
+      tenantId: tenantId,
       year,
       metrics: allEntries.length,
     },
@@ -170,7 +171,7 @@ export async function POST(req: NextRequest) {
 
   // Return updated data
   const rows = await prisma.planningEntry.findMany({
-    where: { tenantId: session.tenantId, year, planType: "actual" },
+    where: { tenantId: tenantId, year, planType: "actual" },
   });
 
   const entries: Record<number, Record<string, number>> = {};

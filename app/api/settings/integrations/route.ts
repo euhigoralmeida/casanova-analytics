@@ -1,10 +1,13 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { requireAuth } from "@/lib/api-helpers";
 
 /**
  * Returns the connection status of each integration platform.
  * Checks env vars to determine if each platform is configured.
  */
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
   const integrations = [
     {
       platform: "google_ads",

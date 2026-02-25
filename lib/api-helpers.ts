@@ -14,3 +14,18 @@ export function requireAuth(req: NextRequest): AuthSuccess | AuthFailure {
   }
   return { session };
 }
+
+/**
+ * Returns the effective tenant ID — for platform admins who are impersonating
+ * a client, this returns the activeTenantId. Otherwise, their own tenantId.
+ */
+export function getEffectiveTenantId(session: SessionPayload): string {
+  if (session.globalRole === "platform_admin" && session.activeTenantId) {
+    return session.activeTenantId;
+  }
+  return session.tenantId;
+}
+
+export function isPlatformAdmin(session: SessionPayload): boolean {
+  return session.globalRole === "platform_admin";
+}

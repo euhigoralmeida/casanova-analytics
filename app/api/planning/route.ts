@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 import { PLANNING_INPUT_METRICS, PLANNING_TARGET_INPUT_METRICS } from "@/types/api";
 import type { PlanningYearData } from "@/types/api";
@@ -34,6 +34,7 @@ export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
+  const tenantId = getEffectiveTenantId(session);
 
   const year = parseInt(req.nextUrl.searchParams.get("year") ?? String(new Date().getFullYear()));
   if (isNaN(year) || year < 2020 || year > 2040) {
@@ -43,7 +44,7 @@ export async function GET(req: NextRequest) {
   const planType = parsePlanType(req.nextUrl.searchParams.get("planType"));
 
   const rows = await prisma.planningEntry.findMany({
-    where: { tenantId: session.tenantId, year, planType },
+    where: { tenantId: tenantId, year, planType },
   });
 
   const { entries, sources } = buildResponse(rows);
@@ -52,7 +53,7 @@ export async function GET(req: NextRequest) {
   let lastSyncedAt: Date | null = null;
   if (planType === "actual") {
     const lastSync = await prisma.planningSyncLog.findFirst({
-      where: { tenantId: session.tenantId, year },
+      where: { tenantId: tenantId, year },
       orderBy: { syncedAt: "desc" },
     });
     lastSyncedAt = lastSync?.syncedAt ?? null;
@@ -75,6 +76,7 @@ export async function PUT(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
+  const tenantId = getEffectiveTenantId(session);
 
   const body = await req.json();
   const { year, entries, planType: rawPlanType } = body as {
@@ -103,7 +105,7 @@ export async function PUT(req: NextRequest) {
       e.value === null
         ? prisma.planningEntry.deleteMany({
             where: {
-              tenantId: session.tenantId,
+              tenantId: tenantId,
               year,
               month: e.month,
               metric: e.metric,
@@ -113,7 +115,7 @@ export async function PUT(req: NextRequest) {
         : prisma.planningEntry.upsert({
             where: {
               tenantId_year_month_metric_planType: {
-                tenantId: session.tenantId,
+                tenantId: tenantId,
                 year,
                 month: e.month,
                 metric: e.metric,
@@ -122,7 +124,7 @@ export async function PUT(req: NextRequest) {
             },
             update: { value: e.value, source: "manual" },
             create: {
-              tenantId: session.tenantId,
+              tenantId: tenantId,
               year,
               month: e.month,
               metric: e.metric,
@@ -135,7 +137,7 @@ export async function PUT(req: NextRequest) {
   );
 
   const rows = await prisma.planningEntry.findMany({
-    where: { tenantId: session.tenantId, year, planType },
+    where: { tenantId: tenantId, year, planType },
   });
 
   const { entries: result, sources } = buildResponse(rows);

@@ -5,6 +5,8 @@ import type { DateRange } from "@/types/api";
 import type { OrganicDataResponse, OrganicStrategyResponse, KeywordClassification } from "@/lib/organic-types";
 import { defaultRange } from "@/lib/constants";
 import { formatBRL, fmtDateSlash } from "@/lib/format";
+import { exportToCSV } from "@/lib/export-csv";
+import { useLastUpdated } from "@/hooks/use-last-updated";
 import DateRangePicker from "@/components/ui/date-range-picker";
 import OrganicTrendChart from "@/components/charts/organic-trend-chart";
 import KeywordPositionChart from "@/components/charts/keyword-position-chart";
@@ -64,21 +66,6 @@ const issueLabels: Record<string, string> = {
 };
 
 /* =========================
-   CSV Export helper
-========================= */
-
-function downloadCSV(filename: string, headers: string[], rows: string[][]) {
-  const csv = [headers.join(","), ...rows.map((r) => r.map((c) => `"${c}"`).join(","))].join("\n");
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-/* =========================
    Main Page
 ========================= */
 
@@ -91,7 +78,7 @@ export default function OrganicPage() {
   const [kwFilter, setKwFilter] = useState<string>("todos");
   const [showAllKw, setShowAllKw] = useState(false);
   const [showAllPages, setShowAllPages] = useState(false);
-  const [expandedPage, setExpandedPage] = useState<string | null>(null);
+  const { label: updatedLabel, markUpdated } = useLastUpdated();
 
   const loadData = useCallback(async (range: DateRange) => {
     setLoading(true);
@@ -107,12 +94,13 @@ export default function OrganicPage() {
       if (stratRes.ok) {
         setStrategy(await stratRes.json());
       }
+      markUpdated();
     } catch {
       setError("Erro ao carregar dados. Tente novamente.");
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [markUpdated]);
 
   useEffect(() => {
     loadData(defaultRange());
@@ -154,13 +142,15 @@ export default function OrganicPage() {
         <div>
           <div className="flex items-center gap-2">
             <Search className="h-5 w-5 text-emerald-600" />
-            <h1 className="text-xl font-bold text-zinc-900">Inteligencia Organica</h1>
-            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Beta</span>
+            <h1 className="text-xl font-bold text-zinc-900">Inteligência Orgânica</h1>
           </div>
           <p className="text-sm text-zinc-500 mt-0.5">
             {fmtDateSlash(dateRange.startDate)} — {fmtDateSlash(dateRange.endDate)}
             {data?.source === "gsc" && <span className="ml-2 text-zinc-400">GSC + GA4</span>}
             {loading && <span className="ml-2 text-zinc-400">Atualizando...</span>}
+            {updatedLabel && !loading && (
+              <span className="ml-2 text-zinc-400">· {updatedLabel}</span>
+            )}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -329,15 +319,28 @@ export default function OrganicPage() {
               <h3 className="text-sm font-semibold text-zinc-800">Keywords ({filteredKw.length})</h3>
               <button
                 onClick={() => {
-                  const kws = filteredKw;
-                  downloadCSV(
+                  exportToCSV(
+                    filteredKw.map((k) => ({
+                      query: k.query,
+                      clicks: k.clicks,
+                      impressions: k.impressions,
+                      ctr: (k.ctr * 100).toFixed(2),
+                      position: k.position.toFixed(1),
+                      score: k.score,
+                      classification: k.classification,
+                      impactBRL: k.estimatedImpactBRL.toFixed(2),
+                    })),
+                    [
+                      { key: "query", label: "Keyword" },
+                      { key: "clicks", label: "Cliques" },
+                      { key: "impressions", label: "Impressões" },
+                      { key: "ctr", label: "CTR" },
+                      { key: "position", label: "Posição" },
+                      { key: "score", label: "Score" },
+                      { key: "classification", label: "Classificação" },
+                      { key: "impactBRL", label: "Impacto R$" },
+                    ],
                     "keywords-organicas.csv",
-                    ["Keyword", "Cliques", "Impressoes", "CTR", "Posicao", "Score", "Classificacao", "Impacto R$"],
-                    kws.map((k) => [
-                      k.query, String(k.clicks), String(k.impressions),
-                      (k.ctr * 100).toFixed(2), k.position.toFixed(1),
-                      String(k.score), k.classification, k.estimatedImpactBRL.toFixed(2),
-                    ]),
                   );
                 }}
                 className="p-1 rounded text-zinc-400 hover:text-zinc-700"
@@ -458,15 +461,28 @@ export default function OrganicPage() {
               <h3 className="text-sm font-semibold text-zinc-800">Paginas ({pages.length})</h3>
               <button
                 onClick={() => {
-                  downloadCSV(
+                  exportToCSV(
+                    pages.map((p) => ({
+                      path: p.path,
+                      clicks: p.clicks,
+                      impressions: p.impressions,
+                      position: p.position.toFixed(1),
+                      score: p.score,
+                      revenue: p.revenue.toFixed(2),
+                      convRate: p.convRate.toFixed(2),
+                      issues: p.issues.join("; "),
+                    })),
+                    [
+                      { key: "path", label: "Página" },
+                      { key: "clicks", label: "Cliques" },
+                      { key: "impressions", label: "Impressões" },
+                      { key: "position", label: "Posição" },
+                      { key: "score", label: "Score" },
+                      { key: "revenue", label: "Receita" },
+                      { key: "convRate", label: "Conv%" },
+                      { key: "issues", label: "Issues" },
+                    ],
                     "paginas-organicas.csv",
-                    ["Pagina", "Cliques", "Impressoes", "Posicao", "Score", "Receita", "Conv%", "Issues"],
-                    pages.map((p) => [
-                      p.path, String(p.clicks), String(p.impressions),
-                      p.position.toFixed(1), String(p.score),
-                      p.revenue.toFixed(2), p.convRate.toFixed(2),
-                      p.issues.join("; "),
-                    ]),
                   );
                 }}
                 className="p-1 rounded text-zinc-400 hover:text-zinc-700"
@@ -495,8 +511,7 @@ export default function OrganicPage() {
                 {visiblePages.map((page) => (
                   <tr
                     key={page.path}
-                    className="border-b border-zinc-50 last:border-0 hover:bg-zinc-50/50 transition-colors cursor-pointer"
-                    onClick={() => setExpandedPage(expandedPage === page.path ? null : page.path)}
+                    className="border-b border-zinc-50 last:border-0 hover:bg-zinc-50/50 transition-colors"
                   >
                     <td className="px-5 py-2.5">
                       <p className="text-xs font-medium text-zinc-700 max-w-[220px] truncate">{page.path}</p>

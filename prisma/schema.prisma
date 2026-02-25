@@ -30,6 +30,7 @@ model User {
   name         String
   passwordHash String
   role         String   @default("viewer") // "admin" | "editor" | "viewer"
+  globalRole   String?  // "platform_admin" | null
   tenantId     String
   tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   active       Boolean  @default(true)

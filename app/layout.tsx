@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Casanova Analytics",
+  title: "FiveP Analytics",
   description: "Dashboard de métricas por SKU — ROAS, CPA, margem, estoque",
 };
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 
 /* =========================
@@ -10,9 +10,10 @@ export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
+  const tenantId = getEffectiveTenantId(session);
 
   const skus = await prisma.skuMaster.findMany({
-    where: { tenantId: session.tenantId },
+    where: { tenantId },
     orderBy: { sku: "asc" },
   });
 
@@ -28,6 +29,7 @@ export async function PUT(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
+  const tenantId = getEffectiveTenantId(session);
 
   const body = await req.json();
   const skuList = body.skus as {
@@ -47,9 +49,9 @@ export async function PUT(req: NextRequest) {
   const results = await Promise.all(
     skuList.map((s) =>
       prisma.skuMaster.upsert({
-        where: { tenantId_sku: { tenantId: session.tenantId, sku: s.sku } },
+        where: { tenantId_sku: { tenantId: tenantId, sku: s.sku } },
         create: {
-          tenantId: session.tenantId,
+          tenantId: tenantId,
           sku: s.sku,
           nome: s.nome,
           marginPct: s.marginPct,
@@ -79,6 +81,7 @@ export async function DELETE(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
+  const tenantId = getEffectiveTenantId(session);
 
   const sku = req.nextUrl.searchParams.get("sku");
   if (!sku) {
@@ -87,7 +90,7 @@ export async function DELETE(req: NextRequest) {
 
   try {
     await prisma.skuMaster.delete({
-      where: { tenantId_sku: { tenantId: session.tenantId, sku } },
+      where: { tenantId_sku: { tenantId: tenantId, sku } },
     });
     return NextResponse.json({ ok: true });
   } catch {

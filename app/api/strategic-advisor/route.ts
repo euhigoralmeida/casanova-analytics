@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 import { AI_CONFIG } from "@/lib/ai/config";
 import { createLLMProvider } from "@/lib/ai/llm-provider";
 import { buildStrategicBrief } from "@/lib/ai/strategic-brief";
@@ -77,6 +77,7 @@ export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
+  const tenantId = getEffectiveTenantId(session);
 
   const url = new URL(req.url);
   const startDate = url.searchParams.get("startDate");
@@ -90,14 +91,14 @@ export async function GET(req: NextRequest) {
   }
 
   // Check cache
-  const cacheKey = advisorCacheKey(session.tenantId, startDate, endDate);
+  const cacheKey = advisorCacheKey(tenantId, startDate, endDate);
   const cached = cacheGet<StrategicAdvisorResponse>(cacheKey);
   if (cached) {
     return Response.json({ ...cached, cached: true });
   }
 
   // Rate limit
-  if (!checkAdvisorLimit(session.tenantId)) {
+  if (!checkAdvisorLimit(tenantId)) {
     return new Response(JSON.stringify({ error: "Limite de consultas estratégicas atingido. Tente novamente em alguns minutos." }), {
       status: 429,
       headers: { "Content-Type": "application/json" },
@@ -106,7 +107,7 @@ export async function GET(req: NextRequest) {
 
   try {
     // Build the cross-domain brief
-    const brief = await buildStrategicBrief(session.tenantId, startDate, endDate);
+    const brief = await buildStrategicBrief(tenantId, startDate, endDate);
 
     // Generate strategic analysis via LLM
     const llm = createLLMProvider();
