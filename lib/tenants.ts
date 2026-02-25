@@ -34,7 +34,7 @@ const FALLBACK_TENANTS: Tenant[] = [
   },
   {
     id: "fivep",
-    name: "FiveP Agency",
+    name: "Fivep",
     slug: "fivep",
     users: [
       {

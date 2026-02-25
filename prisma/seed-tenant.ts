@@ -64,14 +64,14 @@ async function main() {
     }
   }
 
-  // ─── FiveP Agency (platform admin) ───
+  // ─── Fivep (platform admin) ───
   console.log("\n🌱 Seeding tenant: fivep...");
 
   const fivepTenant = await prisma.tenant.upsert({
     where: { slug: "fivep" },
-    update: { name: "FiveP Agency" },
+    update: { name: "Fivep" },
     create: {
-      name: "FiveP Agency",
+      name: "Fivep",
       slug: "fivep",
       plan: "enterprise",
     },
