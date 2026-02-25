@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isConfigured, getCustomer } from "@/lib/google-ads";
+import { getCustomerAsync } from "@/lib/google-ads";
 import { fetchAllSkuMetrics, fetchAccountTotals } from "@/lib/queries";
 import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
@@ -122,9 +122,8 @@ export async function GET(request: NextRequest) {
   ]);
 
   /* ---- DADOS REAIS (Google Ads) ---- */
-  if (isConfigured()) {
-    try {
-      const customer = getCustomer();
+  try {
+    const customer = await getCustomerAsync(tenantId);
       const [allSkus, accountTotals] = await Promise.all([
         fetchAllSkuMetrics(customer, period, startDate, endDate),
         fetchAccountTotals(customer, period, startDate, endDate),
@@ -220,9 +219,8 @@ export async function GET(request: NextRequest) {
         },
         skus,
       });
-    } catch (err) {
-      console.error("Google Ads API error in overview, falling back to mock:", err);
-    }
+  } catch (err) {
+    console.error("Google Ads API error in overview, falling back to mock:", err);
   }
 
   /* ---- MOCK (fallback) ---- */

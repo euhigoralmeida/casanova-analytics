@@ -254,8 +254,9 @@ async function fetchClarityApi(
   numOfDays: number,
   dimension1: string,
   dimension2?: string,
+  overrideToken?: string,
 ): Promise<ClarityMetricBlock[]> {
-  const token = process.env.CLARITY_API_TOKEN!;
+  const token = overrideToken ?? process.env.CLARITY_API_TOKEN!;
 
   let url = `https://www.clarity.ms/export-data/api/v1/project-live-insights?numOfDays=${numOfDays}&dimension1=${dimension1}`;
   if (dimension2) url += `&dimension2=${dimension2}`;
@@ -664,8 +665,24 @@ function extractPageTitle(url: string): string {
 
 export async function fetchClarityFromApi(
   numDays = 3,
+  tenantId?: string,
 ): Promise<{ data: ClarityData; apiCalls: number }> {
-  if (!isClarityConfigured()) {
+  // If tenantId provided, resolve credentials from DB
+  let projectId: string | undefined;
+  let apiToken: string | undefined;
+  if (tenantId) {
+    const { getTenantCredentials } = await import("@/lib/tenant-credentials");
+    const creds = await getTenantCredentials(tenantId, "clarity");
+    if (creds) {
+      projectId = creds.project_id;
+      apiToken = creds.api_token;
+    }
+  }
+  // Fall back to env vars
+  if (!projectId) projectId = process.env.CLARITY_PROJECT_ID;
+  if (!apiToken) apiToken = process.env.CLARITY_API_TOKEN;
+
+  if (!projectId || !apiToken) {
     return {
       data: {
         source: "not_configured",
@@ -683,9 +700,9 @@ export async function fetchClarityFromApi(
 
   // 3 optimized calls using dimension2
   const [urlDeviceBlocks, channelCampaignBlocks, osBrowserBlocks] = await Promise.all([
-    fetchClarityApi(numDays, "URL", "Device"),
-    fetchClarityApi(numDays, "Channel", "Campaign"),
-    fetchClarityApi(numDays, "OS", "Browser"),
+    fetchClarityApi(numDays, "URL", "Device", apiToken),
+    fetchClarityApi(numDays, "Channel", "Campaign", apiToken),
+    fetchClarityApi(numDays, "OS", "Browser", apiToken),
   ]);
 
   let apiCalls = 3;
@@ -714,11 +731,11 @@ export async function fetchClarityFromApi(
     // Fallback: dimension2 not supported, make 3 more individual calls
     urlBlocks = urlDeviceBlocks; // These are already single-dimension (URL only)
     const [devB, chanB, campB, osB, browB] = await Promise.all([
-      fetchClarityApi(numDays, "Device"),
-      fetchClarityApi(numDays, "Channel"),
-      fetchClarityApi(numDays, "Campaign"),
-      fetchClarityApi(numDays, "OS"),
-      fetchClarityApi(numDays, "Browser"),
+      fetchClarityApi(numDays, "Device", undefined, apiToken),
+      fetchClarityApi(numDays, "Channel", undefined, apiToken),
+      fetchClarityApi(numDays, "Campaign", undefined, apiToken),
+      fetchClarityApi(numDays, "OS", undefined, apiToken),
+      fetchClarityApi(numDays, "Browser", undefined, apiToken),
     ]);
     deviceBlocks = devB;
     channelBlocks = chanB;

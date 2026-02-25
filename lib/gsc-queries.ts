@@ -50,12 +50,13 @@ export async function fetchKeywordMetrics(
   tenantId?: string,
 ): Promise<GSCKeywordRow[]> {
   const adjEnd = adjustGSCEndDate(endDate);
-  const cacheKey = `gsc:kw:${startDate}:${adjEnd}`;
+  const tid = tenantId ?? "default";
+  const cacheKey = `${tid}:gsc:kw:${startDate}:${adjEnd}`;
   const cached = getGSCCached<GSCKeywordRow[]>(cacheKey);
   if (cached) return cached;
 
   const client = getGSCClient(tenantId);
-  const siteUrl = getSiteUrl();
+  const siteUrl = getSiteUrl(tenantId);
 
   const response = await client.searchanalytics.query({
     siteUrl,
@@ -90,12 +91,13 @@ export async function fetchPageMetrics(
   tenantId?: string,
 ): Promise<GSCPageRow[]> {
   const adjEnd = adjustGSCEndDate(endDate);
-  const cacheKey = `gsc:pages:${startDate}:${adjEnd}`;
+  const tid = tenantId ?? "default";
+  const cacheKey = `${tid}:gsc:pages:${startDate}:${adjEnd}`;
   const cached = getGSCCached<GSCPageRow[]>(cacheKey);
   if (cached) return cached;
 
   const client = getGSCClient(tenantId);
-  const siteUrl = getSiteUrl();
+  const siteUrl = getSiteUrl(tenantId);
 
   const response = await client.searchanalytics.query({
     siteUrl,
@@ -130,12 +132,13 @@ export async function fetchDailyOrganicTrend(
   tenantId?: string,
 ): Promise<GSCDailyPoint[]> {
   const adjEnd = adjustGSCEndDate(endDate);
-  const cacheKey = `gsc:daily:${startDate}:${adjEnd}`;
+  const tid = tenantId ?? "default";
+  const cacheKey = `${tid}:gsc:daily:${startDate}:${adjEnd}`;
   const cached = getGSCCached<GSCDailyPoint[]>(cacheKey);
   if (cached) return cached;
 
   const client = getGSCClient(tenantId);
-  const siteUrl = getSiteUrl();
+  const siteUrl = getSiteUrl(tenantId);
 
   const response = await client.searchanalytics.query({
     siteUrl,
@@ -171,12 +174,13 @@ export async function fetchKeywordsByPage(
   tenantId?: string,
 ): Promise<GSCKeywordRow[]> {
   const adjEnd = adjustGSCEndDate(endDate);
-  const cacheKey = `gsc:kwp:${page}:${startDate}:${adjEnd}`;
+  const tid = tenantId ?? "default";
+  const cacheKey = `${tid}:gsc:kwp:${page}:${startDate}:${adjEnd}`;
   const cached = getGSCCached<GSCKeywordRow[]>(cacheKey);
   if (cached) return cached;
 
   const client = getGSCClient(tenantId);
-  const siteUrl = getSiteUrl();
+  const siteUrl = getSiteUrl(tenantId);
 
   const response = await client.searchanalytics.query({
     siteUrl,

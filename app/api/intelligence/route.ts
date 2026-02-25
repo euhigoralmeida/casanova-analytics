@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
-import { isConfigured, getCustomer } from "@/lib/google-ads";
-import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
+import { getCustomerAsync } from "@/lib/google-ads";
+import { getGA4ClientAsync } from "@/lib/google-analytics";
 import { fetchAllSkuMetrics, fetchAccountTotals, fetchAllCampaignMetrics, fetchDeviceMetrics } from "@/lib/queries";
 import { fetchGA4Summary, fetchChannelAcquisition, fetchGA4Demographics, fetchGA4Geographic, fetchGA4Devices } from "@/lib/ga4-queries";
 import { computeTargetMonth } from "@/lib/planning-target-calc";
@@ -92,9 +92,8 @@ export async function GET(req: NextRequest) {
   let demographics: DemographicData[] = [];
   let geographic: GeographicData[] = [];
 
-  if (isConfigured()) {
-    try {
-      const customer = getCustomer();
+  try {
+    const customer = await getCustomerAsync(tenantId);
       const [acctData, allSkuData, campData, deviceData] = await Promise.all([
         fetchAccountTotals(customer, period, startDate, endDate),
         fetchAllSkuMetrics(customer, period, startDate, endDate),
@@ -147,25 +146,23 @@ export async function GET(req: NextRequest) {
       }));
 
       devices = deviceData;
-    } catch (err) {
-      console.error("Intelligence: Google Ads error:", err);
-    }
+  } catch (err) {
+    console.error("Intelligence: Google Ads error:", err);
   }
 
   // 4. Fetch GA4 data
   let ga4: GA4Metrics | undefined;
   let channels: ChannelData[] = [];
 
-  if (isGA4Configured()) {
-    try {
-      const ga4Client = getGA4Client();
-      const [summary, channelData, ga4Demo, ga4Geo, ga4Dev] = await Promise.all([
-        fetchGA4Summary(ga4Client, startDate ?? "", endDate ?? ""),
-        fetchChannelAcquisition(ga4Client, startDate ?? "", endDate ?? ""),
-        fetchGA4Demographics(ga4Client, startDate ?? "", endDate ?? "").catch(() => []),
-        fetchGA4Geographic(ga4Client, startDate ?? "", endDate ?? "").catch(() => []),
-        fetchGA4Devices(ga4Client, startDate ?? "", endDate ?? "").catch(() => []),
-      ]);
+  try {
+    const ga4Client = await getGA4ClientAsync(tenantId);
+    const [summary, channelData, ga4Demo, ga4Geo, ga4Dev] = await Promise.all([
+      fetchGA4Summary(ga4Client, startDate ?? "", endDate ?? "", tenantId),
+      fetchChannelAcquisition(ga4Client, startDate ?? "", endDate ?? "", tenantId),
+      fetchGA4Demographics(ga4Client, startDate ?? "", endDate ?? "", tenantId).catch(() => []),
+      fetchGA4Geographic(ga4Client, startDate ?? "", endDate ?? "", tenantId).catch(() => []),
+      fetchGA4Devices(ga4Client, startDate ?? "", endDate ?? "", tenantId).catch(() => []),
+    ]);
 
       ga4 = {
         sessions: summary.sessions,
@@ -225,9 +222,8 @@ export async function GET(req: NextRequest) {
           users: d.users,
         }));
       }
-    } catch (err) {
-      console.error("Intelligence: GA4 error:", err);
-    }
+  } catch (err) {
+    console.error("Intelligence: GA4 error:", err);
   }
 
   // 5. Build context and run analysis

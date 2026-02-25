@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
-import { isConfigured, getCustomer } from "@/lib/google-ads";
-import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
+import { getCustomerAsync } from "@/lib/google-ads";
+import { getGA4ClientAsync } from "@/lib/google-analytics";
 import { fetchAccountTotals } from "@/lib/queries";
 import { fetchGA4Summary, fetchChannelAcquisition } from "@/lib/ga4-queries";
 
@@ -19,6 +19,7 @@ type SyncEntry = { metric: string; month: number; value: number };
 async function fetchMonthData(
   year: number,
   month: number,
+  tenantId?: string,
 ): Promise<SyncEntry[]> {
   const startDate = formatDate(year, month, 1);
   const lastDay = daysInMonth(year, month);
@@ -35,16 +36,17 @@ async function fetchMonthData(
     const today = new Date();
     const endDay = today.getDate();
     const adjustedEnd = formatDate(year, month, endDay);
-    return fetchMonthDataRange(month, startDate, adjustedEnd);
+    return fetchMonthDataRange(month, startDate, adjustedEnd, tenantId);
   }
 
-  return fetchMonthDataRange(month, startDate, endDate);
+  return fetchMonthDataRange(month, startDate, endDate, tenantId);
 }
 
 async function fetchMonthDataRange(
   month: number,
   startDate: string,
   endDate: string,
+  tenantId?: string,
 ): Promise<SyncEntry[]> {
   const entries: SyncEntry[] = [];
 
@@ -52,26 +54,23 @@ async function fetchMonthDataRange(
   const ORGANIC_CHANNELS = ["Organic Search", "Organic Social", "Organic Shopping"];
 
   // Google Ads data
-  if (isConfigured()) {
-    try {
-      const customer = getCustomer();
-      const totals = await fetchAccountTotals(customer, "custom", startDate, endDate);
-      if (totals) {
-        entries.push({ metric: "google_ads", month, value: Math.round(totals.costBRL * 100) / 100 });
-      }
-    } catch (err) {
-      console.error(`Sync: Google Ads error for month ${month}:`, err);
+  try {
+    const customer = await getCustomerAsync(tenantId);
+    const totals = await fetchAccountTotals(customer, "custom", startDate, endDate);
+    if (totals) {
+      entries.push({ metric: "google_ads", month, value: Math.round(totals.costBRL * 100) / 100 });
     }
+  } catch (err) {
+    console.error(`Sync: Google Ads error for month ${month}:`, err);
   }
 
   // GA4 data
-  if (isGA4Configured()) {
-    try {
-      const ga4Client = getGA4Client();
-      const [summary, channels] = await Promise.all([
-        fetchGA4Summary(ga4Client, startDate, endDate),
-        fetchChannelAcquisition(ga4Client, startDate, endDate),
-      ]);
+  try {
+    const ga4Client = await getGA4ClientAsync(tenantId);
+    const [summary, channels] = await Promise.all([
+      fetchGA4Summary(ga4Client, startDate, endDate, tenantId),
+      fetchChannelAcquisition(ga4Client, startDate, endDate, tenantId),
+    ]);
 
       const sessoesMidia = channels
         .filter((c) => PAID_CHANNELS.includes(c.channel))
@@ -89,9 +88,8 @@ async function fetchMonthDataRange(
         { metric: "sessoes_engajadas", month, value: summary.engagedSessions },
         { metric: "taxa_rejeicao", month, value: Math.round(summary.bounceRate * 10000) / 10000 },
       );
-    } catch (err) {
-      console.error(`Sync: GA4 error for month ${month}:`, err);
-    }
+  } catch (err) {
+    console.error(`Sync: GA4 error for month ${month}:`, err);
   }
 
   return entries;
@@ -127,7 +125,7 @@ export async function POST(req: NextRequest) {
   // Fetch data for each month (sequentially to avoid rate limits)
   const allEntries: SyncEntry[] = [];
   for (let m = 1; m <= maxMonth; m++) {
-    const monthEntries = await fetchMonthData(year, m);
+    const monthEntries = await fetchMonthData(year, m, tenantId);
     allEntries.push(...monthEntries);
   }
 

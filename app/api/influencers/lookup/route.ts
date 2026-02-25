@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-helpers";
-import { isInstagramConfigured, fetchIGBusinessDiscovery } from "@/lib/instagram";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { fetchIGBusinessDiscovery } from "@/lib/instagram";
 import { buildLookupResponse } from "@/lib/influencer-discovery";
 
 export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
+  const tenantId = getEffectiveTenantId(auth.session);
 
   const handle = req.nextUrl.searchParams.get("handle")?.trim();
 
@@ -13,15 +14,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Parâmetro 'handle' é obrigatório" }, { status: 400 });
   }
 
-  if (!isInstagramConfigured()) {
-    return NextResponse.json(
-      { error: "Instagram não configurado. Configure META_ADS_ACCESS_TOKEN nas variáveis de ambiente." },
-      { status: 503 },
-    );
-  }
-
   try {
-    const discovery = await fetchIGBusinessDiscovery(handle);
+    const discovery = await fetchIGBusinessDiscovery(handle, tenantId);
     const response = buildLookupResponse(discovery);
     return NextResponse.json(response);
   } catch (err) {

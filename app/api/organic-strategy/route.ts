@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-helpers";
-import { isGSCConfigured } from "@/lib/google-search-console";
-import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
-import { isConfigured as isAdsConfigured, getCustomer, computeComparisonDates } from "@/lib/google-ads";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { getGSCClientAsync } from "@/lib/google-search-console";
+import { getGA4ClientAsync } from "@/lib/google-analytics";
+import { getCustomerAsync, computeComparisonDates } from "@/lib/google-ads";
 import { fetchKeywordsWithDelta, fetchPageMetrics } from "@/lib/gsc-queries";
 import { fetchOrganicLandingPages, fetchOrganicSearchSummary, mergeOrganicData } from "@/lib/organic-intelligence";
 import { fetchUserLifetimeValue, fetchGA4Summary } from "@/lib/ga4-queries";
@@ -18,6 +18,7 @@ import type { OrganicStrategyResponse } from "@/lib/organic-types";
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
   if ("error" in auth) return auth.error;
+  const tenantId = getEffectiveTenantId(auth.session);
 
   const { searchParams } = request.nextUrl;
   const startDate = searchParams.get("startDate") ?? undefined;
@@ -27,7 +28,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "startDate and endDate are required" }, { status: 400 });
   }
 
-  if (!isGSCConfigured()) {
+  // Try to get GSC client — if not configured, return empty
+  try {
+    await getGSCClientAsync(tenantId);
+  } catch {
     const empty: OrganicStrategyResponse = {
       source: "not_configured",
       updatedAt: new Date().toISOString(),
@@ -39,14 +43,12 @@ export async function GET(request: NextRequest) {
 
   try {
     const { prevStart, prevEnd } = computeComparisonDates(startDate, endDate);
-    const ga4Ready = isGA4Configured();
-    const adsReady = isAdsConfigured();
 
     const [keywordsWithDelta, gscPages, ga4Data, adsSearchTerms] = await Promise.all([
-      fetchKeywordsWithDelta(startDate, endDate, prevStart, prevEnd),
-      fetchPageMetrics(startDate, endDate),
-      ga4Ready ? fetchGA4DataForStrategy(startDate, endDate) : Promise.resolve(null),
-      adsReady ? fetchAdsData(startDate, endDate) : Promise.resolve([]),
+      fetchKeywordsWithDelta(startDate, endDate, prevStart, prevEnd, tenantId),
+      fetchPageMetrics(startDate, endDate, tenantId),
+      fetchGA4DataForStrategy(startDate, endDate, tenantId).catch(() => null),
+      fetchAdsData(startDate, endDate, tenantId).catch(() => [] as Awaited<ReturnType<typeof fetchSearchTerms>>),
     ]);
 
     const avgTicket = ga4Data?.avgTicket ?? 150;
@@ -93,15 +95,15 @@ export async function GET(request: NextRequest) {
   }
 }
 
-async function fetchGA4DataForStrategy(startDate: string, endDate: string) {
-  const client = getGA4Client();
+async function fetchGA4DataForStrategy(startDate: string, endDate: string, tenantId?: string) {
+  const client = await getGA4ClientAsync(tenantId);
   const [landingPages, summary, channelLTV, siteSummary] = await Promise.all([
     fetchOrganicLandingPages(client, startDate, endDate).catch(() => []),
     fetchOrganicSearchSummary(client, startDate, endDate).catch(() => ({
       sessions: 0, users: 0, conversions: 0, revenue: 0, bounceRate: 0,
     })),
-    fetchUserLifetimeValue(client, startDate, endDate).catch(() => []),
-    fetchGA4Summary(client, startDate, endDate).catch(() => null),
+    fetchUserLifetimeValue(client, startDate, endDate, tenantId).catch(() => []),
+    fetchGA4Summary(client, startDate, endDate, tenantId).catch(() => null),
   ]);
 
   const organicChannel = channelLTV.find((c) => c.channel === "Organic Search");
@@ -118,11 +120,7 @@ async function fetchGA4DataForStrategy(startDate: string, endDate: string) {
   };
 }
 
-async function fetchAdsData(startDate: string, endDate: string) {
-  try {
-    const customer = getCustomer();
-    return await fetchSearchTerms(customer, startDate, endDate);
-  } catch {
-    return [];
-  }
+async function fetchAdsData(startDate: string, endDate: string, tenantId?: string) {
+  const customer = await getCustomerAsync(tenantId);
+  return await fetchSearchTerms(customer, startDate, endDate);
 }

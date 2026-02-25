@@ -3,6 +3,18 @@ import { getPropertyId } from "./google-analytics";
 import { getCached, setCache } from "./google-ads";
 
 /* =========================
+   Tenant-aware cache helpers
+========================= */
+
+function getGA4TenantCached<T>(key: string, tenantId?: string): T | null {
+  return getCached<T>(`ga4:${key}`, tenantId);
+}
+
+function setGA4TenantCache(key: string, data: unknown, tenantId?: string): void {
+  setCache(`ga4:${key}`, data, tenantId);
+}
+
+/* =========================
    Types
 ========================= */
 
@@ -60,16 +72,9 @@ export type GA4DataResponse = {
 };
 
 /* =========================
-   GA4 Cache (shares 2-min TTL from google-ads.ts)
+   GA4 Cache — DEPRECATED wrappers (use tenant-aware versions above)
+   Kept temporarily for reference; all functions below now use getGA4TenantCached / setGA4TenantCache.
 ========================= */
-
-function getGA4Cached<T>(key: string): T | null {
-  return getCached<T>(`ga4:${key}`);
-}
-
-function setGA4Cache(key: string, data: unknown): void {
-  setCache(`ga4:${key}`, data);
-}
 
 /* =========================
    Funnel Query
@@ -90,13 +95,14 @@ export async function fetchEcommerceFunnel(
   client: BetaAnalyticsDataClient,
   startDate: string,
   endDate: string,
+  tenantId?: string,
 ): Promise<{ funnel: GA4FunnelStep[]; overallConversionRate: number }> {
   const cacheKey = `funnel:${startDate}:${endDate}`;
-  const cached = getGA4Cached<{ funnel: GA4FunnelStep[]; overallConversionRate: number }>(cacheKey);
+  const cached = getGA4TenantCached<{ funnel: GA4FunnelStep[]; overallConversionRate: number }>(cacheKey, tenantId);
   if (cached) return cached;
 
   const [response] = await client.runReport({
-    property: getPropertyId(),
+    property: getPropertyId(tenantId),
     dateRanges: [{ startDate, endDate }],
     dimensions: [{ name: "eventName" }],
     metrics: [{ name: "eventCount" }],
@@ -137,7 +143,7 @@ export async function fetchEcommerceFunnel(
   const overallConversionRate = pageViews > 0 ? Math.round((purchases / pageViews) * 10000) / 100 : 0;
 
   const result = { funnel, overallConversionRate };
-  setGA4Cache(cacheKey, result);
+  setGA4TenantCache(cacheKey, result, tenantId);
   return result;
 }
 
@@ -149,13 +155,14 @@ export async function fetchGA4Summary(
   client: BetaAnalyticsDataClient,
   startDate: string,
   endDate: string,
+  tenantId?: string,
 ): Promise<GA4SummaryData> {
   const cacheKey = `summary:${startDate}:${endDate}`;
-  const cached = getGA4Cached<GA4SummaryData>(cacheKey);
+  const cached = getGA4TenantCached<GA4SummaryData>(cacheKey, tenantId);
   if (cached) return cached;
 
   const [response] = await client.runReport({
-    property: getPropertyId(),
+    property: getPropertyId(tenantId),
     dateRanges: [{ startDate, endDate }],
     metrics: [
       { name: "sessions" },
@@ -200,7 +207,7 @@ export async function fetchGA4Summary(
     checkoutAbandonmentRate,
   };
 
-  setGA4Cache(cacheKey, result);
+  setGA4TenantCache(cacheKey, result, tenantId);
   return result;
 }
 
@@ -214,14 +221,15 @@ export async function fetchGA4FunnelTimeSeries(
   client: BetaAnalyticsDataClient,
   startDate: string,
   endDate: string,
+  tenantId?: string,
 ): Promise<GA4DailyPoint[]> {
   const cacheKey = `ts:${startDate}:${endDate}`;
-  const cached = getGA4Cached<GA4DailyPoint[]>(cacheKey);
+  const cached = getGA4TenantCached<GA4DailyPoint[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   // Query 1: sessions + revenue by date
   const [sessionsRes] = await client.runReport({
-    property: getPropertyId(),
+    property: getPropertyId(tenantId),
     dateRanges: [{ startDate, endDate }],
     dimensions: [{ name: "date" }],
     metrics: [
@@ -233,7 +241,7 @@ export async function fetchGA4FunnelTimeSeries(
 
   // Query 2: event counts by date + eventName for funnel events
   const [eventsRes] = await client.runReport({
-    property: getPropertyId(),
+    property: getPropertyId(tenantId),
     dateRanges: [{ startDate, endDate }],
     dimensions: [{ name: "date" }, { name: "eventName" }],
     metrics: [{ name: "eventCount" }],
@@ -293,7 +301,7 @@ export async function fetchGA4FunnelTimeSeries(
 
   const series = Object.values(dateMap).sort((a, b) => a.date.localeCompare(b.date));
 
-  setGA4Cache(cacheKey, series);
+  setGA4TenantCache(cacheKey, series, tenantId);
   return series;
 }
 
@@ -334,14 +342,15 @@ export async function fetchGA4Demographics(
   client: BetaAnalyticsDataClient,
   startDate: string,
   endDate: string,
+  tenantId?: string,
 ): Promise<GA4DemographicRow[]> {
   const cacheKey = `ga4demo:${startDate}:${endDate}`;
-  const cached = getGA4Cached<GA4DemographicRow[]>(cacheKey);
+  const cached = getGA4TenantCached<GA4DemographicRow[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   const [ageRes, genderRes] = await Promise.all([
     client.runReport({
-      property: getPropertyId(),
+      property: getPropertyId(tenantId),
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "userAgeBracket" }],
       metrics: [
@@ -352,7 +361,7 @@ export async function fetchGA4Demographics(
       ],
     }),
     client.runReport({
-      property: getPropertyId(),
+      property: getPropertyId(tenantId),
       dateRanges: [{ startDate, endDate }],
       dimensions: [{ name: "userGender" }],
       metrics: [
@@ -392,7 +401,7 @@ export async function fetchGA4Demographics(
     });
   }
 
-  setGA4Cache(cacheKey, result);
+  setGA4TenantCache(cacheKey, result, tenantId);
   return result;
 }
 
@@ -412,13 +421,14 @@ export async function fetchGA4Geographic(
   client: BetaAnalyticsDataClient,
   startDate: string,
   endDate: string,
+  tenantId?: string,
 ): Promise<GA4GeographicRow[]> {
   const cacheKey = `ga4geo:${startDate}:${endDate}`;
-  const cached = getGA4Cached<GA4GeographicRow[]>(cacheKey);
+  const cached = getGA4TenantCached<GA4GeographicRow[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   const [response] = await client.runReport({
-    property: getPropertyId(),
+    property: getPropertyId(tenantId),
     dateRanges: [{ startDate, endDate }],
     dimensions: [{ name: "region" }],
     metrics: [
@@ -443,7 +453,7 @@ export async function fetchGA4Geographic(
     };
   });
 
-  setGA4Cache(cacheKey, rows);
+  setGA4TenantCache(cacheKey, rows, tenantId);
   return rows;
 }
 
@@ -469,13 +479,14 @@ export async function fetchGA4Devices(
   client: BetaAnalyticsDataClient,
   startDate: string,
   endDate: string,
+  tenantId?: string,
 ): Promise<GA4DeviceRow[]> {
   const cacheKey = `ga4dev:${startDate}:${endDate}`;
-  const cached = getGA4Cached<GA4DeviceRow[]>(cacheKey);
+  const cached = getGA4TenantCached<GA4DeviceRow[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   const [response] = await client.runReport({
-    property: getPropertyId(),
+    property: getPropertyId(tenantId),
     dateRanges: [{ startDate, endDate }],
     dimensions: [{ name: "deviceCategory" }],
     metrics: [
@@ -499,7 +510,7 @@ export async function fetchGA4Devices(
     };
   });
 
-  setGA4Cache(cacheKey, rows);
+  setGA4TenantCache(cacheKey, rows, tenantId);
   return rows;
 }
 
@@ -558,9 +569,10 @@ export async function fetchCohortRetention(
   client: BetaAnalyticsDataClient,
   startDate: string,
   endDate: string,
+  tenantId?: string,
 ): Promise<CohortRetentionData[]> {
   const cacheKey = `retention-cohort:${startDate}:${endDate}`;
-  const cached = getGA4Cached<CohortRetentionData[]>(cacheKey);
+  const cached = getGA4TenantCached<CohortRetentionData[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   // Build weekly cohorts spanning the date range
@@ -588,7 +600,7 @@ export async function fetchCohortRetention(
   }
 
   const [response] = await client.runReport({
-    property: getPropertyId(),
+    property: getPropertyId(tenantId),
     cohortSpec: {
       cohorts: cohorts.map((c) => ({
         name: c.dimension,
@@ -638,7 +650,7 @@ export async function fetchCohortRetention(
     };
   });
 
-  setGA4Cache(cacheKey, result);
+  setGA4TenantCache(cacheKey, result, tenantId);
   return result;
 }
 
@@ -650,13 +662,14 @@ export async function fetchRetentionSummary(
   client: BetaAnalyticsDataClient,
   startDate: string,
   endDate: string,
+  tenantId?: string,
 ): Promise<RetentionSummary> {
   const cacheKey = `retention-summary:${startDate}:${endDate}`;
-  const cached = getGA4Cached<RetentionSummary>(cacheKey);
+  const cached = getGA4TenantCached<RetentionSummary>(cacheKey, tenantId);
   if (cached) return cached;
 
   const [response] = await client.runReport({
-    property: getPropertyId(),
+    property: getPropertyId(tenantId),
     dateRanges: [{ startDate, endDate }],
     dimensions: [{ name: "newVsReturning" }],
     metrics: [
@@ -715,7 +728,7 @@ export async function fetchRetentionSummary(
     repurchaseEstimate: returningPurchasers > 0 ? Math.round((returningPurchases / returningPurchasers) * 100) / 100 : 0,
   };
 
-  setGA4Cache(cacheKey, result);
+  setGA4TenantCache(cacheKey, result, tenantId);
   return result;
 }
 
@@ -727,13 +740,14 @@ export async function fetchUserLifetimeValue(
   client: BetaAnalyticsDataClient,
   startDate: string,
   endDate: string,
+  tenantId?: string,
 ): Promise<ChannelLTV[]> {
   const cacheKey = `retention-ltv:${startDate}:${endDate}`;
-  const cached = getGA4Cached<ChannelLTV[]>(cacheKey);
+  const cached = getGA4TenantCached<ChannelLTV[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   const [response] = await client.runReport({
-    property: getPropertyId(),
+    property: getPropertyId(tenantId),
     dateRanges: [{ startDate, endDate }],
     dimensions: [{ name: "firstUserDefaultChannelGroup" }],
     metrics: [
@@ -765,7 +779,7 @@ export async function fetchUserLifetimeValue(
     };
   });
 
-  setGA4Cache(cacheKey, channels);
+  setGA4TenantCache(cacheKey, channels, tenantId);
   return channels;
 }
 
@@ -777,13 +791,14 @@ export async function fetchChannelAcquisition(
   client: BetaAnalyticsDataClient,
   startDate: string,
   endDate: string,
+  tenantId?: string,
 ): Promise<ChannelAcquisition[]> {
   const cacheKey = `channels:${startDate}:${endDate}`;
-  const cached = getGA4Cached<ChannelAcquisition[]>(cacheKey);
+  const cached = getGA4TenantCached<ChannelAcquisition[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   const [response] = await client.runReport({
-    property: getPropertyId(),
+    property: getPropertyId(tenantId),
     dateRanges: [{ startDate, endDate }],
     dimensions: [{ name: "firstUserDefaultChannelGroup" }],
     metrics: [
@@ -809,6 +824,6 @@ export async function fetchChannelAcquisition(
     };
   });
 
-  setGA4Cache(cacheKey, channels);
+  setGA4TenantCache(cacheKey, channels, tenantId);
   return channels;
 }

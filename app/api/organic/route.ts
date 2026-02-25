@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-helpers";
-import { isGSCConfigured } from "@/lib/google-search-console";
-import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
-import { isConfigured as isAdsConfigured, getCustomer } from "@/lib/google-ads";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { getGSCClientAsync } from "@/lib/google-search-console";
+import { getGA4ClientAsync } from "@/lib/google-analytics";
+import { getCustomerAsync } from "@/lib/google-ads";
 import { computeComparisonDates } from "@/lib/google-ads";
 import { fetchKeywordsWithDelta, fetchPageMetrics, fetchDailyOrganicTrend } from "@/lib/gsc-queries";
 import { fetchOrganicLandingPages, fetchOrganicSearchSummary, mergeOrganicData } from "@/lib/organic-intelligence";
@@ -18,6 +18,7 @@ import type { OrganicDataResponse } from "@/lib/organic-types";
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
   if ("error" in auth) return auth.error;
+  const tenantId = getEffectiveTenantId(auth.session);
 
   const { searchParams } = request.nextUrl;
   const startDate = searchParams.get("startDate") ?? undefined;
@@ -27,7 +28,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "startDate and endDate are required" }, { status: 400 });
   }
 
-  if (!isGSCConfigured()) {
+  // Try to get GSC client — if not configured, return empty
+  let gscClient;
+  try {
+    gscClient = await getGSCClientAsync(tenantId);
+  } catch {
     const empty: OrganicDataResponse = {
       source: "not_configured",
       updatedAt: new Date().toISOString(),
@@ -40,15 +45,15 @@ export async function GET(request: NextRequest) {
     const { prevStart, prevEnd } = computeComparisonDates(startDate, endDate);
 
     // Parallel fetch: GSC + GA4 + Ads search terms
-    const ga4Ready = isGA4Configured();
-    const adsReady = isAdsConfigured();
+    // Use void reference so TS knows gscClient was resolved (for type narrowing)
+    void gscClient;
 
     const [keywordsWithDelta, gscPages, dailySeries, ga4Data, adsSearchTerms] = await Promise.all([
-      fetchKeywordsWithDelta(startDate, endDate, prevStart, prevEnd),
-      fetchPageMetrics(startDate, endDate),
-      fetchDailyOrganicTrend(startDate, endDate),
-      ga4Ready ? fetchGA4DataForOrganic(startDate, endDate) : Promise.resolve(null),
-      adsReady ? fetchAdsSearchTerms(startDate, endDate) : Promise.resolve([]),
+      fetchKeywordsWithDelta(startDate, endDate, prevStart, prevEnd, tenantId),
+      fetchPageMetrics(startDate, endDate, tenantId),
+      fetchDailyOrganicTrend(startDate, endDate, tenantId),
+      fetchGA4DataForOrganic(startDate, endDate, tenantId).catch(() => null),
+      fetchAdsSearchTerms(startDate, endDate, tenantId).catch(() => [] as Awaited<ReturnType<typeof fetchSearchTerms>>),
     ]);
 
     // GSC summary KPIs
@@ -126,16 +131,16 @@ export async function GET(request: NextRequest) {
    GA4 data for organic module
 ========================= */
 
-async function fetchGA4DataForOrganic(startDate: string, endDate: string) {
-  const client = getGA4Client();
+async function fetchGA4DataForOrganic(startDate: string, endDate: string, tenantId?: string) {
+  const client = await getGA4ClientAsync(tenantId);
 
   const [landingPages, summary, channelLTV, siteSummary] = await Promise.all([
     fetchOrganicLandingPages(client, startDate, endDate).catch(() => []),
     fetchOrganicSearchSummary(client, startDate, endDate).catch(() => ({
       sessions: 0, users: 0, conversions: 0, revenue: 0, bounceRate: 0,
     })),
-    fetchUserLifetimeValue(client, startDate, endDate).catch(() => []),
-    fetchGA4Summary(client, startDate, endDate).catch(() => null),
+    fetchUserLifetimeValue(client, startDate, endDate, tenantId).catch(() => []),
+    fetchGA4Summary(client, startDate, endDate, tenantId).catch(() => null),
   ]);
 
   // Extract organic LTV
@@ -165,11 +170,7 @@ async function fetchGA4DataForOrganic(startDate: string, endDate: string) {
    Ads search terms
 ========================= */
 
-async function fetchAdsSearchTerms(startDate: string, endDate: string) {
-  try {
-    const customer = getCustomer();
-    return await fetchSearchTerms(customer, startDate, endDate);
-  } catch {
-    return [];
-  }
+async function fetchAdsSearchTerms(startDate: string, endDate: string, tenantId?: string) {
+  const customer = await getCustomerAsync(tenantId);
+  return await fetchSearchTerms(customer, startDate, endDate);
 }

@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 import {
-  isInstagramConfigured,
   discoverIGAccountId,
   fetchIGAccount,
   fetchIGMedia,
@@ -16,13 +15,7 @@ import type { IGInsightsResponse } from "@/lib/instagram";
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
   if ("error" in auth) return auth.error;
-
-  if (!isInstagramConfigured()) {
-    return NextResponse.json({
-      source: "not_configured",
-      updatedAt: new Date().toISOString(),
-    } satisfies IGInsightsResponse);
-  }
+  const tenantId = getEffectiveTenantId(auth.session);
 
   const { searchParams } = request.nextUrl;
   const startDate = searchParams.get("startDate");
@@ -34,7 +27,7 @@ export async function GET(request: NextRequest) {
 
   try {
     // Discover IG Business Account
-    const igUserId = await discoverIGAccountId();
+    const igUserId = await discoverIGAccountId(tenantId);
     if (!igUserId) {
       return NextResponse.json({
         source: "discovery_failed",
@@ -44,14 +37,14 @@ export async function GET(request: NextRequest) {
 
     // Fetch all data in parallel
     const [account, media, dailyInsights, periodTotals, audience, onlineFollowers] = await Promise.all([
-      fetchIGAccount(igUserId),
-      fetchIGMedia(igUserId, 50),
-      fetchIGDailyInsights(igUserId, startDate, endDate).catch(() => []),
-      fetchIGPeriodTotals(igUserId, startDate, endDate).catch(() => ({
+      fetchIGAccount(igUserId, tenantId),
+      fetchIGMedia(igUserId, 50, tenantId),
+      fetchIGDailyInsights(igUserId, startDate, endDate, tenantId).catch(() => []),
+      fetchIGPeriodTotals(igUserId, startDate, endDate, tenantId).catch(() => ({
         views: 0, totalInteractions: 0, accountsEngaged: 0, followsAndUnfollows: 0,
       })),
-      fetchIGAudienceDemographics(igUserId).catch(() => ({ genderAge: [], countries: [], cities: [] })),
-      fetchIGOnlineFollowers(igUserId).catch(() => []),
+      fetchIGAudienceDemographics(igUserId, tenantId).catch(() => ({ genderAge: [], countries: [], cities: [] })),
+      fetchIGOnlineFollowers(igUserId, tenantId).catch(() => []),
     ]);
 
     // Enrich top 25 posts by engagement with individual insights
@@ -61,7 +54,7 @@ export async function GET(request: NextRequest) {
 
     const mediaInsights = await Promise.all(
       sortedMedia.map((m) =>
-        fetchIGMediaInsights(m.id).catch(() => ({
+        fetchIGMediaInsights(m.id, tenantId).catch(() => ({
           mediaId: m.id,
           reach: 0,
           saved: 0,

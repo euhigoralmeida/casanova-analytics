@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isConfigured, getCustomer } from "@/lib/google-ads";
+import { getCustomerAsync } from "@/lib/google-ads";
 import { fetchSkuMetrics } from "@/lib/queries";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 
 /* =========================
    Mock data (fallback)
@@ -88,6 +88,7 @@ function buildAlerts(roas: number, cpa: number, marginPct: number, stock: number
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
   if ("error" in auth) return auth.error;
+  const tenantId = getEffectiveTenantId(auth.session);
 
   const { searchParams } = request.nextUrl;
   const period = searchParams.get("period") ?? "7d";
@@ -102,9 +103,8 @@ export async function GET(request: NextRequest) {
   const leadTimeDays = knownProfile?.leadTimeDays ?? 10;
 
   /* ---- DADOS REAIS (Google Ads) ---- */
-  if (isConfigured()) {
-    try {
-      const customer = getCustomer();
+  try {
+    const customer = await getCustomerAsync(tenantId);
       const data = await fetchSkuMetrics(customer, sku, period, startDate, endDate);
 
       if (!data) {
@@ -157,9 +157,8 @@ export async function GET(request: NextRequest) {
         alerts,
         funnel,
       });
-    } catch (err) {
-      console.error("Google Ads API error, falling back to mock:", err);
-    }
+  } catch (err) {
+    console.error("Google Ads API error, falling back to mock:", err);
   }
 
   /* ---- MOCK (fallback) ---- */

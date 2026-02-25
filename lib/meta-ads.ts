@@ -107,9 +107,9 @@ function setCache(key: string, data: unknown): void {
 // ---------- Graph API fetch ----------
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function graphFetch(path: string, params: Record<string, string>): Promise<any> {
+async function graphFetch(path: string, params: Record<string, string>, accessToken?: string): Promise<any> {
   const url = new URL(`${BASE_URL}${path}`);
-  url.searchParams.set("access_token", getAccessToken());
+  url.searchParams.set("access_token", accessToken ?? getAccessToken());
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
   }
@@ -121,6 +121,15 @@ async function graphFetch(path: string, params: Record<string, string>): Promise
     throw new Error(`Meta API ${res.status}: ${body.slice(0, 200)}`);
   }
   return res.json();
+}
+
+/** Resolve tenant credentials, returns { accessToken, accountId } or falls back to env vars. */
+async function resolveMetaCreds(tenantId?: string): Promise<{ accessToken: string; accountId: string }> {
+  if (tenantId) {
+    const creds = await getMetaCredentials(tenantId);
+    if (creds) return creds;
+  }
+  return { accessToken: getAccessToken(), accountId: getAccountId() };
 }
 
 // ---------- Parsing helpers ----------
@@ -153,12 +162,13 @@ function parseRevenue(actionValues: any[] | undefined): number {
 const CAMPAIGN_FIELDS = "campaign_id,campaign_name,objective,impressions,clicks,spend,actions,action_values,cpm,cpc,ctr";
 const ACCOUNT_FIELDS = "impressions,clicks,spend,actions,action_values,cpm,cpc,ctr";
 
-export async function fetchMetaCampaigns(startDate: string, endDate: string): Promise<MetaAdsCampaign[]> {
-  const cacheKey = `meta_campaigns_${startDate}_${endDate}`;
+export async function fetchMetaCampaigns(startDate: string, endDate: string, tenantId?: string): Promise<MetaAdsCampaign[]> {
+  const tid = tenantId ?? "default";
+  const cacheKey = `${tid}:meta_campaigns_${startDate}_${endDate}`;
   const cached = getCached<MetaAdsCampaign[]>(cacheKey);
   if (cached) return cached;
 
-  const actId = getAccountId();
+  const { accessToken, accountId: actId } = await resolveMetaCreds(tenantId);
   const timeRange = JSON.stringify({ since: startDate, until: endDate });
 
   // Fetch campaign-level insights
@@ -167,13 +177,13 @@ export async function fetchMetaCampaigns(startDate: string, endDate: string): Pr
     fields: CAMPAIGN_FIELDS,
     time_range: timeRange,
     limit: "500",
-  });
+  }, accessToken);
 
   // Also fetch campaign statuses
   const campaignStatusData = await graphFetch(`/act_${actId}/campaigns`, {
     fields: "id,name,status,objective",
     limit: "500",
-  }).catch(() => ({ data: [] }));
+  }, accessToken).catch(() => ({ data: [] }));
 
   // Build status lookup
   const statusMap = new Map<string, string>();
@@ -222,18 +232,19 @@ export async function fetchMetaCampaigns(startDate: string, endDate: string): Pr
   return campaigns;
 }
 
-export async function fetchMetaAccountTotals(startDate: string, endDate: string): Promise<MetaAccountTotals> {
-  const cacheKey = `meta_account_${startDate}_${endDate}`;
+export async function fetchMetaAccountTotals(startDate: string, endDate: string, tenantId?: string): Promise<MetaAccountTotals> {
+  const tid = tenantId ?? "default";
+  const cacheKey = `${tid}:meta_account_${startDate}_${endDate}`;
   const cached = getCached<MetaAccountTotals>(cacheKey);
   if (cached) return cached;
 
-  const actId = getAccountId();
+  const { accessToken, accountId: actId } = await resolveMetaCreds(tenantId);
   const timeRange = JSON.stringify({ since: startDate, until: endDate });
 
   const data = await graphFetch(`/act_${actId}/insights`, {
     fields: ACCOUNT_FIELDS,
     time_range: timeRange,
-  });
+  }, accessToken);
 
   const row = data.data?.[0];
   if (!row) {
@@ -264,12 +275,13 @@ export async function fetchMetaAccountTotals(startDate: string, endDate: string)
   return totals;
 }
 
-export async function fetchMetaTimeSeries(startDate: string, endDate: string): Promise<MetaTimeSeriesPoint[]> {
-  const cacheKey = `meta_timeseries_${startDate}_${endDate}`;
+export async function fetchMetaTimeSeries(startDate: string, endDate: string, tenantId?: string): Promise<MetaTimeSeriesPoint[]> {
+  const tid = tenantId ?? "default";
+  const cacheKey = `${tid}:meta_timeseries_${startDate}_${endDate}`;
   const cached = getCached<MetaTimeSeriesPoint[]>(cacheKey);
   if (cached) return cached;
 
-  const actId = getAccountId();
+  const { accessToken, accountId: actId } = await resolveMetaCreds(tenantId);
   const timeRange = JSON.stringify({ since: startDate, until: endDate });
 
   const data = await graphFetch(`/act_${actId}/insights`, {
@@ -277,7 +289,7 @@ export async function fetchMetaTimeSeries(startDate: string, endDate: string): P
     time_range: timeRange,
     time_increment: "1",
     limit: "500",
-  });
+  }, accessToken);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const series: MetaTimeSeriesPoint[] = (data.data || []).map((row: any) => {

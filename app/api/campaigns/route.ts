@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isConfigured, getCustomer } from "@/lib/google-ads";
+import { getCustomerAsync } from "@/lib/google-ads";
 import { fetchAllCampaignMetrics } from "@/lib/queries";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 
 /* =========================
    Mock data (fallback)
@@ -64,16 +64,16 @@ function buildMockCampaigns() {
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
   if ("error" in auth) return auth.error;
+  const tenantId = getEffectiveTenantId(auth.session);
 
   const { searchParams } = request.nextUrl;
   const period = searchParams.get("period") ?? "7d";
   const startDate = searchParams.get("startDate") ?? undefined;
   const endDate = searchParams.get("endDate") ?? undefined;
 
-  if (isConfigured()) {
-    try {
-      const customer = getCustomer();
-      const allCampaigns = await fetchAllCampaignMetrics(customer, period, startDate, endDate);
+  try {
+    const customer = await getCustomerAsync(tenantId);
+    const allCampaigns = await fetchAllCampaignMetrics(customer, period, startDate, endDate);
 
       const campaigns = allCampaigns
         .filter((c) => c.costBRL > 0 || c.impressions > 0)
@@ -98,9 +98,8 @@ export async function GET(request: NextRequest) {
         updatedAt: new Date().toISOString(),
         campaigns,
       });
-    } catch (err) {
-      console.error("Google Ads API error in campaigns:", err);
-    }
+  } catch (err) {
+    console.error("Google Ads API error in campaigns:", err);
   }
 
   return NextResponse.json({

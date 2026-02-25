@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isConfigured, getCustomer } from "@/lib/google-ads";
+import { getCustomerAsync } from "@/lib/google-ads";
 import { fetchSkuTimeSeries, fetchAllTimeSeries, fetchAccountTimeSeries, fetchCampaignTimeSeries, DailyMetrics } from "@/lib/queries";
 import { fmtDate } from "@/lib/format";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 
 /* =========================
    Mock data (fallback)
@@ -65,6 +65,7 @@ function getDaysFromPeriod(period: string, startDate?: string, endDate?: string)
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
   if ("error" in auth) return auth.error;
+  const tenantId = getEffectiveTenantId(auth.session);
 
   const { searchParams } = request.nextUrl;
   const period = searchParams.get("period") ?? "7d";
@@ -75,9 +76,8 @@ export async function GET(request: NextRequest) {
   const endDate = searchParams.get("endDate") ?? undefined;
 
   /* ---- DADOS REAIS (Google Ads) ---- */
-  if (isConfigured()) {
-    try {
-      const customer = getCustomer();
+  try {
+    const customer = await getCustomerAsync(tenantId);
 
       let daily: DailyMetrics[];
       if (scope === "campaign" && campaignId) {
@@ -110,9 +110,8 @@ export async function GET(request: NextRequest) {
         source: "google-ads",
         series,
       });
-    } catch (err) {
-      console.error("Google Ads API error in timeseries, falling back to mock:", err);
-    }
+  } catch (err) {
+    console.error("Google Ads API error in timeseries, falling back to mock:", err);
   }
 
   /* ---- MOCK (fallback) ---- */

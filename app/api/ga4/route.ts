@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
+import { getGA4ClientAsync } from "@/lib/google-analytics";
 import { fetchEcommerceFunnel, fetchGA4Summary, fetchGA4FunnelTimeSeries, fetchChannelAcquisition } from "@/lib/ga4-queries";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 
 /* =========================
    GET handler — v2
@@ -10,6 +10,7 @@ import { requireAuth } from "@/lib/api-helpers";
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
   if ("error" in auth) return auth.error;
+  const tenantId = getEffectiveTenantId(auth.session);
 
   const { searchParams } = request.nextUrl;
   const startDate = searchParams.get("startDate") ?? undefined;
@@ -19,20 +20,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "startDate and endDate are required" }, { status: 400 });
   }
 
-  /* ---- GA4 não configurado ---- */
-  if (!isGA4Configured()) {
-    return NextResponse.json({ source: "not_configured" }, { status: 200 });
-  }
-
   /* ---- DADOS REAIS (GA4) ---- */
   try {
-    const client = getGA4Client();
+    const client = await getGA4ClientAsync(tenantId);
 
     const [funnelData, summary, dailySeries, channelAcquisition] = await Promise.all([
-      fetchEcommerceFunnel(client, startDate, endDate),
-      fetchGA4Summary(client, startDate, endDate),
-      fetchGA4FunnelTimeSeries(client, startDate, endDate),
-      fetchChannelAcquisition(client, startDate, endDate),
+      fetchEcommerceFunnel(client, startDate, endDate, tenantId),
+      fetchGA4Summary(client, startDate, endDate, tenantId),
+      fetchGA4FunnelTimeSeries(client, startDate, endDate, tenantId),
+      fetchChannelAcquisition(client, startDate, endDate, tenantId),
     ]);
 
     const funnel = funnelData.funnel;

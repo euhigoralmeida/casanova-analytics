@@ -97,12 +97,32 @@ export type IGInsightsResponse = {
 
 // ---------- Config ----------
 
+import { getTenantCredentials } from "@/lib/tenant-credentials";
+
 export function isInstagramConfigured(): boolean {
   return !!process.env.META_ADS_ACCESS_TOKEN;
 }
 
 function getAccessToken(): string {
   return process.env.META_ADS_ACCESS_TOKEN!;
+}
+
+/** Resolve IG access token for a tenant — DB first, env fallback. */
+async function resolveIGToken(tenantId?: string): Promise<string> {
+  if (tenantId) {
+    const creds = await getTenantCredentials(tenantId, "instagram");
+    if (creds?.access_token) return creds.access_token;
+  }
+  return getAccessToken();
+}
+
+/** Resolve IG business account ID for a tenant — DB first, env fallback. */
+async function resolveIGBusinessAccountId(tenantId?: string): Promise<string | undefined> {
+  if (tenantId) {
+    const creds = await getTenantCredentials(tenantId, "instagram");
+    if (creds?.business_account_id) return creds.business_account_id;
+  }
+  return process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID || undefined;
 }
 
 // ---------- Cache ----------
@@ -124,9 +144,9 @@ function setCache(key: string, data: unknown): void {
 // ---------- Graph API fetch ----------
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function graphFetch(path: string, params: Record<string, string> = {}): Promise<any> {
+async function graphFetch(path: string, params: Record<string, string> = {}, accessToken?: string): Promise<any> {
   const url = new URL(`${BASE_URL}${path}`);
-  url.searchParams.set("access_token", getAccessToken());
+  url.searchParams.set("access_token", accessToken ?? getAccessToken());
   for (const [k, v] of Object.entries(params)) {
     url.searchParams.set(k, v);
   }
@@ -142,36 +162,40 @@ async function graphFetch(path: string, params: Record<string, string> = {}): Pr
 
 // ---------- Account Discovery ----------
 
-let cachedIGAccountId: { id: string; ts: number } | null = null;
+const cachedIGAccountIds = new Map<string, { id: string; ts: number }>();
 
 /**
  * Get the IG Business Account ID.
- * Priority: INSTAGRAM_BUSINESS_ACCOUNT_ID env var > auto-discover via /me/accounts.
+ * Priority: DB credentials > INSTAGRAM_BUSINESS_ACCOUNT_ID env var > auto-discover via /me/accounts.
  */
-export async function discoverIGAccountId(): Promise<string | null> {
-  // 1. Direct env var (most reliable)
-  const envId = process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID;
-  if (envId) {
-    return envId;
+export async function discoverIGAccountId(tenantId?: string): Promise<string | null> {
+  const tid = tenantId ?? "default";
+
+  // 1. DB credentials (most reliable for multi-tenant)
+  const dbAccountId = await resolveIGBusinessAccountId(tenantId);
+  if (dbAccountId) {
+    return dbAccountId;
   }
 
   // 2. Cached result
-  if (cachedIGAccountId && Date.now() - cachedIGAccountId.ts < ACCOUNT_CACHE_TTL) {
-    return cachedIGAccountId.id;
+  const cached = cachedIGAccountIds.get(tid);
+  if (cached && Date.now() - cached.ts < ACCOUNT_CACHE_TTL) {
+    return cached.id;
   }
 
   // 3. Auto-discover via Pages API (requires pages_show_list permission)
   try {
+    const token = await resolveIGToken(tenantId);
     const data = await graphFetch("/me/accounts", {
       fields: "instagram_business_account{id,username},name",
       limit: "100",
-    });
+    }, token);
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     for (const page of (data.data || []) as any[]) {
       if (page.instagram_business_account?.id) {
         const igId = page.instagram_business_account.id;
-        cachedIGAccountId = { id: igId, ts: Date.now() };
+        cachedIGAccountIds.set(tid, { id: igId, ts: Date.now() });
         return igId;
       }
     }
@@ -186,14 +210,16 @@ export async function discoverIGAccountId(): Promise<string | null> {
 
 // ---------- Public API ----------
 
-export async function fetchIGAccount(igUserId: string): Promise<IGAccount> {
-  const cacheKey = `ig_account_${igUserId}`;
+export async function fetchIGAccount(igUserId: string, tenantId?: string): Promise<IGAccount> {
+  const tid = tenantId ?? "default";
+  const cacheKey = `${tid}:ig_account_${igUserId}`;
   const cached = getCached<IGAccount>(cacheKey);
   if (cached) return cached;
 
+  const token = await resolveIGToken(tenantId);
   const data = await graphFetch(`/${igUserId}`, {
     fields: "username,name,biography,followers_count,follows_count,media_count,profile_picture_url",
-  });
+  }, token);
 
   const account: IGAccount = {
     id: data.id,
@@ -210,15 +236,17 @@ export async function fetchIGAccount(igUserId: string): Promise<IGAccount> {
   return account;
 }
 
-export async function fetchIGMedia(igUserId: string, limit = 50): Promise<IGMedia[]> {
-  const cacheKey = `ig_media_${igUserId}_${limit}`;
+export async function fetchIGMedia(igUserId: string, limit = 50, tenantId?: string): Promise<IGMedia[]> {
+  const tid = tenantId ?? "default";
+  const cacheKey = `${tid}:ig_media_${igUserId}_${limit}`;
   const cached = getCached<IGMedia[]>(cacheKey);
   if (cached) return cached;
 
+  const token = await resolveIGToken(tenantId);
   const data = await graphFetch(`/${igUserId}/media`, {
     fields: "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count",
     limit: String(limit),
-  });
+  }, token);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const media: IGMedia[] = (data.data || []).map((m: any) => ({
@@ -241,14 +269,16 @@ export async function fetchIGMedia(igUserId: string, limit = 50): Promise<IGMedi
  * Fetch per-media insights. v21.0 uses: reach, saved, likes, comments, shares, total_interactions.
  * `engagement` and `impressions` are deprecated.
  */
-export async function fetchIGMediaInsights(mediaId: string): Promise<IGMediaInsights> {
-  const cacheKey = `ig_media_insights_${mediaId}`;
+export async function fetchIGMediaInsights(mediaId: string, tenantId?: string): Promise<IGMediaInsights> {
+  const tid = tenantId ?? "default";
+  const cacheKey = `${tid}:ig_media_insights_${mediaId}`;
   const cached = getCached<IGMediaInsights>(cacheKey);
   if (cached) return cached;
 
+  const token = await resolveIGToken(tenantId);
   const data = await graphFetch(`/${mediaId}/insights`, {
     metric: "reach,saved,likes,comments,shares,total_interactions",
-  });
+  }, token);
 
   const metrics: Record<string, number> = {};
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -279,8 +309,10 @@ export async function fetchIGDailyInsights(
   igUserId: string,
   startDate: string,
   endDate: string,
+  tenantId?: string,
 ): Promise<IGDailyInsight[]> {
-  const cacheKey = `ig_daily_${igUserId}_${startDate}_${endDate}`;
+  const tid = tenantId ?? "default";
+  const cacheKey = `${tid}:ig_daily_${igUserId}_${startDate}_${endDate}`;
   const cached = getCached<IGDailyInsight[]>(cacheKey);
   if (cached) return cached;
 
@@ -302,6 +334,7 @@ export async function fetchIGDailyInsights(
     chunkStart.setDate(chunkStart.getDate() + 1);
   }
 
+  const token = await resolveIGToken(tenantId);
   const allResults = await Promise.all(
     chunks.map((chunk) =>
       graphFetch(`/${igUserId}/insights`, {
@@ -310,7 +343,7 @@ export async function fetchIGDailyInsights(
         metric_type: "time_series",
         since: String(chunk.since),
         until: String(chunk.until),
-      }).catch((err) => {
+      }, token).catch((err) => {
         console.warn("IG daily insights chunk error:", err);
         return { data: [] };
       }),
@@ -350,21 +383,24 @@ export async function fetchIGPeriodTotals(
   igUserId: string,
   startDate: string,
   endDate: string,
+  tenantId?: string,
 ): Promise<IGPeriodTotals> {
-  const cacheKey = `ig_totals_${igUserId}_${startDate}_${endDate}`;
+  const tid = tenantId ?? "default";
+  const cacheKey = `${tid}:ig_totals_${igUserId}_${startDate}_${endDate}`;
   const cached = getCached<IGPeriodTotals>(cacheKey);
   if (cached) return cached;
 
   const since = Math.floor(new Date(startDate + "T00:00:00").getTime() / 1000);
   const until = Math.floor(new Date(endDate + "T23:59:59").getTime() / 1000);
 
+  const token = await resolveIGToken(tenantId);
   const data = await graphFetch(`/${igUserId}/insights`, {
     metric: "views,total_interactions,accounts_engaged,follows_and_unfollows",
     period: "day",
     metric_type: "total_value",
     since: String(since),
     until: String(until),
-  });
+  }, token);
 
   const values: Record<string, number> = {};
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -388,15 +424,18 @@ export async function fetchIGPeriodTotals(
  */
 export async function fetchIGAudienceDemographics(
   igUserId: string,
+  tenantId?: string,
 ): Promise<{
   genderAge: IGAudienceGenderAge[];
   countries: IGAudienceGeo[];
   cities: IGAudienceGeo[];
 }> {
-  const cacheKey = `ig_audience_${igUserId}`;
+  const tid = tenantId ?? "default";
+  const cacheKey = `${tid}:ig_audience_${igUserId}`;
   const cached = getCached<{ genderAge: IGAudienceGenderAge[]; countries: IGAudienceGeo[]; cities: IGAudienceGeo[] }>(cacheKey);
   if (cached) return cached;
 
+  const token = await resolveIGToken(tenantId);
   const [genderAgeData, countryData, cityData] = await Promise.all([
     graphFetch(`/${igUserId}/insights`, {
       metric: "follower_demographics",
@@ -404,21 +443,21 @@ export async function fetchIGAudienceDemographics(
       metric_type: "total_value",
       timeframe: "this_month",
       breakdown: "age,gender",
-    }).catch(() => ({ data: [] })),
+    }, token).catch(() => ({ data: [] })),
     graphFetch(`/${igUserId}/insights`, {
       metric: "follower_demographics",
       period: "lifetime",
       metric_type: "total_value",
       timeframe: "this_month",
       breakdown: "country",
-    }).catch(() => ({ data: [] })),
+    }, token).catch(() => ({ data: [] })),
     graphFetch(`/${igUserId}/insights`, {
       metric: "follower_demographics",
       period: "lifetime",
       metric_type: "total_value",
       timeframe: "this_month",
       breakdown: "city",
-    }).catch(() => ({ data: [] })),
+    }, token).catch(() => ({ data: [] })),
   ]);
 
   const genderAge: IGAudienceGenderAge[] = [];
@@ -498,15 +537,16 @@ const DISCOVERY_CACHE_TTL = 30 * 60 * 1000; // 30 min
  * Fetch another IG Business/Creator account's public data via business_discovery.
  * Requires our own IG Business Account ID as pivot.
  */
-export async function fetchIGBusinessDiscovery(handle: string): Promise<IGDiscoveryResult> {
+export async function fetchIGBusinessDiscovery(handle: string, tenantId?: string): Promise<IGDiscoveryResult> {
   const cleanHandle = handle.replace(/^@/, "").trim().toLowerCase();
   if (!cleanHandle) throw new Error("Handle vazio");
 
-  const cacheKey = `ig_discovery_${cleanHandle}`;
+  const tid = tenantId ?? "default";
+  const cacheKey = `${tid}:ig_discovery_${cleanHandle}`;
   const cached = getCached<IGDiscoveryResult>(cacheKey, DISCOVERY_CACHE_TTL);
   if (cached) return cached;
 
-  const ownAccountId = await discoverIGAccountId();
+  const ownAccountId = await discoverIGAccountId(tenantId);
   if (!ownAccountId) {
     throw new Error("Instagram não configurado. Configure META_ADS_ACCESS_TOKEN e INSTAGRAM_BUSINESS_ACCOUNT_ID.");
   }
@@ -520,10 +560,11 @@ export async function fetchIGBusinessDiscovery(handle: string): Promise<IGDiscov
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let data: any;
+  const token = await resolveIGToken(tenantId);
   try {
     data = await graphFetch(`/${ownAccountId}`, {
       fields: `business_discovery.fields(${fields}).username(${cleanHandle})`,
-    });
+    }, token);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     if (msg.includes("803") || msg.includes("not found") || msg.includes("Cannot query")) {
@@ -567,15 +608,17 @@ export async function fetchIGBusinessDiscovery(handle: string): Promise<IGDiscov
 /**
  * Fetch online followers by hour (lifetime snapshot).
  */
-export async function fetchIGOnlineFollowers(igUserId: string): Promise<IGOnlineFollowers[]> {
-  const cacheKey = `ig_online_${igUserId}`;
+export async function fetchIGOnlineFollowers(igUserId: string, tenantId?: string): Promise<IGOnlineFollowers[]> {
+  const tid = tenantId ?? "default";
+  const cacheKey = `${tid}:ig_online_${igUserId}`;
   const cached = getCached<IGOnlineFollowers[]>(cacheKey);
   if (cached) return cached;
 
+  const token = await resolveIGToken(tenantId);
   const data = await graphFetch(`/${igUserId}/insights`, {
     metric: "online_followers",
     period: "lifetime",
-  });
+  }, token);
 
   const online: IGOnlineFollowers[] = [];
 

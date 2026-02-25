@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 import {
-  isMetaAdsConfigured,
   fetchMetaCampaigns,
   fetchMetaAccountTotals,
   fetchMetaTimeSeries,
@@ -11,14 +10,7 @@ import type { MetaAdsResponse } from "@/lib/meta-ads";
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
   if ("error" in auth) return auth.error;
-
-  if (!isMetaAdsConfigured()) {
-    return NextResponse.json({
-      source: "not_configured",
-      updatedAt: new Date().toISOString(),
-      campaigns: [],
-    } satisfies MetaAdsResponse);
-  }
+  const tenantId = getEffectiveTenantId(auth.session);
 
   const { searchParams } = request.nextUrl;
   const startDate = searchParams.get("startDate");
@@ -30,9 +22,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const [campaigns, accountTotals, timeSeries] = await Promise.all([
-      fetchMetaCampaigns(startDate, endDate),
-      fetchMetaAccountTotals(startDate, endDate),
-      fetchMetaTimeSeries(startDate, endDate),
+      fetchMetaCampaigns(startDate, endDate, tenantId),
+      fetchMetaAccountTotals(startDate, endDate, tenantId),
+      fetchMetaTimeSeries(startDate, endDate, tenantId),
     ]);
 
     return NextResponse.json({

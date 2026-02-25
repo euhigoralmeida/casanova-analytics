@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
+import { getGA4ClientAsync } from "@/lib/google-analytics";
 import { fetchEcommerceFunnel, fetchGA4Summary, fetchGA4FunnelTimeSeries, fetchChannelAcquisition } from "@/lib/ga4-queries";
-import { isClarityConfigured, getClarityDashboardUrl, getClarityFromDB } from "@/lib/clarity";
-import { requireAuth } from "@/lib/api-helpers";
+import { getClarityDashboardUrl, getClarityFromDB } from "@/lib/clarity";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 import type { CRODataResponse } from "@/types/api";
 
 
@@ -13,6 +13,7 @@ import type { CRODataResponse } from "@/types/api";
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
   if ("error" in auth) return auth.error;
+  const tenantId = getEffectiveTenantId(auth.session);
 
   const { searchParams } = request.nextUrl;
   const startDate = searchParams.get("startDate") ?? undefined;
@@ -22,28 +23,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "startDate and endDate are required" }, { status: 400 });
   }
 
-  const ga4Ready = isGA4Configured();
-  const clarityReady = isClarityConfigured();
-
-  // Nothing configured — return empty not_configured response
-  if (!ga4Ready && !clarityReady) {
-    const empty: CRODataResponse = {
-      source: "not_configured",
-      updatedAt: new Date().toISOString(),
-    };
-    return NextResponse.json(empty, { status: 200 });
-  }
-
   try {
-    // Parallel fetch: GA4 (live) + Clarity (from DB snapshot)
+    // Parallel fetch: GA4 (live) + Clarity (from DB snapshot, tenant-aware)
     const [ga4Result, claritySnapshot] = await Promise.all([
-      ga4Ready ? fetchGA4Data(startDate, endDate) : Promise.resolve(null),
-      clarityReady ? getClarityFromDB("default", 3) : Promise.resolve(null),
+      fetchGA4Data(startDate, endDate, tenantId).catch(() => null),
+      getClarityFromDB(tenantId, 3).catch(() => null),
     ]);
 
     // Clarity has data in DB?
     const clarityHasData = !!claritySnapshot;
-    const clarityResult = claritySnapshot?.data ?? null;
+    const clarityResult = claritySnapshot?.data ?? undefined;
 
     const source: CRODataResponse["source"] =
       ga4Result && clarityHasData ? "full" :
@@ -64,10 +53,8 @@ export async function GET(request: NextRequest) {
       response.channelAcquisition = ga4Result.channelAcquisition;
     }
 
-    if (clarityReady) {
+    if (clarityHasData) {
       response.clarityConfigured = true;
-    }
-    if (clarityResult) {
       response.clarity = clarityResult;
       response.clarityDashboardUrl = getClarityDashboardUrl();
       response.clarityFetchedAt = claritySnapshot!.fetchedAt.toISOString();
@@ -84,14 +71,14 @@ export async function GET(request: NextRequest) {
    GA4 data fetcher
 ========================= */
 
-async function fetchGA4Data(startDate: string, endDate: string) {
-  const client = getGA4Client();
+async function fetchGA4Data(startDate: string, endDate: string, tenantId?: string) {
+  const client = await getGA4ClientAsync(tenantId);
 
   const [funnelData, summary, dailySeries, channelAcquisition] = await Promise.all([
-    fetchEcommerceFunnel(client, startDate, endDate),
-    fetchGA4Summary(client, startDate, endDate),
-    fetchGA4FunnelTimeSeries(client, startDate, endDate),
-    fetchChannelAcquisition(client, startDate, endDate),
+    fetchEcommerceFunnel(client, startDate, endDate, tenantId),
+    fetchGA4Summary(client, startDate, endDate, tenantId),
+    fetchGA4FunnelTimeSeries(client, startDate, endDate, tenantId),
+    fetchChannelAcquisition(client, startDate, endDate, tenantId),
   ]);
 
   const funnel = funnelData.funnel;

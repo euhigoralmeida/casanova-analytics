@@ -66,6 +66,11 @@ export async function getGSCClientAsync(tenantId?: string): Promise<searchconsol
   const email = creds?.client_email ?? getClientEmail();
   const pk = creds?.private_key ?? getPrivateKey();
 
+  // Store site URL from DB credentials if available
+  if (creds?.site_url) {
+    _siteUrls.set(key, creds.site_url);
+  }
+
   const auth = new google.auth.JWT({
     email,
     key: pk,
@@ -76,6 +81,17 @@ export async function getGSCClientAsync(tenantId?: string): Promise<searchconsol
   return client;
 }
 
-export function getSiteUrl(): string {
+export function getSiteUrl(tenantId?: string): string {
+  // Site URL from DB-cached credentials (if already loaded by getGSCClientAsync)
+  const key = tenantId ?? "default";
+  const cached = _siteUrls.get(key);
+  if (cached) return cached;
   return process.env.GSC_SITE_URL ?? "";
+}
+
+const _siteUrls = new Map<string, string>();
+
+/** Store site URL from DB credentials when using async client. */
+export function setSiteUrl(tenantId: string, siteUrl: string): void {
+  _siteUrls.set(tenantId, siteUrl);
 }

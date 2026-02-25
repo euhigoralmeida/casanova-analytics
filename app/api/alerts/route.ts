@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isConfigured, getCustomer, computeComparisonDates } from "@/lib/google-ads";
-import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
+import { getCustomerAsync, computeComparisonDates } from "@/lib/google-ads";
+import { getGA4ClientAsync } from "@/lib/google-analytics";
 import { fetchAccountTotals, fetchAllCampaignMetrics, fetchAllSkuMetrics, fetchAccountTimeSeries } from "@/lib/queries";
 import { fetchRetentionSummary } from "@/lib/ga4-queries";
 import { computeAllSmartAlerts } from "@/lib/alert-engine";
 import type { SmartAlert, SmartAlertsResponse } from "@/lib/alert-types";
-import { requireAuth } from "@/lib/api-helpers";
+import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 
 /* =========================
    Mock fallback
@@ -112,6 +112,7 @@ function buildMockAlerts(): SmartAlert[] {
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
   if ("error" in auth) return auth.error;
+  const tenantId = getEffectiveTenantId(auth.session);
 
   const { searchParams } = request.nextUrl;
   const period = searchParams.get("period") ?? "7d";
@@ -126,32 +127,31 @@ export async function GET(request: NextRequest) {
   const { prevStart, prevEnd } = computeComparisonDates(startDate, endDate);
 
   /* ---- DADOS REAIS (Google Ads) ---- */
-  if (isConfigured()) {
-    try {
-      const customer = getCustomer();
+  try {
+    const customer = await getCustomerAsync(tenantId);
 
-      const [
-        currentAccount,
-        previousAccount,
-        currentCampaigns,
-        previousCampaigns,
-        currentSkus,
-        previousSkus,
-        dailyTimeSeries,
-      ] = await Promise.all([
-        fetchAccountTotals(customer, period, startDate, endDate),
-        fetchAccountTotals(customer, "custom", prevStart, prevEnd),
-        fetchAllCampaignMetrics(customer, period, startDate, endDate),
-        fetchAllCampaignMetrics(customer, "custom", prevStart, prevEnd),
-        fetchAllSkuMetrics(customer, period, startDate, endDate),
-        fetchAllSkuMetrics(customer, "custom", prevStart, prevEnd),
-        fetchAccountTimeSeries(customer, period, startDate, endDate),
-      ]);
+    const [
+      currentAccount,
+      previousAccount,
+      currentCampaigns,
+      previousCampaigns,
+      currentSkus,
+      previousSkus,
+      dailyTimeSeries,
+    ] = await Promise.all([
+      fetchAccountTotals(customer, period, startDate, endDate),
+      fetchAccountTotals(customer, "custom", prevStart, prevEnd),
+      fetchAllCampaignMetrics(customer, period, startDate, endDate),
+      fetchAllCampaignMetrics(customer, "custom", prevStart, prevEnd),
+      fetchAllSkuMetrics(customer, period, startDate, endDate),
+      fetchAllSkuMetrics(customer, "custom", prevStart, prevEnd),
+      fetchAccountTimeSeries(customer, period, startDate, endDate),
+    ]);
 
-      // Fetch retention data from GA4 if configured
-      const retentionSummary = isGA4Configured()
-        ? await fetchRetentionSummary(getGA4Client(), startDate, endDate).catch(() => undefined)
-        : undefined;
+    // Fetch retention data from GA4
+    const retentionSummary = await getGA4ClientAsync(tenantId)
+      .then((ga4Client) => fetchRetentionSummary(ga4Client, startDate, endDate, tenantId))
+      .catch(() => undefined);
 
       const alerts = computeAllSmartAlerts(
         currentAccount,
@@ -183,9 +183,8 @@ export async function GET(request: NextRequest) {
       };
 
       return NextResponse.json(response);
-    } catch (err) {
-      console.error("Google Ads API error in alerts, falling back to mock:", err);
-    }
+  } catch (err) {
+    console.error("Google Ads API error in alerts, falling back to mock:", err);
   }
 
   /* ---- MOCK (fallback) ---- */
