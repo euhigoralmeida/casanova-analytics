@@ -1,8 +1,8 @@
 // Executes AI tool calls using existing data functions
 // TenantId is injected server-side — LLM cannot access other tenants' data
 
-import { isConfigured, getCustomer } from "@/lib/google-ads";
-import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
+import { getCustomerAsync } from "@/lib/google-ads";
+import { getGA4ClientAsync } from "@/lib/google-analytics";
 import {
   fetchAccountTotals,
   fetchAllSkuMetrics,
@@ -37,7 +37,7 @@ export async function executeTool(
 async function executeToolInternal(
   toolName: string,
   input: ToolInput,
-  _tenantId: string,
+  tenantId: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): Promise<any> {
   const { startDate, endDate } = input;
@@ -45,9 +45,9 @@ async function executeToolInternal(
 
   switch (toolName) {
     case "get_account_metrics": {
-      if (!isConfigured()) return { error: "Google Ads não configurado" };
-      const customer = getCustomer();
-      const data = await fetchAccountTotals(customer, period, startDate, endDate);
+      let customer;
+      try { customer = await getCustomerAsync(tenantId); } catch { return { error: "Google Ads não configurado" }; }
+      const data = await fetchAccountTotals(customer, period, startDate, endDate, tenantId);
       const revenue = Math.round(data.revenue * 100) / 100;
       const ads = Math.round(data.costBRL * 100) / 100;
       return {
@@ -63,21 +63,21 @@ async function executeToolInternal(
     }
 
     case "get_sku_metrics": {
-      if (!isConfigured()) return { error: "Google Ads não configurado" };
-      const customer = getCustomer();
+      let customer;
+      try { customer = await getCustomerAsync(tenantId); } catch { return { error: "Google Ads não configurado" }; }
       if (input.sku) {
-        const data = await fetchSkuMetrics(customer, input.sku, period, startDate, endDate);
+        const data = await fetchSkuMetrics(customer, input.sku, period, startDate, endDate, tenantId);
         if (!data) return { error: `SKU ${input.sku} não encontrado` };
         return formatSku(data);
       }
-      const allData = await fetchAllSkuMetrics(customer, period, startDate, endDate);
+      const allData = await fetchAllSkuMetrics(customer, period, startDate, endDate, tenantId);
       return allData.map(formatSku);
     }
 
     case "get_campaign_metrics": {
-      if (!isConfigured()) return { error: "Google Ads não configurado" };
-      const customer = getCustomer();
-      const data = await fetchAllCampaignMetrics(customer, period, startDate, endDate);
+      let customer;
+      try { customer = await getCustomerAsync(tenantId); } catch { return { error: "Google Ads não configurado" }; }
+      const data = await fetchAllCampaignMetrics(customer, period, startDate, endDate, tenantId);
       return data.map((c) => ({
         campanha: c.campaignName,
         tipo: c.channelType,
@@ -93,31 +93,31 @@ async function executeToolInternal(
     }
 
     case "get_segmentation": {
-      if (!isConfigured()) return { error: "Google Ads não configurado" };
-      const customer = getCustomer();
+      let customer;
+      try { customer = await getCustomerAsync(tenantId); } catch { return { error: "Google Ads não configurado" }; }
       const segment = input.segment as string;
 
       if (segment === "device") {
-        const data = await fetchDeviceMetrics(customer, period, startDate, endDate);
+        const data = await fetchDeviceMetrics(customer, period, startDate, endDate, tenantId);
         return data.map(formatSegment);
       }
       if (segment === "age" || segment === "gender") {
-        const data = await fetchDemographicMetrics(customer, period, startDate, endDate);
+        const data = await fetchDemographicMetrics(customer, period, startDate, endDate, tenantId);
         return data.filter((d) => d.type === segment).map(formatDemoSegment);
       }
       if (segment === "geographic") {
-        const data = await fetchGeographicMetrics(customer, period, startDate, endDate);
+        const data = await fetchGeographicMetrics(customer, period, startDate, endDate, tenantId);
         return data.map(formatGeoSegment);
       }
       return { error: `Segmento desconhecido: ${segment}` };
     }
 
     case "get_ga4_funnel": {
-      if (!isGA4Configured()) return { error: "GA4 não configurado" };
-      const client = getGA4Client();
+      let client;
+      try { client = await getGA4ClientAsync(tenantId); } catch { return { error: "GA4 não configurado" }; }
       const [funnelData, summary] = await Promise.all([
-        fetchEcommerceFunnel(client, startDate, endDate),
-        fetchGA4Summary(client, startDate, endDate),
+        fetchEcommerceFunnel(client, startDate, endDate, tenantId),
+        fetchGA4Summary(client, startDate, endDate, tenantId),
       ]);
       return {
         funil: funnelData.funnel,
@@ -132,9 +132,9 @@ async function executeToolInternal(
     }
 
     case "get_channel_acquisition": {
-      if (!isGA4Configured()) return { error: "GA4 não configurado" };
-      const client = getGA4Client();
-      const data = await fetchChannelAcquisition(client, startDate, endDate);
+      let client;
+      try { client = await getGA4ClientAsync(tenantId); } catch { return { error: "GA4 não configurado" }; }
+      const data = await fetchChannelAcquisition(client, startDate, endDate, tenantId);
       return data.map((c) => ({
         canal: c.channel,
         sessoes: c.sessions,
@@ -147,7 +147,7 @@ async function executeToolInternal(
     case "get_planning_targets": {
       const { year, month } = input;
       const planRows = await prisma.planningEntry.findMany({
-        where: { tenantId: _tenantId, year, month, planType: "target" },
+        where: { tenantId, year, month, planType: "target" },
       });
       if (planRows.length === 0) return { error: `Sem metas para ${month}/${year}` };
       const inputs: Record<string, number> = {};
@@ -159,13 +159,13 @@ async function executeToolInternal(
     }
 
     case "get_timeseries": {
-      if (!isConfigured()) return { error: "Google Ads não configurado" };
-      const customer = getCustomer();
+      let customer;
+      try { customer = await getCustomerAsync(tenantId); } catch { return { error: "Google Ads não configurado" }; }
       if (input.scope === "sku" && input.id) {
-        const data = await fetchSkuTimeSeries(customer, input.id, period, startDate, endDate);
+        const data = await fetchSkuTimeSeries(customer, input.id, period, startDate, endDate, tenantId);
         return data.map(formatDaily);
       }
-      const data = await fetchAccountTimeSeries(customer, period, startDate, endDate);
+      const data = await fetchAccountTimeSeries(customer, period, startDate, endDate, tenantId);
       return data.map(formatDaily);
     }
 
@@ -192,16 +192,16 @@ async function executeToolInternal(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let channels: any[] = [];
 
-      if (isConfigured()) {
-        const customer = getCustomer();
-        const skuExtras = await loadSkuExtras(_tenantId);
+      try {
+        const customer = await getCustomerAsync(tenantId);
+        const skuExtras = await loadSkuExtras(tenantId);
         const [acctData, allSkuData, campData, devData, demoData, geoData] = await Promise.all([
-          fetchAccountTotals(customer, period, startDate, endDate),
-          fetchAllSkuMetrics(customer, period, startDate, endDate),
-          fetchAllCampaignMetrics(customer, period, startDate, endDate),
-          fetchDeviceMetrics(customer, period, startDate, endDate).catch(() => []),
-          fetchDemographicMetrics(customer, period, startDate, endDate).catch(() => []),
-          fetchGeographicMetrics(customer, period, startDate, endDate).catch(() => []),
+          fetchAccountTotals(customer, period, startDate, endDate, tenantId),
+          fetchAllSkuMetrics(customer, period, startDate, endDate, tenantId),
+          fetchAllCampaignMetrics(customer, period, startDate, endDate, tenantId),
+          fetchDeviceMetrics(customer, period, startDate, endDate, tenantId).catch(() => []),
+          fetchDemographicMetrics(customer, period, startDate, endDate, tenantId).catch(() => []),
+          fetchGeographicMetrics(customer, period, startDate, endDate, tenantId).catch(() => []),
         ]);
 
         const revenue = Math.round(acctData.revenue * 100) / 100;
@@ -240,13 +240,13 @@ async function executeToolInternal(
         devices = devData;
         demographics = demoData;
         geographic = geoData;
-      }
+      } catch { /* Google Ads not configured for this tenant */ }
 
-      if (isGA4Configured()) {
-        const ga4Client = getGA4Client();
+      try {
+        const ga4Client = await getGA4ClientAsync(tenantId);
         const [summary, channelData] = await Promise.all([
-          fetchGA4Summary(ga4Client, startDate, endDate),
-          fetchChannelAcquisition(ga4Client, startDate, endDate),
+          fetchGA4Summary(ga4Client, startDate, endDate, tenantId),
+          fetchChannelAcquisition(ga4Client, startDate, endDate, tenantId),
         ]);
         ga4 = {
           sessions: summary.sessions, users: summary.users,
@@ -258,13 +258,13 @@ async function executeToolInternal(
           channel: c.channel, sessions: c.sessions,
           users: c.users, conversions: c.conversions, revenue: c.revenue,
         }));
-      }
+      } catch { /* GA4 not configured for this tenant */ }
 
       // Planning
       let planning = {};
       try {
         const planRows = await prisma.planningEntry.findMany({
-          where: { tenantId: _tenantId, year: now.getFullYear(), month: now.getMonth() + 1, planType: "target" },
+          where: { tenantId, year: now.getFullYear(), month: now.getMonth() + 1, planType: "target" },
         });
         const inputs: Record<string, number> = {};
         for (const row of planRows) inputs[row.metric] = row.value;
@@ -273,7 +273,7 @@ async function executeToolInternal(
       } catch { /* ignore */ }
 
       const result = await analyzeCognitive({
-        tenantId: _tenantId,
+        tenantId,
         periodStart: startDate,
         periodEnd: endDate,
         daysInPeriod,
@@ -307,12 +307,12 @@ async function executeToolInternal(
     }
 
     case "get_retention_metrics": {
-      if (!isGA4Configured()) return { error: "GA4 não configurado" };
-      const ga4Client = getGA4Client();
+      let ga4Client;
+      try { ga4Client = await getGA4ClientAsync(tenantId); } catch { return { error: "GA4 não configurado" }; }
       const [summary, ltv, cohorts] = await Promise.all([
-        fetchRetentionSummary(ga4Client, startDate, endDate),
-        fetchUserLifetimeValue(ga4Client, startDate, endDate),
-        fetchCohortRetention(ga4Client, startDate, endDate),
+        fetchRetentionSummary(ga4Client, startDate, endDate, tenantId),
+        fetchUserLifetimeValue(ga4Client, startDate, endDate, tenantId),
+        fetchCohortRetention(ga4Client, startDate, endDate, tenantId),
       ]);
       return {
         resumo: {
@@ -347,7 +347,7 @@ async function executeToolInternal(
     case "get_cro_clarity": {
       const { isClarityConfigured, getClarityFromDB } = await import("@/lib/clarity");
       if (!isClarityConfigured()) return { error: "Microsoft Clarity não configurado" };
-      const snapshot = await getClarityFromDB("default", 3);
+      const snapshot = await getClarityFromDB(tenantId, 3);
       if (!snapshot) return { error: "Dados do Clarity ainda não disponíveis. Aguarde o próximo sync automático." };
       const clarityData = snapshot.data;
       if (clarityData.source !== "clarity") return { error: "Erro ao buscar dados do Clarity" };
@@ -420,11 +420,12 @@ async function executeToolInternal(
     }
 
     case "get_meta_ads_metrics": {
-      const { isMetaAdsConfigured, fetchMetaCampaigns, fetchMetaAccountTotals } = await import("@/lib/meta-ads");
-      if (!isMetaAdsConfigured()) return { error: "Meta Ads não configurado" };
+      const { fetchMetaCampaigns, fetchMetaAccountTotals, getMetaCredentials } = await import("@/lib/meta-ads");
+      const metaCreds = await getMetaCredentials(tenantId);
+      if (!metaCreds) return { error: "Meta Ads não configurado" };
       const [metaCampaigns, metaTotals] = await Promise.all([
-        fetchMetaCampaigns(startDate, endDate),
-        fetchMetaAccountTotals(startDate, endDate),
+        fetchMetaCampaigns(startDate, endDate, tenantId),
+        fetchMetaAccountTotals(startDate, endDate, tenantId),
       ]);
       return {
         contaTotais: {
@@ -454,11 +455,11 @@ async function executeToolInternal(
     }
 
     case "compare_periods": {
-      if (!isConfigured()) return { error: "Google Ads não configurado" };
-      const customer = getCustomer();
+      let customer;
+      try { customer = await getCustomerAsync(tenantId); } catch { return { error: "Google Ads não configurado" }; }
       const [p1, p2] = await Promise.all([
-        fetchAccountTotals(customer, "custom", input.period1Start, input.period1End),
-        fetchAccountTotals(customer, "custom", input.period2Start, input.period2End),
+        fetchAccountTotals(customer, "custom", input.period1Start, input.period1End, tenantId),
+        fetchAccountTotals(customer, "custom", input.period2Start, input.period2End, tenantId),
       ]);
 
       const format = (d: typeof p1) => {

@@ -33,9 +33,10 @@ export async function fetchSkuMetrics(
   period: string,
   startDate?: string,
   endDate?: string,
+  tenantId?: string,
 ): Promise<SkuMetrics | null> {
   const cacheKey = startDate && endDate ? `sku:${sku}:${startDate}:${endDate}` : `sku:${sku}:${period}`;
-  const cached = getCached<SkuMetrics>(cacheKey);
+  const cached = getCached<SkuMetrics>(cacheKey, tenantId);
   if (cached) return cached;
 
   const dateClause = buildDateClause(period, startDate, endDate);
@@ -93,7 +94,7 @@ export async function fetchSkuMetrics(
 
   result.campaignStatus = isRecentEnabled ? "ENABLED" : "PAUSED";
 
-  setCache(cacheKey, result);
+  setCache(cacheKey, result, tenantId);
   return result;
 }
 
@@ -106,9 +107,10 @@ export async function fetchAllSkuMetrics(
   period: string,
   startDate?: string,
   endDate?: string,
+  tenantId?: string,
 ): Promise<SkuMetrics[]> {
   const cacheKey = startDate && endDate ? `all:${startDate}:${endDate}` : `all:${period}`;
-  const cached = getCached<SkuMetrics[]>(cacheKey);
+  const cached = getCached<SkuMetrics[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   const dateClause = buildDateClause(period, startDate, endDate);
@@ -174,7 +176,7 @@ export async function fetchAllSkuMetrics(
   }
 
   const result = Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
-  setCache(cacheKey, result);
+  setCache(cacheKey, result, tenantId);
   return result;
 }
 
@@ -196,9 +198,10 @@ export async function fetchAccountTotals(
   period: string,
   startDate?: string,
   endDate?: string,
+  tenantId?: string,
 ): Promise<AccountTotals> {
   const cacheKey = startDate && endDate ? `acct:${startDate}:${endDate}` : `acct:${period}`;
-  const cached = getCached<AccountTotals>(cacheKey);
+  const cached = getCached<AccountTotals>(cacheKey, tenantId);
   if (cached) return cached;
 
   const dateClause = buildDateClause(period, startDate, endDate);
@@ -236,7 +239,7 @@ export async function fetchAccountTotals(
   result.costBRL = Math.round(result.costBRL * 100) / 100;
   result.revenue = Math.round(result.revenue * 100) / 100;
 
-  setCache(cacheKey, result);
+  setCache(cacheKey, result, tenantId);
   return result;
 }
 
@@ -263,9 +266,10 @@ export async function fetchSkuTimeSeries(
   period: string,
   startDate?: string,
   endDate?: string,
+  tenantId?: string,
 ): Promise<DailyMetrics[]> {
   const cacheKey = startDate && endDate ? `ts:${sku}:${startDate}:${endDate}` : `ts:${sku}:${period}`;
-  const cached = getCached<DailyMetrics[]>(cacheKey);
+  const cached = getCached<DailyMetrics[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   const dateClause = buildDateClause(period, startDate, endDate);
@@ -309,7 +313,7 @@ export async function fetchSkuTimeSeries(
   }
 
   const result = Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
-  setCache(cacheKey, result);
+  setCache(cacheKey, result, tenantId);
   return result;
 }
 
@@ -322,9 +326,10 @@ export async function fetchAllTimeSeries(
   period: string,
   startDate?: string,
   endDate?: string,
+  tenantId?: string,
 ): Promise<DailyMetrics[]> {
   const cacheKey = startDate && endDate ? `ts:all:${startDate}:${endDate}` : `ts:all:${period}`;
-  const cached = getCached<DailyMetrics[]>(cacheKey);
+  const cached = getCached<DailyMetrics[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   const dateClause = buildDateClause(period, startDate, endDate);
@@ -366,7 +371,7 @@ export async function fetchAllTimeSeries(
   }
 
   const resultAll = Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
-  setCache(cacheKey, resultAll);
+  setCache(cacheKey, resultAll, tenantId);
   return resultAll;
 }
 
@@ -380,9 +385,10 @@ export async function fetchAccountTimeSeries(
   period: string,
   startDate?: string,
   endDate?: string,
+  tenantId?: string,
 ): Promise<DailyMetrics[]> {
   const cacheKey = startDate && endDate ? `ts:acct:${startDate}:${endDate}` : `ts:acct:${period}`;
-  const cached = getCached<DailyMetrics[]>(cacheKey);
+  const cached = getCached<DailyMetrics[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   const dateClause = buildDateClause(period, startDate, endDate);
@@ -425,7 +431,7 @@ export async function fetchAccountTimeSeries(
   }
 
   const resultAcct = Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
-  setCache(cacheKey, resultAcct);
+  setCache(cacheKey, resultAcct, tenantId);
   return resultAcct;
 }
 
@@ -496,9 +502,10 @@ export async function fetchAllCampaignMetrics(
   period: string,
   startDate?: string,
   endDate?: string,
+  tenantId?: string,
 ): Promise<CampaignMetrics[]> {
   const cacheKey = startDate && endDate ? `camps:${startDate}:${endDate}` : `camps:${period}`;
-  const cached = getCached<CampaignMetrics[]>(cacheKey);
+  const cached = getCached<CampaignMetrics[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   const dateClause = buildDateClause(period, startDate, endDate);
@@ -538,7 +545,7 @@ export async function fetchAllCampaignMetrics(
     });
   }
 
-  setCache(cacheKey, result);
+  setCache(cacheKey, result, tenantId);
   return result;
 }
 
@@ -666,9 +673,10 @@ export async function fetchDeviceMetrics(
   period: string,
   startDate?: string,
   endDate?: string,
+  tenantId?: string,
 ): Promise<DeviceMetrics[]> {
   const cacheKey = startDate && endDate ? `dev:${startDate}:${endDate}` : `dev:${period}`;
-  const cached = getCached<DeviceMetrics[]>(cacheKey);
+  const cached = getCached<DeviceMetrics[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   const dateClause = buildDateClause(period, startDate, endDate);
@@ -710,7 +718,7 @@ export async function fetchDeviceMetrics(
   }
 
   const result = Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
-  setCache(cacheKey, result);
+  setCache(cacheKey, result, tenantId);
   return result;
 }
 
@@ -723,9 +731,10 @@ export async function fetchDemographicMetrics(
   period: string,
   startDate?: string,
   endDate?: string,
+  tenantId?: string,
 ): Promise<DemographicMetrics[]> {
   const cacheKey = startDate && endDate ? `demo:${startDate}:${endDate}` : `demo:${period}`;
-  const cached = getCached<DemographicMetrics[]>(cacheKey);
+  const cached = getCached<DemographicMetrics[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   const dateClause = buildDateClause(period, startDate, endDate);
@@ -795,7 +804,7 @@ export async function fetchDemographicMetrics(
   }
   result.push(...genderMap.values());
 
-  setCache(cacheKey, result);
+  setCache(cacheKey, result, tenantId);
   return result;
 }
 
@@ -808,9 +817,10 @@ export async function fetchGeographicMetrics(
   period: string,
   startDate?: string,
   endDate?: string,
+  tenantId?: string,
 ): Promise<GeographicMetrics[]> {
   const cacheKey = startDate && endDate ? `geo:${startDate}:${endDate}` : `geo:${period}`;
-  const cached = getCached<GeographicMetrics[]>(cacheKey);
+  const cached = getCached<GeographicMetrics[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   const dateClause = buildDateClause(period, startDate, endDate);
@@ -858,7 +868,7 @@ export async function fetchGeographicMetrics(
   }
 
   const result = Array.from(map.values()).sort((a, b) => b.revenue - a.revenue);
-  setCache(cacheKey, result);
+  setCache(cacheKey, result, tenantId);
   return result;
 }
 
@@ -872,9 +882,10 @@ export async function fetchCampaignTimeSeries(
   period: string,
   startDate?: string,
   endDate?: string,
+  tenantId?: string,
 ): Promise<DailyMetrics[]> {
   const cacheKey = startDate && endDate ? `ts:camp:${campaignId}:${startDate}:${endDate}` : `ts:camp:${campaignId}:${period}`;
-  const cached = getCached<DailyMetrics[]>(cacheKey);
+  const cached = getCached<DailyMetrics[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   const dateClause = buildDateClause(period, startDate, endDate);
@@ -917,7 +928,7 @@ export async function fetchCampaignTimeSeries(
   }
 
   const resultCamp = Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
-  setCache(cacheKey, resultCamp);
+  setCache(cacheKey, resultCamp, tenantId);
   return resultCamp;
 }
 
@@ -943,9 +954,10 @@ export async function fetchSearchTerms(
   customer: Customer,
   startDate: string,
   endDate: string,
+  tenantId?: string,
 ): Promise<AdsSearchTerm[]> {
   const cacheKey = `search-terms:${startDate}:${endDate}`;
-  const cached = getCached<AdsSearchTerm[]>(cacheKey);
+  const cached = getCached<AdsSearchTerm[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   const dateClause = buildDateClause("custom", startDate, endDate);
@@ -982,6 +994,6 @@ export async function fetchSearchTerms(
     });
   }
 
-  setCache(cacheKey, result);
+  setCache(cacheKey, result, tenantId);
   return result;
 }

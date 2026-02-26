@@ -18,6 +18,7 @@ import {
   ChevronDown,
   PanelLeftClose,
   PanelLeftOpen,
+  Building2,
 } from "lucide-react";
 import Image from "next/image";
 
@@ -146,6 +147,40 @@ export default function Sidebar({
 
       {/* Nav */}
       <nav className={`flex-1 py-3 space-y-0.5 overflow-y-auto ${collapsed ? "px-1.5" : "px-3"}`}>
+        {/* Admin section — platform_admin only */}
+        {globalRole === "platform_admin" && (
+          <>
+            {collapsed ? (
+              <Link
+                href="/admin/tenants"
+                onClick={() => onClose?.()}
+                title="Clientes"
+                className={`flex items-center justify-center p-2.5 rounded-lg transition-colors ${
+                  pathname.startsWith("/admin")
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                }`}
+              >
+                <Building2 size={18} strokeWidth={pathname.startsWith("/admin") ? 2.2 : 1.8} />
+              </Link>
+            ) : (
+              <Link
+                href="/admin/tenants"
+                onClick={() => onClose?.()}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                  pathname.startsWith("/admin")
+                    ? "bg-emerald-50 text-emerald-700"
+                    : "text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900"
+                }`}
+              >
+                <Building2 size={18} strokeWidth={pathname.startsWith("/admin") ? 2.2 : 1.8} />
+                Clientes
+              </Link>
+            )}
+            <div className={`border-b border-zinc-100 ${collapsed ? "mx-1 my-1" : "mx-2 my-1"}`} />
+          </>
+        )}
+
         {navItems.map((item) => {
           const Icon = item.icon;
           const hasChildren = !!item.children;

@@ -172,5 +172,5 @@ async function fetchGA4DataForOrganic(startDate: string, endDate: string, tenant
 
 async function fetchAdsSearchTerms(startDate: string, endDate: string, tenantId?: string) {
   const customer = await getCustomerAsync(tenantId);
-  return await fetchSearchTerms(customer, startDate, endDate);
+  return await fetchSearchTerms(customer, startDate, endDate, tenantId);
 }

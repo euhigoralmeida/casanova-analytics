@@ -122,5 +122,5 @@ async function fetchGA4DataForStrategy(startDate: string, endDate: string, tenan
 
 async function fetchAdsData(startDate: string, endDate: string, tenantId?: string) {
   const customer = await getCustomerAsync(tenantId);
-  return await fetchSearchTerms(customer, startDate, endDate);
+  return await fetchSearchTerms(customer, startDate, endDate, tenantId);
 }

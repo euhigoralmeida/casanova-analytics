@@ -92,6 +92,34 @@ async function main() {
   });
   console.log(`  ✓ User: ${fivepUser.email} (${fivepUser.role}, globalRole: platform_admin)`);
 
+  // ─── Yella Life ───
+  console.log("\n🌱 Seeding tenant: yellalife...");
+
+  const yellaTenant = await prisma.tenant.upsert({
+    where: { slug: "yellalife" },
+    update: { name: "Yella Life" },
+    create: {
+      name: "Yella Life",
+      slug: "yellalife",
+      plan: "pro",
+    },
+  });
+  console.log(`  ✓ Tenant: ${yellaTenant.name} (${yellaTenant.id})`);
+
+  const yellaUser = await prisma.user.upsert({
+    where: { tenantId_email: { tenantId: yellaTenant.id, email: "admin@yellalife.com" } },
+    update: { name: "Admin Yella Life", role: "admin" },
+    create: {
+      email: "admin@yellalife.com",
+      name: "Admin Yella Life",
+      role: "admin",
+      // Hash for "yellalife2024"
+      passwordHash: "$2b$10$Il8qPPEBxJgtC3aBrv/ci.GwaP1qSdl117QdvmWarjZ6Y9tF6SSAG",
+      tenantId: yellaTenant.id,
+    },
+  });
+  console.log(`  ✓ User: ${yellaUser.email} (${yellaUser.role})`);
+
   console.log("\n✅ Seed completed successfully!");
 }
 

@@ -1,7 +1,7 @@
 // Builds a comprehensive cross-domain brief for the Strategic Advisor LLM prompt
 // Uses ONLY existing data sources — zero new queries
 
-import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
+import { getGA4ClientAsync } from "@/lib/google-analytics";
 import {
   fetchEcommerceFunnel,
   fetchGA4Summary,
@@ -14,10 +14,9 @@ import { buildContextSummary, buildPeriodContext } from "./context-builder";
 import { prisma } from "@/lib/db";
 import { computeTargetMonth } from "@/lib/planning-target-calc";
 import { formatBRL } from "@/lib/format";
-import { isClarityConfigured, getClarityFromDB } from "@/lib/clarity";
-import { isGSCConfigured } from "@/lib/google-search-console";
+import { getClarityFromDB } from "@/lib/clarity";
 import { fetchKeywordMetrics, fetchPageMetrics } from "@/lib/gsc-queries";
-import { isConfigured as isAdsConfigured, getCustomer, computeComparisonDates } from "@/lib/google-ads";
+import { getCustomerAsync, computeComparisonDates } from "@/lib/google-ads";
 import { fetchSearchTerms } from "@/lib/queries";
 import { detectCannibalization } from "@/lib/organic-cannibalization";
 
@@ -35,11 +34,11 @@ export async function buildStrategicBrief(
   // Parallel fetches: cognitive + GA4 + planning + action history + clarity + organic
   const [cognitive, ga4Extras, planningSection, actionsSection, clarityData, organicSection] = await Promise.all([
     fetchCognitiveDirectly(tenantId, startDate, endDate).catch(() => null),
-    fetchGA4Extras(startDate, endDate),
+    fetchGA4Extras(tenantId, startDate, endDate),
     fetchPlanningTargets(tenantId),
     fetchRecentActions(tenantId),
-    isClarityConfigured() ? getClarityFromDB("default", 3).then(s => s?.data ?? null).catch(() => null) : Promise.resolve(null),
-    fetchOrganicSection(startDate, endDate),
+    getClarityFromDB(tenantId, 3).then(s => s?.data ?? null).catch(() => null),
+    fetchOrganicSection(tenantId, startDate, endDate),
   ]);
 
   // 1. AQUISICAO — from cognitive engine
@@ -50,7 +49,7 @@ export async function buildStrategicBrief(
   }
 
   // 1.5 AQUISICAO (Meta Ads)
-  const metaSection = await fetchMetaAdsSection(startDate, endDate);
+  const metaSection = await fetchMetaAdsSection(tenantId, startDate, endDate);
   if (metaSection) {
     sections.push(metaSection);
     sections.push("");
@@ -193,18 +192,16 @@ export async function buildStrategicBrief(
 
 // ---------- Helpers ----------
 
-async function fetchGA4Extras(startDate: string, endDate: string) {
-  if (!isGA4Configured()) {
-    return {};
-  }
+async function fetchGA4Extras(tenantId: string, startDate: string, endDate: string) {
+  let client;
+  try { client = await getGA4ClientAsync(tenantId); } catch { return {}; }
 
-  const client = getGA4Client();
   const [funnelData, summary, retention, channelLTV, channels] = await Promise.all([
-    fetchEcommerceFunnel(client, startDate, endDate).catch(() => null),
-    fetchGA4Summary(client, startDate, endDate).catch(() => null),
-    fetchRetentionSummary(client, startDate, endDate).catch(() => null),
-    fetchUserLifetimeValue(client, startDate, endDate).catch(() => null),
-    fetchChannelAcquisition(client, startDate, endDate).catch(() => null),
+    fetchEcommerceFunnel(client, startDate, endDate, tenantId).catch(() => null),
+    fetchGA4Summary(client, startDate, endDate, tenantId).catch(() => null),
+    fetchRetentionSummary(client, startDate, endDate, tenantId).catch(() => null),
+    fetchUserLifetimeValue(client, startDate, endDate, tenantId).catch(() => null),
+    fetchChannelAcquisition(client, startDate, endDate, tenantId).catch(() => null),
   ]);
 
   return {
@@ -256,14 +253,15 @@ async function fetchPlanningTargets(tenantId: string): Promise<string | null> {
   }
 }
 
-async function fetchMetaAdsSection(startDate: string, endDate: string): Promise<string | null> {
+async function fetchMetaAdsSection(tenantId: string, startDate: string, endDate: string): Promise<string | null> {
   try {
-    const { isMetaAdsConfigured, fetchMetaCampaigns, fetchMetaAccountTotals } = await import("@/lib/meta-ads");
-    if (!isMetaAdsConfigured()) return null;
+    const { fetchMetaCampaigns, fetchMetaAccountTotals, getMetaCredentials } = await import("@/lib/meta-ads");
+    const metaCreds = await getMetaCredentials(tenantId);
+    if (!metaCreds) return null;
 
     const [campaigns, totals] = await Promise.all([
-      fetchMetaCampaigns(startDate, endDate),
-      fetchMetaAccountTotals(startDate, endDate),
+      fetchMetaCampaigns(startDate, endDate, tenantId),
+      fetchMetaAccountTotals(startDate, endDate, tenantId),
     ]);
 
     const lines: string[] = ["## AQUISICAO (Meta Ads)"];
@@ -286,13 +284,11 @@ async function fetchMetaAdsSection(startDate: string, endDate: string): Promise<
   }
 }
 
-async function fetchOrganicSection(startDate: string, endDate: string): Promise<string | null> {
+async function fetchOrganicSection(tenantId: string, startDate: string, endDate: string): Promise<string | null> {
   try {
-    if (!isGSCConfigured()) return null;
-
     const [keywords, pages] = await Promise.all([
-      fetchKeywordMetrics(startDate, endDate).catch(() => []),
-      fetchPageMetrics(startDate, endDate).catch(() => []),
+      fetchKeywordMetrics(startDate, endDate, tenantId).catch(() => []),
+      fetchPageMetrics(startDate, endDate, tenantId).catch(() => []),
     ]);
 
     if (keywords.length === 0 && pages.length === 0) return null;
@@ -327,13 +323,13 @@ async function fetchOrganicSection(startDate: string, endDate: string): Promise<
     }
 
     // Cannibalization summary
-    if (isAdsConfigured()) {
-      try {
+    try {
+      {
         const { prevStart, prevEnd } = computeComparisonDates(startDate, endDate);
         void prevStart;
         void prevEnd;
-        const customer = getCustomer();
-        const adsTerms = await fetchSearchTerms(customer, startDate, endDate);
+        const customer = await getCustomerAsync(tenantId);
+        const adsTerms = await fetchSearchTerms(customer, startDate, endDate, tenantId);
         const cannibal = detectCannibalization(keywords, adsTerms);
         if (cannibal.length > 0) {
           const totalSavings = cannibal.reduce((s, c) => s + c.estimatedSavingsBRL, 0);
@@ -343,8 +339,8 @@ async function fetchOrganicSection(startDate: string, endDate: string): Promise<
             lines.push(`- "${c.keyword}": pos org ${c.organicPosition.toFixed(0)}, custo pago ${formatBRL(c.paidCostBRL)}, tipo ${c.type}, economia ${formatBRL(c.estimatedSavingsBRL)}`);
           }
         }
-      } catch { /* ignore ads errors */ }
-    }
+      }
+    } catch { /* ignore ads errors */ }
 
     return lines.join("\n");
   } catch (err) {

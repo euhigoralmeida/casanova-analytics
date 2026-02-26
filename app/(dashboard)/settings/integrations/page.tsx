@@ -6,7 +6,11 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
-  ExternalLink,
+  X,
+  Eye,
+  EyeOff,
+  Settings2,
+  Unplug,
 } from "lucide-react";
 
 type IntegrationStatus = {
@@ -15,57 +19,68 @@ type IntegrationStatus = {
   description: string;
   connected: boolean;
   lastSync?: string;
-  envVars: string[];
+};
+
+type FieldDef = {
+  key: string;
+  label: string;
+  type: "text" | "password" | "textarea";
+  placeholder?: string;
+  optional?: boolean;
+};
+
+const PLATFORM_FIELDS: Record<string, FieldDef[]> = {
+  google_ads: [
+    { key: "developer_token", label: "Developer Token", type: "password" },
+    { key: "client_id", label: "Client ID", type: "text" },
+    { key: "client_secret", label: "Client Secret", type: "password" },
+    { key: "refresh_token", label: "Refresh Token", type: "password" },
+    { key: "customer_id", label: "Customer ID", type: "text", placeholder: "123-456-7890" },
+    { key: "login_customer_id", label: "Login Customer ID (MCC)", type: "text", optional: true },
+  ],
+  ga4: [
+    { key: "property_id", label: "Property ID", type: "text", placeholder: "123456789" },
+    { key: "client_email", label: "Client Email (Service Account)", type: "text", placeholder: "sa@project.iam.gserviceaccount.com" },
+    { key: "private_key", label: "Private Key", type: "textarea", placeholder: "-----BEGIN PRIVATE KEY-----\n..." },
+  ],
+  meta_ads: [
+    { key: "access_token", label: "Access Token", type: "password" },
+    { key: "account_id", label: "Account ID", type: "text", placeholder: "act_123456789" },
+  ],
+  google_search_console: [
+    { key: "site_url", label: "Site URL", type: "text", placeholder: "https://www.exemplo.com.br" },
+    { key: "client_email", label: "Client Email (Service Account)", type: "text" },
+    { key: "private_key", label: "Private Key", type: "textarea", placeholder: "-----BEGIN PRIVATE KEY-----\n..." },
+  ],
+  clarity: [
+    { key: "project_id", label: "Project ID", type: "text" },
+    { key: "api_token", label: "API Token", type: "password" },
+  ],
+  instagram: [
+    { key: "access_token", label: "Access Token", type: "password" },
+    { key: "business_account_id", label: "Business Account ID", type: "text" },
+  ],
 };
 
 const PLATFORMS: IntegrationStatus[] = [
-  {
-    platform: "google_ads",
-    label: "Google Ads",
-    description: "Campanhas Shopping, SKUs, ROAS, CPA, conversões",
-    connected: false,
-    envVars: ["GOOGLE_ADS_DEVELOPER_TOKEN", "GOOGLE_ADS_CLIENT_ID", "GOOGLE_ADS_CLIENT_SECRET", "GOOGLE_ADS_REFRESH_TOKEN", "GOOGLE_ADS_CUSTOMER_ID"],
-  },
-  {
-    platform: "ga4",
-    label: "Google Analytics 4",
-    description: "Funil de conversão, sessões, aquisição por canal, retenção",
-    connected: false,
-    envVars: ["GA4_PROPERTY_ID", "GA4_CLIENT_EMAIL", "GA4_PRIVATE_KEY_BASE64"],
-  },
-  {
-    platform: "meta_ads",
-    label: "Meta Ads",
-    description: "Campanhas Facebook/Instagram Ads, métricas de performance",
-    connected: false,
-    envVars: ["META_ADS_ACCESS_TOKEN", "META_ADS_ACCOUNT_ID"],
-  },
-  {
-    platform: "google_search_console",
-    label: "Google Search Console",
-    description: "SEO orgânico, queries, páginas, impressões, cliques",
-    connected: false,
-    envVars: ["GSC_SITE_URL", "GSC_CLIENT_EMAIL"],
-  },
-  {
-    platform: "clarity",
-    label: "Microsoft Clarity",
-    description: "CRO, dead/rage clicks, scroll depth, heatmaps",
-    connected: false,
-    envVars: ["CLARITY_PROJECT_ID", "CLARITY_API_TOKEN"],
-  },
-  {
-    platform: "instagram",
-    label: "Instagram Business",
-    description: "Insights do perfil, publicações, audiência, crescimento",
-    connected: false,
-    envVars: ["META_ADS_ACCESS_TOKEN"],
-  },
+  { platform: "google_ads", label: "Google Ads", description: "Campanhas Shopping, SKUs, ROAS, CPA, conversões", connected: false },
+  { platform: "ga4", label: "Google Analytics 4", description: "Funil de conversão, sessões, aquisição por canal, retenção", connected: false },
+  { platform: "meta_ads", label: "Meta Ads", description: "Campanhas Facebook/Instagram Ads, métricas de performance", connected: false },
+  { platform: "google_search_console", label: "Google Search Console", description: "SEO orgânico, queries, páginas, impressões, cliques", connected: false },
+  { platform: "clarity", label: "Microsoft Clarity", description: "CRO, dead/rage clicks, scroll depth, heatmaps", connected: false },
+  { platform: "instagram", label: "Instagram Business", description: "Insights do perfil, publicações, audiência, crescimento", connected: false },
 ];
 
 export default function IntegrationsPage() {
   const [integrations, setIntegrations] = useState<IntegrationStatus[]>(PLATFORMS);
   const [loading, setLoading] = useState(true);
+  const [editPlatform, setEditPlatform] = useState<string | null>(null);
+  const [formValues, setFormValues] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [visibleFields, setVisibleFields] = useState<Record<string, boolean>>({});
+  const [isAdmin, setIsAdmin] = useState(false);
 
   const loadStatus = useCallback(async () => {
     setLoading(true);
@@ -76,11 +91,7 @@ export default function IntegrationsPage() {
         setIntegrations((prev) =>
           prev.map((p) => {
             const status = data.integrations?.find((i: { platform: string }) => i.platform === p.platform);
-            return {
-              ...p,
-              connected: status?.connected ?? false,
-              lastSync: status?.lastSync,
-            };
+            return { ...p, connected: status?.connected ?? false, lastSync: status?.lastSync };
           }),
         );
       }
@@ -92,9 +103,86 @@ export default function IntegrationsPage() {
   }, []);
 
   useEffect(() => {
+    try {
+      const user = JSON.parse(localStorage.getItem("ca_user") || "{}");
+      setIsAdmin(user.role === "admin" || user.globalRole === "platform_admin");
+    } catch {
+      // not admin
+    }
     loadStatus();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function openEditModal(platform: string) {
+    setEditPlatform(platform);
+    setFormValues({});
+    setError("");
+    setSuccess("");
+    setVisibleFields({});
+  }
+
+  function closeModal() {
+    setEditPlatform(null);
+    setFormValues({});
+    setError("");
+    setSuccess("");
+    setVisibleFields({});
+  }
+
+  async function handleSave() {
+    if (!editPlatform) return;
+    setError("");
+    setSuccess("");
+    setSaving(true);
+
+    try {
+      const res = await fetch("/api/settings/integrations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform: editPlatform, credentials: formValues }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || "Erro ao salvar");
+        return;
+      }
+
+      setSuccess("Credenciais salvas com sucesso!");
+      loadStatus();
+      setTimeout(closeModal, 1200);
+    } catch {
+      setError("Erro de conexão");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleDisconnect(platform: string) {
+    if (!confirm("Tem certeza que deseja desconectar esta integração?")) return;
+
+    try {
+      const res = await fetch("/api/settings/integrations", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform }),
+      });
+
+      if (res.ok) {
+        loadStatus();
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  function toggleFieldVisibility(key: string) {
+    setVisibleFields((prev) => ({ ...prev, [key]: !prev[key] }));
+  }
+
+  const editFields = editPlatform ? PLATFORM_FIELDS[editPlatform] ?? [] : [];
+  const editLabel = PLATFORMS.find((p) => p.platform === editPlatform)?.label ?? "";
 
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6 space-y-6">
@@ -159,9 +247,25 @@ export default function IntegrationsPage() {
                     </span>
                   )}
                 </div>
-                {!integration.connected && (
-                  <div className="text-[10px] text-zinc-400">
-                    Variáveis: {integration.envVars.join(", ")}
+                {isAdmin && (
+                  <div className="flex items-center gap-2">
+                    {integration.connected && (
+                      <button
+                        onClick={() => handleDisconnect(integration.platform)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+                        title="Desconectar"
+                      >
+                        <Unplug size={12} />
+                        Desconectar
+                      </button>
+                    )}
+                    <button
+                      onClick={() => openEditModal(integration.platform)}
+                      className="flex items-center gap-1 px-2.5 py-1.5 text-xs text-zinc-600 border border-zinc-200 rounded-lg hover:bg-zinc-50 transition-colors"
+                    >
+                      <Settings2 size={12} />
+                      {integration.connected ? "Editar" : "Configurar"}
+                    </button>
                   </div>
                 )}
               </div>
@@ -170,14 +274,101 @@ export default function IntegrationsPage() {
         </div>
       )}
 
-      <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-5">
-        <h3 className="text-sm font-semibold text-blue-900 mb-2">Como configurar</h3>
-        <ul className="text-xs text-blue-800 space-y-1.5">
-          <li>As integrações são configuradas via variáveis de ambiente no <code className="bg-blue-100 px-1 rounded">.env.local</code> (dev) ou painel Vercel (produção).</li>
-          <li>Em breve: configuração via OAuth diretamente nesta página.</li>
-          <li>Cada plataforma é independente — o dashboard mostra dados parciais se apenas algumas estiverem configuradas.</li>
-        </ul>
-      </div>
+      {!isAdmin && (
+        <div className="rounded-2xl border border-blue-100 bg-blue-50/50 p-5">
+          <h3 className="text-sm font-semibold text-blue-900 mb-2">Como configurar</h3>
+          <ul className="text-xs text-blue-800 space-y-1.5">
+            <li>Entre em contato com o administrador para configurar as integrações da sua conta.</li>
+            <li>Cada plataforma é independente — o dashboard mostra dados parciais se apenas algumas estiverem configuradas.</li>
+          </ul>
+        </div>
+      )}
+
+      {/* Edit/Configure Modal */}
+      {editPlatform && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-100">
+              <h2 className="text-lg font-semibold text-zinc-900">
+                Configurar {editLabel}
+              </h2>
+              <button
+                onClick={closeModal}
+                className="p-1 rounded-lg hover:bg-zinc-100 text-zinc-400 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="px-6 py-5 space-y-4">
+              {error && (
+                <div className="rounded-lg bg-red-50 border border-red-200 p-3 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
+              {success && (
+                <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-3 text-sm text-emerald-700">
+                  {success}
+                </div>
+              )}
+
+              {editFields.map((field) => (
+                <div key={field.key}>
+                  <label className="block text-sm font-medium text-zinc-700 mb-1">
+                    {field.label}
+                    {field.optional && <span className="text-zinc-400 font-normal"> (opcional)</span>}
+                  </label>
+                  {field.type === "textarea" ? (
+                    <textarea
+                      value={formValues[field.key] ?? ""}
+                      onChange={(e) => setFormValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                      placeholder={field.placeholder}
+                      rows={4}
+                      className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 resize-none"
+                    />
+                  ) : (
+                    <div className="relative">
+                      <input
+                        type={field.type === "password" && !visibleFields[field.key] ? "password" : "text"}
+                        value={formValues[field.key] ?? ""}
+                        onChange={(e) => setFormValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
+                        placeholder={field.placeholder}
+                        className="w-full px-3 py-2 pr-10 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                      />
+                      {field.type === "password" && (
+                        <button
+                          type="button"
+                          onClick={() => toggleFieldVisibility(field.key)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-zinc-600"
+                        >
+                          {visibleFields[field.key] ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={closeModal}
+                  className="flex-1 py-2.5 border border-zinc-200 text-zinc-700 text-sm font-medium rounded-lg hover:bg-zinc-50 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="flex-1 py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+                >
+                  {saving && <Loader2 size={14} className="animate-spin" />}
+                  Salvar Credenciais
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

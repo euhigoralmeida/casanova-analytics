@@ -95,10 +95,10 @@ export async function GET(req: NextRequest) {
   try {
     const customer = await getCustomerAsync(tenantId);
       const [acctData, allSkuData, campData, deviceData] = await Promise.all([
-        fetchAccountTotals(customer, period, startDate, endDate),
-        fetchAllSkuMetrics(customer, period, startDate, endDate),
-        fetchAllCampaignMetrics(customer, period, startDate, endDate),
-        fetchDeviceMetrics(customer, period, startDate, endDate).catch(() => []),
+        fetchAccountTotals(customer, period, startDate, endDate, tenantId),
+        fetchAllSkuMetrics(customer, period, startDate, endDate, tenantId),
+        fetchAllCampaignMetrics(customer, period, startDate, endDate, tenantId),
+        fetchDeviceMetrics(customer, period, startDate, endDate, tenantId).catch(() => []),
       ]);
 
       account = {

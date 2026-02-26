@@ -125,8 +125,8 @@ export async function GET(request: NextRequest) {
   try {
     const customer = await getCustomerAsync(tenantId);
       const [allSkus, accountTotals] = await Promise.all([
-        fetchAllSkuMetrics(customer, period, startDate, endDate),
-        fetchAccountTotals(customer, period, startDate, endDate),
+        fetchAllSkuMetrics(customer, period, startDate, endDate, tenantId),
+        fetchAccountTotals(customer, period, startDate, endDate, tenantId),
       ]);
 
       let totalRevenue = 0;

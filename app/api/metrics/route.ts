@@ -105,7 +105,7 @@ export async function GET(request: NextRequest) {
   /* ---- DADOS REAIS (Google Ads) ---- */
   try {
     const customer = await getCustomerAsync(tenantId);
-      const data = await fetchSkuMetrics(customer, sku, period, startDate, endDate);
+      const data = await fetchSkuMetrics(customer, sku, period, startDate, endDate, tenantId);
 
       if (!data) {
         // SKU não tem dados Shopping neste período — retornar zeros (dados reais, não mock)

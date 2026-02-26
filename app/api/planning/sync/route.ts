@@ -56,7 +56,7 @@ async function fetchMonthDataRange(
   // Google Ads data
   try {
     const customer = await getCustomerAsync(tenantId);
-    const totals = await fetchAccountTotals(customer, "custom", startDate, endDate);
+    const totals = await fetchAccountTotals(customer, "custom", startDate, endDate, tenantId);
     if (totals) {
       entries.push({ metric: "google_ads", month, value: Math.round(totals.costBRL * 100) / 100 });
     }

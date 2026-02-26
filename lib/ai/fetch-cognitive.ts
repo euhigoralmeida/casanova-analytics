@@ -1,8 +1,8 @@
 // Fetches cognitive analysis directly (no HTTP round-trip)
 // Used by /api/chat and /api/ai-insights to avoid server-to-server fetch issues on Vercel
 
-import { isConfigured, getCustomer } from "@/lib/google-ads";
-import { isGA4Configured, getGA4Client } from "@/lib/google-analytics";
+import { getCustomerAsync } from "@/lib/google-ads";
+import { getGA4ClientAsync } from "@/lib/google-analytics";
 import { fetchAccountTotals, fetchAllSkuMetrics, fetchAllCampaignMetrics, fetchDeviceMetrics, fetchDemographicMetrics, fetchGeographicMetrics } from "@/lib/queries";
 import { fetchGA4Summary, fetchChannelAcquisition } from "@/lib/ga4-queries";
 import { prisma } from "@/lib/db";
@@ -77,17 +77,17 @@ export async function fetchCognitiveDirectly(
     let demographics: AnyMetrics[] = [];
     let geographic: AnyMetrics[] = [];
 
-    if (isConfigured()) {
-      try {
-        const customer = getCustomer();
+    try {
+      {
+        const customer = await getCustomerAsync(tenantId);
         const period = "custom";
         const [acctData, allSkuData, campData, deviceData, demoData, geoData] = await Promise.all([
-          fetchAccountTotals(customer, period, startDate, endDate),
-          fetchAllSkuMetrics(customer, period, startDate, endDate),
-          fetchAllCampaignMetrics(customer, period, startDate, endDate),
-          fetchDeviceMetrics(customer, period, startDate, endDate).catch(() => []),
-          fetchDemographicMetrics(customer, period, startDate, endDate).catch(() => []),
-          fetchGeographicMetrics(customer, period, startDate, endDate).catch(() => []),
+          fetchAccountTotals(customer, period, startDate, endDate, tenantId),
+          fetchAllSkuMetrics(customer, period, startDate, endDate, tenantId),
+          fetchAllCampaignMetrics(customer, period, startDate, endDate, tenantId),
+          fetchDeviceMetrics(customer, period, startDate, endDate, tenantId).catch(() => []),
+          fetchDemographicMetrics(customer, period, startDate, endDate, tenantId).catch(() => []),
+          fetchGeographicMetrics(customer, period, startDate, endDate, tenantId).catch(() => []),
         ]);
 
         const revenue = Math.round(acctData.revenue * 100) / 100;
@@ -128,21 +128,21 @@ export async function fetchCognitiveDirectly(
         devices = deviceData;
         demographics = demoData;
         geographic = geoData;
-      } catch (err) {
-        console.error("fetchCognitiveDirectly: Google Ads error:", err);
       }
+    } catch (err) {
+      console.error("fetchCognitiveDirectly: Google Ads error:", err);
     }
 
     // GA4
     let ga4: AnyMetrics | undefined;
     let channels: AnyMetrics[] = [];
 
-    if (isGA4Configured()) {
-      try {
-        const ga4Client = getGA4Client();
+    try {
+      {
+        const ga4Client = await getGA4ClientAsync(tenantId);
         const [summary, channelData] = await Promise.all([
-          fetchGA4Summary(ga4Client, startDate, endDate),
-          fetchChannelAcquisition(ga4Client, startDate, endDate),
+          fetchGA4Summary(ga4Client, startDate, endDate, tenantId),
+          fetchChannelAcquisition(ga4Client, startDate, endDate, tenantId),
         ]);
         ga4 = {
           sessions: summary.sessions, users: summary.users,
@@ -154,9 +154,9 @@ export async function fetchCognitiveDirectly(
           channel: c.channel, sessions: c.sessions,
           users: c.users, conversions: c.conversions, revenue: c.revenue,
         }));
-      } catch (err) {
-        console.error("fetchCognitiveDirectly: GA4 error:", err);
       }
+    } catch (err) {
+      console.error("fetchCognitiveDirectly: GA4 error:", err);
     }
 
     const result = await analyzeCognitive({

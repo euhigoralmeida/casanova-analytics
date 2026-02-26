@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const customer = await getCustomerAsync(tenantId);
-    const allCampaigns = await fetchAllCampaignMetrics(customer, period, startDate, endDate);
+    const allCampaigns = await fetchAllCampaignMetrics(customer, period, startDate, endDate, tenantId);
 
       const campaigns = allCampaigns
         .filter((c) => c.costBRL > 0 || c.impressions > 0)

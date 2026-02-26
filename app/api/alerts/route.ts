@@ -139,13 +139,13 @@ export async function GET(request: NextRequest) {
       previousSkus,
       dailyTimeSeries,
     ] = await Promise.all([
-      fetchAccountTotals(customer, period, startDate, endDate),
-      fetchAccountTotals(customer, "custom", prevStart, prevEnd),
-      fetchAllCampaignMetrics(customer, period, startDate, endDate),
-      fetchAllCampaignMetrics(customer, "custom", prevStart, prevEnd),
-      fetchAllSkuMetrics(customer, period, startDate, endDate),
-      fetchAllSkuMetrics(customer, "custom", prevStart, prevEnd),
-      fetchAccountTimeSeries(customer, period, startDate, endDate),
+      fetchAccountTotals(customer, period, startDate, endDate, tenantId),
+      fetchAccountTotals(customer, "custom", prevStart, prevEnd, tenantId),
+      fetchAllCampaignMetrics(customer, period, startDate, endDate, tenantId),
+      fetchAllCampaignMetrics(customer, "custom", prevStart, prevEnd, tenantId),
+      fetchAllSkuMetrics(customer, period, startDate, endDate, tenantId),
+      fetchAllSkuMetrics(customer, "custom", prevStart, prevEnd, tenantId),
+      fetchAccountTimeSeries(customer, period, startDate, endDate, tenantId),
     ]);
 
     // Fetch retention data from GA4

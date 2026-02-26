@@ -81,13 +81,13 @@ export async function GET(request: NextRequest) {
 
       let daily: DailyMetrics[];
       if (scope === "campaign" && campaignId) {
-        daily = await fetchCampaignTimeSeries(customer, campaignId, period, startDate, endDate);
+        daily = await fetchCampaignTimeSeries(customer, campaignId, period, startDate, endDate, tenantId);
       } else if (scope === "account") {
-        daily = await fetchAccountTimeSeries(customer, period, startDate, endDate);
+        daily = await fetchAccountTimeSeries(customer, period, startDate, endDate, tenantId);
       } else if (scope === "all") {
-        daily = await fetchAllTimeSeries(customer, period, startDate, endDate);
+        daily = await fetchAllTimeSeries(customer, period, startDate, endDate, tenantId);
       } else {
-        daily = await fetchSkuTimeSeries(customer, sku ?? "", period, startDate, endDate);
+        daily = await fetchSkuTimeSeries(customer, sku ?? "", period, startDate, endDate, tenantId);
       }
 
       // Calcular métricas derivadas por dia
