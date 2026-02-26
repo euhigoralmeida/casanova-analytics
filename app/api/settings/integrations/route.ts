@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
-import { getTenantCredentials, type Platform } from "@/lib/tenant-credentials";
+import {
+  getTenantCredentials,
+  invalidateCredentialsCache,
+  type Platform,
+} from "@/lib/tenant-credentials";
+import { encryptCredentials } from "@/lib/secrets";
+import { prisma } from "@/lib/db";
 
 const PLATFORMS: Platform[] = [
   "google_ads",
@@ -10,6 +16,15 @@ const PLATFORMS: Platform[] = [
   "clarity",
   "instagram",
 ];
+
+const REQUIRED_FIELDS: Record<Platform, string[]> = {
+  google_ads: ["developer_token", "client_id", "client_secret", "refresh_token", "customer_id"],
+  ga4: ["property_id", "client_email", "private_key"],
+  meta_ads: ["access_token", "account_id"],
+  clarity: ["project_id", "api_token"],
+  google_search_console: ["site_url", "client_email", "private_key"],
+  instagram: ["access_token", "business_account_id"],
+};
 
 /**
  * Returns the connection status of each integration platform.
@@ -31,4 +46,113 @@ export async function GET(req: NextRequest) {
   );
 
   return NextResponse.json({ integrations });
+}
+
+/**
+ * Save encrypted credentials for a platform integration.
+ * Requires admin role.
+ */
+export async function POST(req: NextRequest) {
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
+
+  if (auth.session.role !== "admin" && auth.session.globalRole !== "platform_admin") {
+    return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
+  }
+
+  const tenantId = getEffectiveTenantId(auth.session);
+
+  let body: { platform?: string; credentials?: Record<string, string> };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+
+  const { platform, credentials } = body;
+
+  if (!platform || !PLATFORMS.includes(platform as Platform)) {
+    return NextResponse.json(
+      { error: `Plataforma inválida. Use: ${PLATFORMS.join(", ")}` },
+      { status: 400 },
+    );
+  }
+
+  if (!credentials || typeof credentials !== "object") {
+    return NextResponse.json({ error: "Credenciais são obrigatórias" }, { status: 400 });
+  }
+
+  const required = REQUIRED_FIELDS[platform as Platform];
+  const missing = required.filter((k) => !credentials[k]?.trim());
+  if (missing.length > 0) {
+    return NextResponse.json(
+      { error: `Campos obrigatórios ausentes: ${missing.join(", ")}` },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const normalized: Record<string, string> = {};
+    for (const [key, value] of Object.entries(credentials)) {
+      normalized[key] = key === "private_key"
+        ? value.replace(/^\s+|\s+$/g, "")
+        : value.trim();
+    }
+    const encrypted = encryptCredentials(normalized);
+
+    await prisma.integration.upsert({
+      where: { tenantId_platform: { tenantId, platform } },
+      update: { credentials: encrypted, active: true, updatedAt: new Date() },
+      create: { tenantId, platform, credentials: encrypted, active: true },
+    });
+
+    invalidateCredentialsCache(tenantId, platform as Platform);
+
+    return NextResponse.json({ ok: true, platform });
+  } catch (e) {
+    console.error("[settings/integrations] POST error:", e);
+    return NextResponse.json({ error: "Erro ao salvar credenciais" }, { status: 500 });
+  }
+}
+
+/**
+ * Remove (deactivate) credentials for a platform integration.
+ * Requires admin role.
+ */
+export async function DELETE(req: NextRequest) {
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth.error;
+
+  if (auth.session.role !== "admin" && auth.session.globalRole !== "platform_admin") {
+    return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
+  }
+
+  const tenantId = getEffectiveTenantId(auth.session);
+
+  let body: { platform?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "JSON inválido" }, { status: 400 });
+  }
+
+  const { platform } = body;
+
+  if (!platform || !PLATFORMS.includes(platform as Platform)) {
+    return NextResponse.json({ error: "Plataforma inválida" }, { status: 400 });
+  }
+
+  try {
+    await prisma.integration.updateMany({
+      where: { tenantId, platform },
+      data: { active: false },
+    });
+
+    invalidateCredentialsCache(tenantId, platform as Platform);
+
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error("[settings/integrations] DELETE error:", e);
+    return NextResponse.json({ error: "Erro ao remover integração" }, { status: 500 });
+  }
 }
