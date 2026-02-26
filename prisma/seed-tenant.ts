@@ -18,10 +18,11 @@ async function main() {
   // Upsert tenant
   const tenant = await prisma.tenant.upsert({
     where: { slug: "casanova" },
-    update: { name: "Casanova Metais" },
+    update: { name: "Casanova Metais", logo: "/logo-casanova.png" },
     create: {
       name: "Casanova Metais",
       slug: "casanova",
+      logo: "/logo-casanova.png",
       plan: "pro",
     },
   });
@@ -69,10 +70,11 @@ async function main() {
 
   const fivepTenant = await prisma.tenant.upsert({
     where: { slug: "fivep" },
-    update: { name: "Fivep" },
+    update: { name: "Fivep", logo: "/logo-fivep.png" },
     create: {
       name: "Fivep",
       slug: "fivep",
+      logo: "/logo-fivep.png",
       plan: "enterprise",
     },
   });
@@ -97,10 +99,11 @@ async function main() {
 
   const yellaTenant = await prisma.tenant.upsert({
     where: { slug: "yellalife" },
-    update: { name: "Yella Life" },
+    update: { name: "Yella Life", logo: "/logo-yellalife.png" },
     create: {
       name: "Yella Life",
       slug: "yellalife",
+      logo: "/logo-yellalife.png",
       plan: "pro",
     },
   });

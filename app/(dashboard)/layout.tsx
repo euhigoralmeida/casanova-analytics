@@ -25,7 +25,7 @@ const pageTitles: Record<string, string> = {
   "/settings": "Configurações",
 };
 
-type TenantData = { id?: string; name?: string };
+type TenantData = { id?: string; name?: string; logo?: string };
 
 function readTenantData(): TenantData {
   if (typeof window === "undefined") return {};
@@ -86,6 +86,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         <div className="fixed inset-y-0 left-0 z-30">
           <Sidebar
             tenantName={tenantData.name}
+            tenantLogo={tenantData.logo}
             globalRole={userData.globalRole}
             collapsed={sidebarCollapsed}
             onToggleCollapse={toggleCollapse}
@@ -101,7 +102,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             onClick={() => setSidebarOpen(false)}
           />
           <div className="fixed inset-y-0 left-0 z-50 lg:hidden">
-            <Sidebar tenantName={tenantData.name} globalRole={userData.globalRole} onClose={() => setSidebarOpen(false)} />
+            <Sidebar tenantName={tenantData.name} tenantLogo={tenantData.logo} globalRole={userData.globalRole} onClose={() => setSidebarOpen(false)} />
           </div>
         </>
       )}

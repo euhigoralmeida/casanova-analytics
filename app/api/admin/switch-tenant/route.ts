@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   const response = NextResponse.json({
     ok: true,
-    tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
+    tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug, logo: tenant.logo ?? null },
   });
 
   response.cookies.set(SESSION_COOKIE, token, {

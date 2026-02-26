@@ -23,6 +23,7 @@ const FALLBACK_TENANTS: Tenant[] = [
     id: "casanova",
     name: "Casanova Metais",
     slug: "casanova",
+    logo: "/logo-casanova.png",
     users: [
       {
         email: "admin@casanova.com",
@@ -36,6 +37,7 @@ const FALLBACK_TENANTS: Tenant[] = [
     id: "fivep",
     name: "Fivep",
     slug: "fivep",
+    logo: "/logo-fivep.png",
     users: [
       {
         email: "contato@fivep.com.br",
@@ -50,6 +52,7 @@ const FALLBACK_TENANTS: Tenant[] = [
     id: "yellalife",
     name: "Yella Life",
     slug: "yellalife",
+    logo: "/logo-yellalife.png",
     users: [
       {
         email: "admin@yellalife.com",
