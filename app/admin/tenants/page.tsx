@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Plus,
   Building2,
@@ -12,12 +14,14 @@ import {
   Check,
   Eye,
   EyeOff,
+  ExternalLink,
 } from "lucide-react";
 
 type TenantRow = {
   id: string;
   name: string;
   slug: string;
+  logo: string | null;
   plan: string;
   createdAt: string;
   _count: { users: number; integrations: number };
@@ -54,6 +58,7 @@ function slugify(text: string): string {
 }
 
 export default function AdminTenantsPage() {
+  const router = useRouter();
   const [tenants, setTenants] = useState<TenantRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -67,6 +72,7 @@ export default function AdminTenantsPage() {
   } | null>(null);
   const [copied, setCopied] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [switchingId, setSwitchingId] = useState<string | null>(null);
 
   const loadTenants = useCallback(async () => {
     setLoading(true);
@@ -84,20 +90,8 @@ export default function AdminTenantsPage() {
   }, []);
 
   useEffect(() => {
-    // Check admin access
-    try {
-      const user = JSON.parse(localStorage.getItem("ca_user") || "{}");
-      if (user.globalRole !== "platform_admin") {
-        window.location.href = "/overview";
-        return;
-      }
-    } catch {
-      window.location.href = "/overview";
-      return;
-    }
     loadTenants();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadTenants]);
 
   function updateForm(field: keyof CreateForm, value: string | boolean) {
     setForm((prev) => {
@@ -158,6 +152,26 @@ export default function AdminTenantsPage() {
     setTimeout(() => setCopied(false), 2000);
   }
 
+  async function viewDashboard(tenant: TenantRow) {
+    setSwitchingId(tenant.id);
+    try {
+      const res = await fetch("/api/admin/switch-tenant", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantId: tenant.id }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        localStorage.setItem("ca_tenant", JSON.stringify(data.tenant));
+        router.push("/overview");
+      }
+    } catch {
+      // ignore
+    } finally {
+      setSwitchingId(null);
+    }
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -210,6 +224,9 @@ export default function AdminTenantsPage() {
                 <th className="text-left px-4 py-3 font-medium text-zinc-600">
                   Criado em
                 </th>
+                <th className="text-right px-4 py-3 font-medium text-zinc-600">
+                  Ações
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -253,6 +270,28 @@ export default function AdminTenantsPage() {
                   </td>
                   <td className="px-4 py-3 text-zinc-500 text-xs">
                     {new Date(t.createdAt).toLocaleDateString("pt-BR")}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-2">
+                      <Link
+                        href={`/admin/tenants/${t.id}`}
+                        className="text-xs px-2.5 py-1.5 border border-zinc-200 rounded-lg text-zinc-600 hover:bg-zinc-50 transition-colors"
+                      >
+                        Detalhes
+                      </Link>
+                      <button
+                        onClick={() => viewDashboard(t)}
+                        disabled={switchingId === t.id}
+                        className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                      >
+                        {switchingId === t.id ? (
+                          <Loader2 size={12} className="animate-spin" />
+                        ) : (
+                          <ExternalLink size={12} />
+                        )}
+                        Ver Dashboard
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuth, requireTenantContext } from "@/lib/api-helpers";
 import {
   getTenantCredentials,
   invalidateCredentialsCache,
@@ -33,7 +33,10 @@ const REQUIRED_FIELDS: Record<Platform, string[]> = {
 export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
-  const tenantId = getEffectiveTenantId(auth.session);
+  const tenantId = requireTenantContext(auth.session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   const integrations = await Promise.all(
     PLATFORMS.map(async (platform) => {
@@ -60,7 +63,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
   }
 
-  const tenantId = getEffectiveTenantId(auth.session);
+  const tenantId = requireTenantContext(auth.session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   let body: { platform?: string; credentials?: Record<string, string> };
   try {
@@ -127,7 +133,10 @@ export async function DELETE(req: NextRequest) {
     return NextResponse.json({ error: "Acesso negado" }, { status: 403 });
   }
 
-  const tenantId = getEffectiveTenantId(auth.session);
+  const tenantId = requireTenantContext(auth.session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   let body: { platform?: string };
   try {

@@ -5,7 +5,7 @@ import { fetchAccountTotals, fetchAllCampaignMetrics, fetchAllSkuMetrics, fetchA
 import { fetchRetentionSummary } from "@/lib/ga4-queries";
 import { computeAllSmartAlerts } from "@/lib/alert-engine";
 import type { SmartAlert, SmartAlertsResponse } from "@/lib/alert-types";
-import { requireAuthWithRateLimit, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuthWithRateLimit, requireTenantContext } from "@/lib/api-helpers";
 import { logger } from "@/lib/logger";
 
 /* =========================
@@ -113,7 +113,10 @@ function buildMockAlerts(): SmartAlert[] {
 export async function GET(request: NextRequest) {
   const auth = requireAuthWithRateLimit(request);
   if ("error" in auth) return auth.error;
-  const tenantId = getEffectiveTenantId(auth.session);
+  const tenantId = requireTenantContext(auth.session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   const { searchParams } = request.nextUrl;
   const period = searchParams.get("period") ?? "7d";

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuth, requireTenantContext } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 import { PLANNING_INPUT_METRICS, PLANNING_TARGET_INPUT_METRICS } from "@/types/api";
 import type { PlanningYearData } from "@/types/api";
@@ -34,7 +34,10 @@ export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
-  const tenantId = getEffectiveTenantId(session);
+  const tenantId = requireTenantContext(session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   const year = parseInt(req.nextUrl.searchParams.get("year") ?? String(new Date().getFullYear()));
   if (isNaN(year) || year < 2020 || year > 2040) {
@@ -76,7 +79,10 @@ export async function PUT(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
-  const tenantId = getEffectiveTenantId(session);
+  const tenantId = requireTenantContext(session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   const body = await req.json();
   const { year, entries, planType: rawPlanType } = body as {

@@ -5,13 +5,22 @@ const SESSION_COOKIE = "ca_session";
 // Rotas públicas que não precisam de autenticação
 const publicPaths = ["/login", "/api/auth/login", "/api/auth/logout", "/api/cron/", "/api/health"];
 
-/** Verify HMAC session token using Web Crypto API (Edge-compatible) */
-async function verifyToken(token: string): Promise<boolean> {
+type TokenPayload = {
+  tenantId: string;
+  email: string;
+  role: string;
+  globalRole?: string;
+  activeTenantId?: string;
+  exp: number;
+};
+
+/** Verify HMAC session token and decode payload (Edge-compatible) */
+async function verifyAndDecode(token: string): Promise<TokenPayload | null> {
   const secret = process.env.AUTH_SECRET;
-  if (!secret) return false;
+  if (!secret) return null;
 
   const [encoded, hmac] = token.split(".");
-  if (!encoded || !hmac) return false;
+  if (!encoded || !hmac) return null;
 
   try {
     const key = await crypto.subtle.importKey(
@@ -27,15 +36,14 @@ async function verifyToken(token: string): Promise<boolean> {
       .replace(/\//g, "_")
       .replace(/=+$/, "");
 
-    if (hmac !== expected) return false;
+    if (hmac !== expected) return null;
 
-    // Check expiry
-    const payload = JSON.parse(atob(encoded.replace(/-/g, "+").replace(/_/g, "/")));
-    if (payload.exp < Date.now()) return false;
+    const payload = JSON.parse(atob(encoded.replace(/-/g, "+").replace(/_/g, "/"))) as TokenPayload;
+    if (payload.exp < Date.now()) return null;
 
-    return true;
+    return payload;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -53,21 +61,32 @@ export async function middleware(req: NextRequest) {
   }
 
   const token = req.cookies.get(SESSION_COOKIE)?.value;
+  const payload = token ? await verifyAndDecode(token) : null;
 
-  // Verificar assinatura HMAC do cookie
-  const valid = token ? await verifyToken(token) : false;
-
+  // API routes: 401 se não autenticado
   if (pathname.startsWith("/api/")) {
-    if (!valid) {
+    if (!payload) {
       return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
     }
     return NextResponse.next();
   }
 
   // Páginas sem auth válido → redirect login
-  if (!valid) {
-    const loginUrl = new URL("/login", req.url);
-    return NextResponse.redirect(loginUrl);
+  if (!payload) {
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
+
+  // /admin/* → bloquear se não é platform_admin
+  if (pathname.startsWith("/admin")) {
+    if (payload.globalRole !== "platform_admin") {
+      return NextResponse.redirect(new URL("/overview", req.url));
+    }
+    return NextResponse.next();
+  }
+
+  // Rotas cliente → se admin sem activeTenantId, redirect /admin
+  if (payload.globalRole === "platform_admin" && !payload.activeTenantId) {
+    return NextResponse.redirect(new URL("/admin", req.url));
   }
 
   return NextResponse.next();

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getGA4ClientAsync } from "@/lib/google-analytics";
 import { fetchEcommerceFunnel, fetchGA4Summary, fetchGA4FunnelTimeSeries, fetchChannelAcquisition } from "@/lib/ga4-queries";
-import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuth, requireTenantContext } from "@/lib/api-helpers";
 
 /* =========================
    GET handler — v2
@@ -10,7 +10,10 @@ import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
   if ("error" in auth) return auth.error;
-  const tenantId = getEffectiveTenantId(auth.session);
+  const tenantId = requireTenantContext(auth.session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   const { searchParams } = request.nextUrl;
   const startDate = searchParams.get("startDate") ?? undefined;

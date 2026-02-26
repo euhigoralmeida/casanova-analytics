@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuth, requireTenantContext } from "@/lib/api-helpers";
 import { AI_CONFIG } from "@/lib/ai/config";
 import { createGeminiClient, withRetry } from "@/lib/ai/client";
 import { GEMINI_TOOLS } from "@/lib/ai/tools";
@@ -32,7 +32,13 @@ export async function POST(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
-  const tenantId = getEffectiveTenantId(session);
+  const tenantId = requireTenantContext(session);
+  if (!tenantId) {
+    return new Response(JSON.stringify({ error: "Selecione um cliente" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
   if (!AI_CONFIG.enabled) {
     return new Response(JSON.stringify({ error: "IA desabilitada" }), {

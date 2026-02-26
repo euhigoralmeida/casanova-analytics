@@ -31,7 +31,13 @@ export default function LoginPage() {
 
       localStorage.setItem("ca_tenant", JSON.stringify(data.tenant));
       localStorage.setItem("ca_user", JSON.stringify(data.user));
-      router.push("/overview");
+
+      // Platform admin → admin panel; client → dashboard
+      if (data.user.globalRole === "platform_admin") {
+        router.push("/admin");
+      } else {
+        router.push("/overview");
+      }
     } catch {
       setError("Erro de conexão");
     } finally {

@@ -18,12 +18,13 @@ async function main() {
   // Upsert tenant
   const tenant = await prisma.tenant.upsert({
     where: { slug: "casanova" },
-    update: { name: "Casanova Metais", logo: "/logo-casanova.png" },
+    update: { name: "Casanova Metais", logo: "/logo-casanova.png", onboardingStatus: "complete" },
     create: {
       name: "Casanova Metais",
       slug: "casanova",
       logo: "/logo-casanova.png",
       plan: "pro",
+      onboardingStatus: "complete",
     },
   });
   console.log(`  ✓ Tenant: ${tenant.name} (${tenant.id})`);
@@ -70,12 +71,13 @@ async function main() {
 
   const fivepTenant = await prisma.tenant.upsert({
     where: { slug: "fivep" },
-    update: { name: "Fivep", logo: "/logo-fivep.png" },
+    update: { name: "Fivep", logo: "/logo-fivep.png", onboardingStatus: "complete" },
     create: {
       name: "Fivep",
       slug: "fivep",
       logo: "/logo-fivep.png",
       plan: "enterprise",
+      onboardingStatus: "complete",
     },
   });
   console.log(`  ✓ Tenant: ${fivepTenant.name} (${fivepTenant.id})`);
@@ -99,12 +101,13 @@ async function main() {
 
   const yellaTenant = await prisma.tenant.upsert({
     where: { slug: "yellalife" },
-    update: { name: "Yella Life", logo: "/logo-yellalife.png" },
+    update: { name: "Yella Life", logo: "/logo-yellalife.png", onboardingStatus: "complete" },
     create: {
       name: "Yella Life",
       slug: "yellalife",
       logo: "/logo-yellalife.png",
       plan: "pro",
+      onboardingStatus: "complete",
     },
   });
   console.log(`  ✓ Tenant: ${yellaTenant.name} (${yellaTenant.id})`);

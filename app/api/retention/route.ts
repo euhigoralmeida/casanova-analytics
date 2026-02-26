@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getGA4ClientAsync } from "@/lib/google-analytics";
 import { fetchCohortRetention, fetchRetentionSummary, fetchUserLifetimeValue } from "@/lib/ga4-queries";
 import type { RetentionData } from "@/lib/ga4-queries";
-import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuth, requireTenantContext } from "@/lib/api-helpers";
 
 /* =========================
    Mock data for when GA4 is not configured
@@ -51,7 +51,10 @@ function generateMockData(): RetentionData {
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
   if ("error" in auth) return auth.error;
-  const tenantId = getEffectiveTenantId(auth.session);
+  const tenantId = requireTenantContext(auth.session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   const { searchParams } = request.nextUrl;
   const startDate = searchParams.get("startDate") ?? undefined;

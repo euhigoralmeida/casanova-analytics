@@ -50,3 +50,26 @@ export function getEffectiveTenantId(session: SessionPayload): string {
 export function isPlatformAdmin(session: SessionPayload): boolean {
   return session.globalRole === "platform_admin";
 }
+
+/**
+ * For data routes — returns tenantId or null if admin has no tenant selected.
+ * Use this instead of getEffectiveTenantId for defense-in-depth.
+ */
+export function requireTenantContext(session: SessionPayload): string | null {
+  if (session.globalRole === "platform_admin") {
+    return session.activeTenantId || null;
+  }
+  return session.tenantId;
+}
+
+/**
+ * Auth + platform_admin check in one call. Returns 401 or 403 on failure.
+ */
+export function requirePlatformAdmin(req: NextRequest): AuthSuccess | AuthFailure {
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth;
+  if (!isPlatformAdmin(auth.session)) {
+    return { error: NextResponse.json({ error: "Acesso negado" }, { status: 403 }) };
+  }
+  return auth;
+}

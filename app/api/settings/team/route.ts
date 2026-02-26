@@ -1,7 +1,7 @@
 import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/auth";
-import { getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireTenantContext } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 
@@ -10,7 +10,10 @@ export async function GET(req: NextRequest) {
   if (!session) {
     return NextResponse.json({ error: "Não autenticado" }, { status: 401 });
   }
-  const tenantId = getEffectiveTenantId(session);
+  const tenantId = requireTenantContext(session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   try {
     const members = await prisma.user.findMany({
@@ -30,7 +33,10 @@ export async function POST(req: NextRequest) {
   if (!session || session.role !== "admin") {
     return NextResponse.json({ error: "Sem permissão" }, { status: 403 });
   }
-  const tenantId = getEffectiveTenantId(session);
+  const tenantId = requireTenantContext(session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   try {
     const { email, name, role } = await req.json();

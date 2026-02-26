@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuth, requireTenantContext } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 import { getCustomerAsync } from "@/lib/google-ads";
 import { getGA4ClientAsync } from "@/lib/google-analytics";
@@ -103,7 +103,10 @@ export async function POST(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
-  const tenantId = getEffectiveTenantId(session);
+  const tenantId = requireTenantContext(session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   const body = await req.json();
   const year = body.year as number;

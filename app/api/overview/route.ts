@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCustomerAsync } from "@/lib/google-ads";
 import { fetchAllSkuMetrics, fetchAccountTotals } from "@/lib/queries";
-import { requireAuthWithRateLimit, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuthWithRateLimit, requireTenantContext } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 import { computeTargetMonth } from "@/lib/planning-target-calc";
 import { loadSkuExtras } from "@/lib/sku-master";
@@ -115,7 +115,10 @@ export async function GET(request: NextRequest) {
 
   const auth = requireAuthWithRateLimit(request);
   if ("error" in auth) return auth.error;
-  const tenantId = getEffectiveTenantId(auth.session);
+  const tenantId = requireTenantContext(auth.session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   const [targets, skuExtras] = await Promise.all([
     getPlanningTargets(tenantId),

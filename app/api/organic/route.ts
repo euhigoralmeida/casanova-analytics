@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuth, requireTenantContext } from "@/lib/api-helpers";
 import { getGSCClientAsync } from "@/lib/google-search-console";
 import { getGA4ClientAsync } from "@/lib/google-analytics";
 import { getCustomerAsync } from "@/lib/google-ads";
@@ -19,7 +19,10 @@ import type { OrganicDataResponse } from "@/lib/organic-types";
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
   if ("error" in auth) return auth.error;
-  const tenantId = getEffectiveTenantId(auth.session);
+  const tenantId = requireTenantContext(auth.session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   const { searchParams } = request.nextUrl;
   const startDate = searchParams.get("startDate") ?? undefined;

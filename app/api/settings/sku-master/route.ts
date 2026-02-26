@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuth, requireTenantContext } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 
 /* =========================
@@ -10,7 +10,10 @@ export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
-  const tenantId = getEffectiveTenantId(session);
+  const tenantId = requireTenantContext(session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   const skus = await prisma.skuMaster.findMany({
     where: { tenantId },
@@ -29,7 +32,10 @@ export async function PUT(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
-  const tenantId = getEffectiveTenantId(session);
+  const tenantId = requireTenantContext(session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   const body = await req.json();
   const skuList = body.skus as {
@@ -81,7 +87,10 @@ export async function DELETE(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
-  const tenantId = getEffectiveTenantId(session);
+  const tenantId = requireTenantContext(session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   const sku = req.nextUrl.searchParams.get("sku");
   if (!sku) {

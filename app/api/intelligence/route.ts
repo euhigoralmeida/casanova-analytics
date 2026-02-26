@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, requireAuthWithRateLimit, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuth, requireAuthWithRateLimit, requireTenantContext } from "@/lib/api-helpers";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/db";
 import { getCustomerAsync } from "@/lib/google-ads";
@@ -32,7 +32,10 @@ export async function GET(req: NextRequest) {
   const auth = requireAuthWithRateLimit(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
-  const tenantId = getEffectiveTenantId(session);
+  const tenantId = requireTenantContext(session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   const { searchParams } = req.nextUrl;
   const period = searchParams.get("period") ?? "30d";
@@ -305,7 +308,10 @@ export async function POST(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
-  const tenantId = getEffectiveTenantId(session);
+  const tenantId = requireTenantContext(session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   const body = await req.json();
   const { insightId, actionType, description } = body as {

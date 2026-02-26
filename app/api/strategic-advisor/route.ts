@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuth, requireTenantContext } from "@/lib/api-helpers";
 import { AI_CONFIG } from "@/lib/ai/config";
 import { createLLMProvider } from "@/lib/ai/llm-provider";
 import { buildStrategicBrief } from "@/lib/ai/strategic-brief";
@@ -77,7 +77,13 @@ export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
-  const tenantId = getEffectiveTenantId(session);
+  const tenantId = requireTenantContext(session);
+  if (!tenantId) {
+    return new Response(JSON.stringify({ error: "Selecione um cliente" }), {
+      status: 400,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
 
   const url = new URL(req.url);
   const startDate = url.searchParams.get("startDate");

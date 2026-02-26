@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuth, requireTenantContext } from "@/lib/api-helpers";
 import {
   fetchMetaCampaigns,
   fetchMetaAccountTotals,
@@ -10,7 +10,10 @@ import type { MetaAdsResponse } from "@/lib/meta-ads";
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
   if ("error" in auth) return auth.error;
-  const tenantId = getEffectiveTenantId(auth.session);
+  const tenantId = requireTenantContext(auth.session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   const { searchParams } = request.nextUrl;
   const startDate = searchParams.get("startDate");

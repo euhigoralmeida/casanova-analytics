@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCustomerAsync } from "@/lib/google-ads";
 import { fetchSkuTimeSeries, fetchAllTimeSeries, fetchAccountTimeSeries, fetchCampaignTimeSeries, DailyMetrics } from "@/lib/queries";
 import { fmtDate } from "@/lib/format";
-import { requireAuthWithRateLimit, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuthWithRateLimit, requireTenantContext } from "@/lib/api-helpers";
 
 /* =========================
    Mock data (fallback)
@@ -65,7 +65,10 @@ function getDaysFromPeriod(period: string, startDate?: string, endDate?: string)
 export async function GET(request: NextRequest) {
   const auth = requireAuthWithRateLimit(request);
   if ("error" in auth) return auth.error;
-  const tenantId = getEffectiveTenantId(auth.session);
+  const tenantId = requireTenantContext(auth.session);
+  if (!tenantId) {
+    return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
+  }
 
   const { searchParams } = request.nextUrl;
   const period = searchParams.get("period") ?? "7d";
