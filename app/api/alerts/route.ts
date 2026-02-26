@@ -5,7 +5,8 @@ import { fetchAccountTotals, fetchAllCampaignMetrics, fetchAllSkuMetrics, fetchA
 import { fetchRetentionSummary } from "@/lib/ga4-queries";
 import { computeAllSmartAlerts } from "@/lib/alert-engine";
 import type { SmartAlert, SmartAlertsResponse } from "@/lib/alert-types";
-import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuthWithRateLimit, getEffectiveTenantId } from "@/lib/api-helpers";
+import { logger } from "@/lib/logger";
 
 /* =========================
    Mock fallback
@@ -110,7 +111,7 @@ function buildMockAlerts(): SmartAlert[] {
 ========================= */
 
 export async function GET(request: NextRequest) {
-  const auth = requireAuth(request);
+  const auth = requireAuthWithRateLimit(request);
   if ("error" in auth) return auth.error;
   const tenantId = getEffectiveTenantId(auth.session);
 
@@ -184,7 +185,7 @@ export async function GET(request: NextRequest) {
 
       return NextResponse.json(response);
   } catch (err) {
-    console.error("Google Ads API error in alerts, falling back to mock:", err);
+    logger.error("Google Ads API error in alerts, falling back to mock", { route: "/api/alerts", tenantId }, err);
   }
 
   /* ---- MOCK (fallback) ---- */

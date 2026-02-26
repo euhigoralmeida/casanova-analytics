@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, type SessionPayload } from "@/lib/auth";
+import { checkApiLimit } from "@/lib/ai/rate-limiter";
 
 type AuthSuccess = { session: SessionPayload };
 type AuthFailure = { error: NextResponse };
@@ -13,6 +14,26 @@ export function requireAuth(req: NextRequest): AuthSuccess | AuthFailure {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
   }
   return { session };
+}
+
+/**
+ * Auth + rate limit in one call. Returns 401 if not authenticated, 429 if rate limited.
+ */
+export function requireAuthWithRateLimit(req: NextRequest, maxPerMinute: number = 120): AuthSuccess | AuthFailure {
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth;
+
+  const tenantId = getEffectiveTenantId(auth.session);
+  if (!checkApiLimit(tenantId, maxPerMinute)) {
+    return {
+      error: NextResponse.json(
+        { error: "Limite de requisições excedido. Tente novamente em alguns segundos." },
+        { status: 429 },
+      ),
+    };
+  }
+
+  return auth;
 }
 
 /**

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuth, requireAuthWithRateLimit, getEffectiveTenantId } from "@/lib/api-helpers";
+import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/db";
 import { getCustomerAsync } from "@/lib/google-ads";
 import { getGA4ClientAsync } from "@/lib/google-analytics";
@@ -28,7 +29,7 @@ function daysInMonth(year: number, month: number): number {
 ========================= */
 export async function GET(req: NextRequest) {
   try {
-  const auth = requireAuth(req);
+  const auth = requireAuthWithRateLimit(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
   const tenantId = getEffectiveTenantId(session);
@@ -78,7 +79,7 @@ export async function GET(req: NextRequest) {
       pct_aprovacao_receita: targetAll.pct_aprovacao_receita,
     };
   } catch (err) {
-    console.error("Intelligence: planning fetch error:", err);
+    logger.error("Intelligence: planning fetch error", { route: "/api/intelligence", tenantId }, err);
   }
 
   // 2. Load SKU extras from DB (margin, stock, cost)
@@ -147,7 +148,7 @@ export async function GET(req: NextRequest) {
 
       devices = deviceData;
   } catch (err) {
-    console.error("Intelligence: Google Ads error:", err);
+    logger.error("Intelligence: Google Ads error", { route: "/api/intelligence", tenantId }, err);
   }
 
   // 4. Fetch GA4 data
@@ -223,7 +224,7 @@ export async function GET(req: NextRequest) {
         }));
       }
   } catch (err) {
-    console.error("Intelligence: GA4 error:", err);
+    logger.error("Intelligence: GA4 error", { route: "/api/intelligence", tenantId }, err);
   }
 
   // 5. Build context and run analysis
@@ -249,7 +250,7 @@ export async function GET(req: NextRequest) {
   try {
     result = await analyzeCognitive(ctx);
   } catch (err) {
-    console.error("Intelligence: analyze error:", err);
+    logger.error("Intelligence: analyze error", { route: "/api/intelligence", tenantId }, err);
     return NextResponse.json({ error: "Erro ao analisar", detail: String(err) }, { status: 500 });
   }
 
@@ -270,7 +271,7 @@ export async function GET(req: NextRequest) {
         recommendations: i.recommendations as any,
         source: i.source,
       })),
-    }).catch((e: unknown) => console.error("Intelligence: insight persist error:", e));
+    }).catch((e: unknown) => logger.error("Intelligence: insight persist error", { route: "/api/intelligence", tenantId }, e));
   }
 
   // 7. Persist daily metric snapshot (async, don't block response)
@@ -286,12 +287,12 @@ export async function GET(req: NextRequest) {
         metrics: { revenue: s.revenue, ads: s.ads, roas: s.roas, cpa: s.cpa,
                    impressions: s.impressions, clicks: s.clicks, conversions: s.conversions },
       })),
-    ).catch((e: unknown) => console.error("Intelligence: snapshot persist error:", e));
+    ).catch((e: unknown) => logger.error("Intelligence: snapshot persist error", { route: "/api/intelligence", tenantId }, e));
   }
 
   return NextResponse.json(result);
   } catch (err) {
-    console.error("Intelligence GET: uncaught error:", err);
+    logger.error("Intelligence GET: uncaught error", { route: "/api/intelligence" }, err);
     return NextResponse.json({ error: "Erro interno", detail: String(err) }, { status: 500 });
   }
 }

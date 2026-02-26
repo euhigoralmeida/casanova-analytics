@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCustomerAsync } from "@/lib/google-ads";
 import { fetchAllCampaignMetrics } from "@/lib/queries";
-import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuthWithRateLimit, getEffectiveTenantId } from "@/lib/api-helpers";
 
 /* =========================
    Mock data (fallback)
@@ -62,7 +62,7 @@ function buildMockCampaigns() {
 ========================= */
 
 export async function GET(request: NextRequest) {
-  const auth = requireAuth(request);
+  const auth = requireAuthWithRateLimit(request);
   if ("error" in auth) return auth.error;
   const tenantId = getEffectiveTenantId(auth.session);
 

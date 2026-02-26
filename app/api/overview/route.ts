@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCustomerAsync } from "@/lib/google-ads";
 import { fetchAllSkuMetrics, fetchAccountTotals } from "@/lib/queries";
-import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuthWithRateLimit, getEffectiveTenantId } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 import { computeTargetMonth } from "@/lib/planning-target-calc";
 import { loadSkuExtras } from "@/lib/sku-master";
+import { logger } from "@/lib/logger";
 
 /* =========================
    Mock data (fallback)
@@ -112,7 +113,7 @@ export async function GET(request: NextRequest) {
   const startDate = searchParams.get("startDate") ?? undefined;
   const endDate = searchParams.get("endDate") ?? undefined;
 
-  const auth = requireAuth(request);
+  const auth = requireAuthWithRateLimit(request);
   if ("error" in auth) return auth.error;
   const tenantId = getEffectiveTenantId(auth.session);
 
@@ -220,7 +221,7 @@ export async function GET(request: NextRequest) {
         skus,
       });
   } catch (err) {
-    console.error("Google Ads API error in overview, falling back to mock:", err);
+    logger.error("Google Ads API error in overview, falling back to mock", { route: "/api/overview", tenantId }, err);
   }
 
   /* ---- MOCK (fallback) ---- */

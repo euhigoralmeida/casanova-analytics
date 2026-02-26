@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCustomerAsync } from "@/lib/google-ads";
 import { fetchSkuMetrics } from "@/lib/queries";
-import { requireAuth, getEffectiveTenantId } from "@/lib/api-helpers";
+import { requireAuthWithRateLimit, getEffectiveTenantId } from "@/lib/api-helpers";
+import { logger } from "@/lib/logger";
 
 /* =========================
    Mock data (fallback)
@@ -86,7 +87,7 @@ function buildAlerts(roas: number, cpa: number, marginPct: number, stock: number
 ========================= */
 
 export async function GET(request: NextRequest) {
-  const auth = requireAuth(request);
+  const auth = requireAuthWithRateLimit(request);
   if ("error" in auth) return auth.error;
   const tenantId = getEffectiveTenantId(auth.session);
 
@@ -158,7 +159,7 @@ export async function GET(request: NextRequest) {
         funnel,
       });
   } catch (err) {
-    console.error("Google Ads API error, falling back to mock:", err);
+    logger.error("Google Ads API error, falling back to mock", { route: "/api/metrics", tenantId }, err);
   }
 
   /* ---- MOCK (fallback) ---- */

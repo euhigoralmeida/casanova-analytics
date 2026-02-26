@@ -9,6 +9,7 @@ import { chatSystemPrompt, strategicChatSystemPrompt } from "@/lib/ai/prompts";
 import { buildStrategicBrief } from "@/lib/ai/strategic-brief";
 import { checkChatLimit } from "@/lib/ai/rate-limiter";
 import { fetchCognitiveDirectly } from "@/lib/ai/fetch-cognitive";
+import { logger } from "@/lib/logger";
 import type { Content, Part } from "@google/generative-ai";
 
 type ChatMessage = {
@@ -72,7 +73,7 @@ export async function POST(req: NextRequest) {
       try {
         brief = await buildStrategicBrief(tenantId, context.startDate, context.endDate);
       } catch (ctxErr) {
-        console.error("Chat: strategic brief error (non-fatal):", ctxErr);
+        logger.error("Chat: strategic brief error (non-fatal)", { route: "/api/chat", tenantId }, ctxErr);
       }
       systemPrompt = strategicChatSystemPrompt(brief, periodContext);
     } else {
@@ -84,7 +85,7 @@ export async function POST(req: NextRequest) {
           contextSummary = buildContextSummary(cognitiveData);
         }
       } catch (ctxErr) {
-        console.error("Chat: cognitive context error (non-fatal):", ctxErr);
+        logger.error("Chat: cognitive context error (non-fatal)", { route: "/api/chat", tenantId }, ctxErr);
       }
       systemPrompt = chatSystemPrompt(contextSummary, periodContext);
     }
@@ -156,7 +157,7 @@ export async function POST(req: NextRequest) {
       headers: { "Content-Type": "application/json" },
     });
   } catch (err) {
-    console.error("Chat API error:", err);
+    logger.error("Chat API error", { route: "/api/chat", tenantId }, err);
     const msg = err instanceof Error ? err.message : String(err);
     const isRateLimit = msg.includes("429") || msg.includes("Resource exhausted");
     return new Response(

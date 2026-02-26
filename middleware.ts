@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 const SESSION_COOKIE = "ca_session";
 
 // Rotas públicas que não precisam de autenticação
-const publicPaths = ["/login", "/api/auth/login", "/api/auth/logout", "/api/cron/"];
+const publicPaths = ["/login", "/api/auth/login", "/api/auth/logout", "/api/cron/", "/api/health"];
 
 /** Verify HMAC session token using Web Crypto API (Edge-compatible) */
 async function verifyToken(token: string): Promise<boolean> {
