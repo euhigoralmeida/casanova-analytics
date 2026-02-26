@@ -9,6 +9,7 @@ import { fetchUserLifetimeValue, fetchGA4Summary } from "@/lib/ga4-queries";
 import { fetchSearchTerms } from "@/lib/queries";
 import { detectCannibalization } from "@/lib/organic-cannibalization";
 import { generateOrganicStrategy } from "@/lib/organic-strategy";
+import { logger } from "@/lib/logger";
 import type { OrganicStrategyResponse } from "@/lib/organic-types";
 
 /* =========================
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(strategy);
   } catch (err) {
-    console.error("Organic Strategy API error:", err);
+    logger.error("Organic Strategy API error", { route: "/api/organic-strategy", tenantId }, err);
     return NextResponse.json(
       { source: "error", error: "Erro interno ao gerar estrategia organica" },
       { status: 500 },
@@ -98,8 +99,8 @@ export async function GET(request: NextRequest) {
 async function fetchGA4DataForStrategy(startDate: string, endDate: string, tenantId?: string) {
   const client = await getGA4ClientAsync(tenantId);
   const [landingPages, summary, channelLTV, siteSummary] = await Promise.all([
-    fetchOrganicLandingPages(client, startDate, endDate).catch(() => []),
-    fetchOrganicSearchSummary(client, startDate, endDate).catch(() => ({
+    fetchOrganicLandingPages(client, startDate, endDate, tenantId).catch(() => []),
+    fetchOrganicSearchSummary(client, startDate, endDate, tenantId).catch(() => ({
       sessions: 0, users: 0, conversions: 0, revenue: 0, bounceRate: 0,
     })),
     fetchUserLifetimeValue(client, startDate, endDate, tenantId).catch(() => []),

@@ -19,13 +19,14 @@ export async function fetchOrganicLandingPages(
   client: BetaAnalyticsDataClient,
   startDate: string,
   endDate: string,
+  tenantId?: string,
 ): Promise<GA4OrganicLandingPage[]> {
   const cacheKey = `ga4:org-lp:${startDate}:${endDate}`;
-  const cached = getCached<GA4OrganicLandingPage[]>(cacheKey);
+  const cached = getCached<GA4OrganicLandingPage[]>(cacheKey, tenantId);
   if (cached) return cached;
 
   const [response] = await client.runReport({
-    property: getPropertyId(),
+    property: getPropertyId(tenantId),
     dateRanges: [{ startDate, endDate }],
     dimensions: [{ name: "landingPagePlusQueryString" }],
     metrics: [
@@ -60,7 +61,7 @@ export async function fetchOrganicLandingPages(
     };
   });
 
-  setCache(cacheKey, rows);
+  setCache(cacheKey, rows, tenantId);
   return rows;
 }
 
@@ -72,13 +73,14 @@ export async function fetchOrganicSearchSummary(
   client: BetaAnalyticsDataClient,
   startDate: string,
   endDate: string,
+  tenantId?: string,
 ): Promise<GA4OrganicSummary> {
   const cacheKey = `ga4:org-sum:${startDate}:${endDate}`;
-  const cached = getCached<GA4OrganicSummary>(cacheKey);
+  const cached = getCached<GA4OrganicSummary>(cacheKey, tenantId);
   if (cached) return cached;
 
   const [response] = await client.runReport({
-    property: getPropertyId(),
+    property: getPropertyId(tenantId),
     dateRanges: [{ startDate, endDate }],
     metrics: [
       { name: "sessions" },
@@ -106,7 +108,7 @@ export async function fetchOrganicSearchSummary(
     bounceRate: Math.round((vals[4] ?? 0) * 100) / 100,
   };
 
-  setCache(cacheKey, result);
+  setCache(cacheKey, result, tenantId);
   return result;
 }
 

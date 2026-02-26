@@ -46,6 +46,19 @@ const FALLBACK_TENANTS: Tenant[] = [
       },
     ],
   },
+  {
+    id: "yellalife",
+    name: "Yella Life",
+    slug: "yellalife",
+    users: [
+      {
+        email: "admin@yellalife.com",
+        passwordHash: "$2b$10$Il8qPPEBxJgtC3aBrv/ci.GwaP1qSdl117QdvmWarjZ6Y9tF6SSAG",
+        role: "admin",
+        name: "Admin Yella Life",
+      },
+    ],
+  },
 ];
 
 export async function getTenant(tenantId: string): Promise<Tenant | undefined> {
