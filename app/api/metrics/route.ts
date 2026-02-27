@@ -109,6 +109,18 @@ export async function GET(request: NextRequest) {
   /* ---- DADOS REAIS (Google Ads) ---- */
   try {
     const customer = await getCustomerAsync(tenantId);
+    if (!customer) {
+      return NextResponse.json({
+        sku,
+        period,
+        source: "not_configured",
+        skuTitle: sku,
+        updatedAt: new Date().toISOString(),
+        cards: { roas: 0, cpa: 0, arpur: 0, marginPct, revenue: 0, ads: 0, grossProfit: 0, profitAfterAds: 0, stock, leadTimeDays, cpc: 0, cpm: 0, conversions: 0, clicks: 0, convRate: 0 },
+        alerts: [],
+        funnel: [],
+      });
+    }
       const data = await fetchSkuMetrics(customer, sku, period, startDate, endDate, tenantId);
 
       if (!data) {

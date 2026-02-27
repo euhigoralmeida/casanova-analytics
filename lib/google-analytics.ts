@@ -41,36 +41,36 @@ export function getGA4Client(tenantId?: string): BetaAnalyticsDataClient {
   return client;
 }
 
-/** Async version — checks DB credentials first, falls back to env vars. */
-export async function getGA4ClientAsync(tenantId?: string): Promise<BetaAnalyticsDataClient> {
+/**
+ * Async version — checks DB credentials first.
+ * Returns null if the tenant has no GA4 credentials configured.
+ */
+export async function getGA4ClientAsync(tenantId?: string): Promise<BetaAnalyticsDataClient | null> {
   const key = tenantId ?? "default";
-  let client = _clients.get(key);
-  if (client) return client;
+  const existing = _clients.get(key);
+  if (existing) return existing;
 
   const creds = await getTenantCredentials(tenantId, "ga4");
-  if (creds) {
-    client = new BetaAnalyticsDataClient({
-      credentials: {
-        client_email: creds.client_email,
-        private_key: creds.private_key,
-      },
-    });
-    _propertyIds.set(key, creds.property_id);
-  } else {
-    client = new BetaAnalyticsDataClient({
-      credentials: {
-        client_email: process.env.GA4_CLIENT_EMAIL!,
-        private_key: getPrivateKey(),
-      },
-    });
-  }
+  if (!creds) return null;
+
+  const client = new BetaAnalyticsDataClient({
+    credentials: {
+      client_email: creds.client_email,
+      private_key: creds.private_key,
+    },
+  });
+  _propertyIds.set(key, creds.property_id);
   _clients.set(key, client);
   return client;
 }
 
-export function getPropertyId(tenantId?: string): string {
+/**
+ * Returns the GA4 property ID for a tenant.
+ * Returns null if no property ID is available (tenant not configured).
+ */
+export function getPropertyId(tenantId?: string): string | null {
   const key = tenantId ?? "default";
   const cached = _propertyIds.get(key);
   if (cached) return `properties/${cached}`;
-  return `properties/${process.env.GA4_PROPERTY_ID}`;
+  return null;
 }

@@ -133,6 +133,17 @@ export async function GET(request: NextRequest) {
   /* ---- DADOS REAIS (Google Ads) ---- */
   try {
     const customer = await getCustomerAsync(tenantId);
+    if (!customer) {
+      return NextResponse.json({
+        period,
+        source: "not_configured",
+        updatedAt: new Date().toISOString(),
+        currentPeriod: { start: startDate, end: endDate },
+        previousPeriod: { start: prevStart, end: prevEnd },
+        alerts: [],
+        summary: { total: 0, danger: 0, warn: 0, info: 0, success: 0 },
+      } satisfies SmartAlertsResponse);
+    }
 
     const [
       currentAccount,
@@ -154,7 +165,7 @@ export async function GET(request: NextRequest) {
 
     // Fetch retention data from GA4
     const retentionSummary = await getGA4ClientAsync(tenantId)
-      .then((ga4Client) => fetchRetentionSummary(ga4Client, startDate, endDate, tenantId))
+      .then((ga4Client) => ga4Client ? fetchRetentionSummary(ga4Client, startDate, endDate, tenantId) : undefined)
       .catch(() => undefined);
 
       const alerts = computeAllSmartAlerts(

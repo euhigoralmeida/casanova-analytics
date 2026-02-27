@@ -16,7 +16,7 @@ import { computeTargetMonth } from "@/lib/planning-target-calc";
 import { formatBRL } from "@/lib/format";
 import { getClarityFromDB } from "@/lib/clarity";
 import { fetchKeywordMetrics, fetchPageMetrics } from "@/lib/gsc-queries";
-import { getCustomerAsync, computeComparisonDates } from "@/lib/google-ads";
+import { getCustomerAsync } from "@/lib/google-ads";
 import { fetchSearchTerms } from "@/lib/queries";
 import { detectCannibalization } from "@/lib/organic-cannibalization";
 
@@ -193,8 +193,8 @@ export async function buildStrategicBrief(
 // ---------- Helpers ----------
 
 async function fetchGA4Extras(tenantId: string, startDate: string, endDate: string) {
-  let client;
-  try { client = await getGA4ClientAsync(tenantId); } catch { return {}; }
+  const client = await getGA4ClientAsync(tenantId);
+  if (!client) return {};
 
   const [funnelData, summary, retention, channelLTV, channels] = await Promise.all([
     fetchEcommerceFunnel(client, startDate, endDate, tenantId).catch(() => null),
@@ -323,12 +323,9 @@ async function fetchOrganicSection(tenantId: string, startDate: string, endDate:
     }
 
     // Cannibalization summary
-    try {
-      {
-        const { prevStart, prevEnd } = computeComparisonDates(startDate, endDate);
-        void prevStart;
-        void prevEnd;
-        const customer = await getCustomerAsync(tenantId);
+    const customer = await getCustomerAsync(tenantId);
+    if (customer) {
+      try {
         const adsTerms = await fetchSearchTerms(customer, startDate, endDate, tenantId);
         const cannibal = detectCannibalization(keywords, adsTerms);
         if (cannibal.length > 0) {
@@ -339,8 +336,8 @@ async function fetchOrganicSection(tenantId: string, startDate: string, endDate:
             lines.push(`- "${c.keyword}": pos org ${c.organicPosition.toFixed(0)}, custo pago ${formatBRL(c.paidCostBRL)}, tipo ${c.type}, economia ${formatBRL(c.estimatedSavingsBRL)}`);
           }
         }
-      }
-    } catch { /* ignore ads errors */ }
+      } catch { /* ignore ads errors */ }
+    }
 
     return lines.join("\n");
   } catch (err) {

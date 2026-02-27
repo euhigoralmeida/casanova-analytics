@@ -70,10 +70,6 @@ export function isMetaAdsConfigured(): boolean {
   );
 }
 
-function getAccountId(): string {
-  return process.env.META_ADS_ACCOUNT_ID!;
-}
-
 function getAccessToken(): string {
   return process.env.META_ADS_ACCESS_TOKEN!;
 }
@@ -123,13 +119,10 @@ async function graphFetch(path: string, params: Record<string, string>, accessTo
   return res.json();
 }
 
-/** Resolve tenant credentials, returns { accessToken, accountId } or falls back to env vars. */
-async function resolveMetaCreds(tenantId?: string): Promise<{ accessToken: string; accountId: string }> {
-  if (tenantId) {
-    const creds = await getMetaCredentials(tenantId);
-    if (creds) return creds;
-  }
-  return { accessToken: getAccessToken(), accountId: getAccountId() };
+/** Resolve tenant credentials. Returns null if tenant has no Meta Ads configured. */
+async function resolveMetaCreds(tenantId?: string): Promise<{ accessToken: string; accountId: string } | null> {
+  const creds = await getMetaCredentials(tenantId);
+  return creds;
 }
 
 // ---------- Parsing helpers ----------
@@ -168,7 +161,9 @@ export async function fetchMetaCampaigns(startDate: string, endDate: string, ten
   const cached = getCached<MetaAdsCampaign[]>(cacheKey);
   if (cached) return cached;
 
-  const { accessToken, accountId: actId } = await resolveMetaCreds(tenantId);
+  const creds = await resolveMetaCreds(tenantId);
+  if (!creds) throw new Error("META_ADS_NOT_CONFIGURED");
+  const { accessToken, accountId: actId } = creds;
   const timeRange = JSON.stringify({ since: startDate, until: endDate });
 
   // Fetch campaign-level insights
@@ -238,7 +233,9 @@ export async function fetchMetaAccountTotals(startDate: string, endDate: string,
   const cached = getCached<MetaAccountTotals>(cacheKey);
   if (cached) return cached;
 
-  const { accessToken, accountId: actId } = await resolveMetaCreds(tenantId);
+  const creds = await resolveMetaCreds(tenantId);
+  if (!creds) throw new Error("META_ADS_NOT_CONFIGURED");
+  const { accessToken, accountId: actId } = creds;
   const timeRange = JSON.stringify({ since: startDate, until: endDate });
 
   const data = await graphFetch(`/act_${actId}/insights`, {
@@ -281,7 +278,9 @@ export async function fetchMetaTimeSeries(startDate: string, endDate: string, te
   const cached = getCached<MetaTimeSeriesPoint[]>(cacheKey);
   if (cached) return cached;
 
-  const { accessToken, accountId: actId } = await resolveMetaCreds(tenantId);
+  const creds = await resolveMetaCreds(tenantId);
+  if (!creds) throw new Error("META_ADS_NOT_CONFIGURED");
+  const { accessToken, accountId: actId } = creds;
   const timeRange = JSON.stringify({ since: startDate, until: endDate });
 
   const data = await graphFetch(`/act_${actId}/insights`, {

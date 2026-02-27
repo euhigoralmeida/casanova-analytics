@@ -45,8 +45,8 @@ async function executeToolInternal(
 
   switch (toolName) {
     case "get_account_metrics": {
-      let customer;
-      try { customer = await getCustomerAsync(tenantId); } catch { return { error: "Google Ads não configurado" }; }
+      const customer = await getCustomerAsync(tenantId);
+      if (!customer) return { error: "Google Ads não configurado" };
       const data = await fetchAccountTotals(customer, period, startDate, endDate, tenantId);
       const revenue = Math.round(data.revenue * 100) / 100;
       const ads = Math.round(data.costBRL * 100) / 100;
@@ -63,8 +63,8 @@ async function executeToolInternal(
     }
 
     case "get_sku_metrics": {
-      let customer;
-      try { customer = await getCustomerAsync(tenantId); } catch { return { error: "Google Ads não configurado" }; }
+      const customer = await getCustomerAsync(tenantId);
+      if (!customer) return { error: "Google Ads não configurado" };
       if (input.sku) {
         const data = await fetchSkuMetrics(customer, input.sku, period, startDate, endDate, tenantId);
         if (!data) return { error: `SKU ${input.sku} não encontrado` };
@@ -75,8 +75,8 @@ async function executeToolInternal(
     }
 
     case "get_campaign_metrics": {
-      let customer;
-      try { customer = await getCustomerAsync(tenantId); } catch { return { error: "Google Ads não configurado" }; }
+      const customer = await getCustomerAsync(tenantId);
+      if (!customer) return { error: "Google Ads não configurado" };
       const data = await fetchAllCampaignMetrics(customer, period, startDate, endDate, tenantId);
       return data.map((c) => ({
         campanha: c.campaignName,
@@ -93,8 +93,8 @@ async function executeToolInternal(
     }
 
     case "get_segmentation": {
-      let customer;
-      try { customer = await getCustomerAsync(tenantId); } catch { return { error: "Google Ads não configurado" }; }
+      const customer = await getCustomerAsync(tenantId);
+      if (!customer) return { error: "Google Ads não configurado" };
       const segment = input.segment as string;
 
       if (segment === "device") {
@@ -113,8 +113,8 @@ async function executeToolInternal(
     }
 
     case "get_ga4_funnel": {
-      let client;
-      try { client = await getGA4ClientAsync(tenantId); } catch { return { error: "GA4 não configurado" }; }
+      const client = await getGA4ClientAsync(tenantId);
+      if (!client) return { error: "GA4 não configurado" };
       const [funnelData, summary] = await Promise.all([
         fetchEcommerceFunnel(client, startDate, endDate, tenantId),
         fetchGA4Summary(client, startDate, endDate, tenantId),
@@ -132,8 +132,8 @@ async function executeToolInternal(
     }
 
     case "get_channel_acquisition": {
-      let client;
-      try { client = await getGA4ClientAsync(tenantId); } catch { return { error: "GA4 não configurado" }; }
+      const client = await getGA4ClientAsync(tenantId);
+      if (!client) return { error: "GA4 não configurado" };
       const data = await fetchChannelAcquisition(client, startDate, endDate, tenantId);
       return data.map((c) => ({
         canal: c.channel,
@@ -159,8 +159,8 @@ async function executeToolInternal(
     }
 
     case "get_timeseries": {
-      let customer;
-      try { customer = await getCustomerAsync(tenantId); } catch { return { error: "Google Ads não configurado" }; }
+      const customer = await getCustomerAsync(tenantId);
+      if (!customer) return { error: "Google Ads não configurado" };
       if (input.scope === "sku" && input.id) {
         const data = await fetchSkuTimeSeries(customer, input.id, period, startDate, endDate, tenantId);
         return data.map(formatDaily);
@@ -192,73 +192,77 @@ async function executeToolInternal(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let channels: any[] = [];
 
-      try {
-        const customer = await getCustomerAsync(tenantId);
-        const skuExtras = await loadSkuExtras(tenantId);
-        const [acctData, allSkuData, campData, devData, demoData, geoData] = await Promise.all([
-          fetchAccountTotals(customer, period, startDate, endDate, tenantId),
-          fetchAllSkuMetrics(customer, period, startDate, endDate, tenantId),
-          fetchAllCampaignMetrics(customer, period, startDate, endDate, tenantId),
-          fetchDeviceMetrics(customer, period, startDate, endDate, tenantId).catch(() => []),
-          fetchDemographicMetrics(customer, period, startDate, endDate, tenantId).catch(() => []),
-          fetchGeographicMetrics(customer, period, startDate, endDate, tenantId).catch(() => []),
-        ]);
+      const customer = await getCustomerAsync(tenantId);
+      if (customer) {
+        try {
+          const skuExtras = await loadSkuExtras(tenantId);
+          const [acctData, allSkuData, campData, devData, demoData, geoData] = await Promise.all([
+            fetchAccountTotals(customer, period, startDate, endDate, tenantId),
+            fetchAllSkuMetrics(customer, period, startDate, endDate, tenantId),
+            fetchAllCampaignMetrics(customer, period, startDate, endDate, tenantId),
+            fetchDeviceMetrics(customer, period, startDate, endDate, tenantId).catch(() => []),
+            fetchDemographicMetrics(customer, period, startDate, endDate, tenantId).catch(() => []),
+            fetchGeographicMetrics(customer, period, startDate, endDate, tenantId).catch(() => []),
+          ]);
 
-        const revenue = Math.round(acctData.revenue * 100) / 100;
-        const ads = Math.round(acctData.costBRL * 100) / 100;
-        account = {
-          ads, impressions: acctData.impressions, clicks: acctData.clicks,
-          conversions: acctData.conversions, revenue,
-          roas: ads > 0 ? Math.round((revenue / ads) * 100) / 100 : 0,
-          cpa: acctData.conversions > 0 ? Math.round((ads / acctData.conversions) * 100) / 100 : 0,
-          ctr: acctData.impressions > 0 ? Math.round((acctData.clicks / acctData.impressions) * 10000) / 100 : 0,
-        };
-
-        skus = allSkuData.map((d) => {
-          const extras = skuExtras[d.sku];
-          const rev = Math.round(d.revenue * 100) / 100;
-          const cost = Math.round(d.costBRL * 100) / 100;
-          const roas = cost > 0 ? Math.round((rev / cost) * 100) / 100 : 0;
-          const cpa = d.conversions > 0 ? Math.round((cost / d.conversions) * 100) / 100 : 0;
-          return {
-            sku: d.sku, nome: extras?.nome ?? d.title,
-            revenue: rev, ads: cost, roas, cpa,
-            impressions: d.impressions, clicks: d.clicks, conversions: d.conversions,
-            status: "manter" as const,
+          const revenue = Math.round(acctData.revenue * 100) / 100;
+          const ads = Math.round(acctData.costBRL * 100) / 100;
+          account = {
+            ads, impressions: acctData.impressions, clicks: acctData.clicks,
+            conversions: acctData.conversions, revenue,
+            roas: ads > 0 ? Math.round((revenue / ads) * 100) / 100 : 0,
+            cpa: acctData.conversions > 0 ? Math.round((ads / acctData.conversions) * 100) / 100 : 0,
+            ctr: acctData.impressions > 0 ? Math.round((acctData.clicks / acctData.impressions) * 10000) / 100 : 0,
           };
-        });
 
-        campaigns = campData.map((c) => ({
-          campaignId: c.campaignId, campaignName: c.campaignName,
-          channelType: c.channelType, status: c.status,
-          costBRL: c.costBRL, revenue: c.revenue,
-          roas: c.costBRL > 0 ? Math.round((c.revenue / c.costBRL) * 100) / 100 : 0,
-          cpa: c.conversions > 0 ? Math.round((c.costBRL / c.conversions) * 100) / 100 : 0,
-          conversions: c.conversions, impressions: c.impressions, clicks: c.clicks,
-        }));
+          skus = allSkuData.map((d) => {
+            const extras = skuExtras[d.sku];
+            const rev = Math.round(d.revenue * 100) / 100;
+            const cost = Math.round(d.costBRL * 100) / 100;
+            const roas = cost > 0 ? Math.round((rev / cost) * 100) / 100 : 0;
+            const cpa = d.conversions > 0 ? Math.round((cost / d.conversions) * 100) / 100 : 0;
+            return {
+              sku: d.sku, nome: extras?.nome ?? d.title,
+              revenue: rev, ads: cost, roas, cpa,
+              impressions: d.impressions, clicks: d.clicks, conversions: d.conversions,
+              status: "manter" as const,
+            };
+          });
 
-        devices = devData;
-        demographics = demoData;
-        geographic = geoData;
-      } catch { /* Google Ads not configured for this tenant */ }
+          campaigns = campData.map((c) => ({
+            campaignId: c.campaignId, campaignName: c.campaignName,
+            channelType: c.channelType, status: c.status,
+            costBRL: c.costBRL, revenue: c.revenue,
+            roas: c.costBRL > 0 ? Math.round((c.revenue / c.costBRL) * 100) / 100 : 0,
+            cpa: c.conversions > 0 ? Math.round((c.costBRL / c.conversions) * 100) / 100 : 0,
+            conversions: c.conversions, impressions: c.impressions, clicks: c.clicks,
+          }));
 
-      try {
-        const ga4Client = await getGA4ClientAsync(tenantId);
-        const [summary, channelData] = await Promise.all([
-          fetchGA4Summary(ga4Client, startDate, endDate, tenantId),
-          fetchChannelAcquisition(ga4Client, startDate, endDate, tenantId),
-        ]);
-        ga4 = {
-          sessions: summary.sessions, users: summary.users,
-          purchases: summary.purchases, purchaseRevenue: summary.purchaseRevenue,
-          bounceRate: summary.bounceRate, engagedSessions: summary.engagedSessions,
-          cartAbandonmentRate: summary.cartAbandonmentRate,
-        };
-        channels = channelData.map((c) => ({
-          channel: c.channel, sessions: c.sessions,
-          users: c.users, conversions: c.conversions, revenue: c.revenue,
-        }));
-      } catch { /* GA4 not configured for this tenant */ }
+          devices = devData;
+          demographics = demoData;
+          geographic = geoData;
+        } catch { /* Google Ads query error */ }
+      }
+
+      const ga4Client = await getGA4ClientAsync(tenantId);
+      if (ga4Client) {
+        try {
+          const [summary, channelData] = await Promise.all([
+            fetchGA4Summary(ga4Client, startDate, endDate, tenantId),
+            fetchChannelAcquisition(ga4Client, startDate, endDate, tenantId),
+          ]);
+          ga4 = {
+            sessions: summary.sessions, users: summary.users,
+            purchases: summary.purchases, purchaseRevenue: summary.purchaseRevenue,
+            bounceRate: summary.bounceRate, engagedSessions: summary.engagedSessions,
+            cartAbandonmentRate: summary.cartAbandonmentRate,
+          };
+          channels = channelData.map((c) => ({
+            channel: c.channel, sessions: c.sessions,
+            users: c.users, conversions: c.conversions, revenue: c.revenue,
+          }));
+        } catch { /* GA4 query error */ }
+      }
 
       // Planning
       let planning = {};
@@ -307,8 +311,8 @@ async function executeToolInternal(
     }
 
     case "get_retention_metrics": {
-      let ga4Client;
-      try { ga4Client = await getGA4ClientAsync(tenantId); } catch { return { error: "GA4 não configurado" }; }
+      const ga4Client = await getGA4ClientAsync(tenantId);
+      if (!ga4Client) return { error: "GA4 não configurado" };
       const [summary, ltv, cohorts] = await Promise.all([
         fetchRetentionSummary(ga4Client, startDate, endDate, tenantId),
         fetchUserLifetimeValue(ga4Client, startDate, endDate, tenantId),
@@ -455,8 +459,8 @@ async function executeToolInternal(
     }
 
     case "compare_periods": {
-      let customer;
-      try { customer = await getCustomerAsync(tenantId); } catch { return { error: "Google Ads não configurado" }; }
+      const customer = await getCustomerAsync(tenantId);
+      if (!customer) return { error: "Google Ads não configurado" };
       const [p1, p2] = await Promise.all([
         fetchAccountTotals(customer, "custom", input.period1Start, input.period1End, tenantId),
         fetchAccountTotals(customer, "custom", input.period2Start, input.period2End, tenantId),

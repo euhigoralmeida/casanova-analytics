@@ -76,6 +76,7 @@ export async function GET(request: NextRequest) {
 
 async function fetchGA4Data(startDate: string, endDate: string, tenantId?: string) {
   const client = await getGA4ClientAsync(tenantId);
+  if (!client) return null;
 
   const [funnelData, summary, dailySeries, channelAcquisition] = await Promise.all([
     fetchEcommerceFunnel(client, startDate, endDate, tenantId),

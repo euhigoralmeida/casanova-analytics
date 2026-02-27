@@ -18,7 +18,7 @@ export type SmartAlert = {
 
 export type SmartAlertsResponse = {
   period: string;
-  source: "google-ads" | "mock";
+  source: "google-ads" | "mock" | "not_configured";
   updatedAt: string;
   currentPeriod: { start: string; end: string };
   previousPeriod: { start: string; end: string };

@@ -77,9 +77,9 @@ export async function fetchCognitiveDirectly(
     let demographics: AnyMetrics[] = [];
     let geographic: AnyMetrics[] = [];
 
-    try {
-      {
-        const customer = await getCustomerAsync(tenantId);
+    const customer = await getCustomerAsync(tenantId);
+    if (customer) {
+      try {
         const period = "custom";
         const [acctData, allSkuData, campData, deviceData, demoData, geoData] = await Promise.all([
           fetchAccountTotals(customer, period, startDate, endDate, tenantId),
@@ -128,18 +128,18 @@ export async function fetchCognitiveDirectly(
         devices = deviceData;
         demographics = demoData;
         geographic = geoData;
+      } catch (err) {
+        console.error("fetchCognitiveDirectly: Google Ads error:", err);
       }
-    } catch (err) {
-      console.error("fetchCognitiveDirectly: Google Ads error:", err);
     }
 
     // GA4
     let ga4: AnyMetrics | undefined;
     let channels: AnyMetrics[] = [];
 
-    try {
-      {
-        const ga4Client = await getGA4ClientAsync(tenantId);
+    const ga4Client = await getGA4ClientAsync(tenantId);
+    if (ga4Client) {
+      try {
         const [summary, channelData] = await Promise.all([
           fetchGA4Summary(ga4Client, startDate, endDate, tenantId),
           fetchChannelAcquisition(ga4Client, startDate, endDate, tenantId),
@@ -154,9 +154,9 @@ export async function fetchCognitiveDirectly(
           channel: c.channel, sessions: c.sessions,
           users: c.users, conversions: c.conversions, revenue: c.revenue,
         }));
+      } catch (err) {
+        console.error("fetchCognitiveDirectly: GA4 error:", err);
       }
-    } catch (err) {
-      console.error("fetchCognitiveDirectly: GA4 error:", err);
     }
 
     const result = await analyzeCognitive({

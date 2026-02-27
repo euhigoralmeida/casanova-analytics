@@ -56,9 +56,11 @@ async function fetchMonthDataRange(
   // Google Ads data
   try {
     const customer = await getCustomerAsync(tenantId);
-    const totals = await fetchAccountTotals(customer, "custom", startDate, endDate, tenantId);
-    if (totals) {
-      entries.push({ metric: "google_ads", month, value: Math.round(totals.costBRL * 100) / 100 });
+    if (customer) {
+      const totals = await fetchAccountTotals(customer, "custom", startDate, endDate, tenantId);
+      if (totals) {
+        entries.push({ metric: "google_ads", month, value: Math.round(totals.costBRL * 100) / 100 });
+      }
     }
   } catch (err) {
     console.error(`Sync: Google Ads error for month ${month}:`, err);
@@ -67,6 +69,7 @@ async function fetchMonthDataRange(
   // GA4 data
   try {
     const ga4Client = await getGA4ClientAsync(tenantId);
+    if (!ga4Client) return entries;
     const [summary, channels] = await Promise.all([
       fetchGA4Summary(ga4Client, startDate, endDate, tenantId),
       fetchChannelAcquisition(ga4Client, startDate, endDate, tenantId),

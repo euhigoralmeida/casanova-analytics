@@ -107,22 +107,16 @@ function getAccessToken(): string {
   return process.env.META_ADS_ACCESS_TOKEN!;
 }
 
-/** Resolve IG access token for a tenant — DB first, env fallback. */
-async function resolveIGToken(tenantId?: string): Promise<string> {
-  if (tenantId) {
-    const creds = await getTenantCredentials(tenantId, "instagram");
-    if (creds?.access_token) return creds.access_token;
-  }
-  return getAccessToken();
+/** Resolve IG access token for a tenant. Returns null if not configured. */
+async function resolveIGToken(tenantId?: string): Promise<string | null> {
+  const creds = await getTenantCredentials(tenantId, "instagram");
+  return creds?.access_token ?? null;
 }
 
-/** Resolve IG business account ID for a tenant — DB first, env fallback. */
-async function resolveIGBusinessAccountId(tenantId?: string): Promise<string | undefined> {
-  if (tenantId) {
-    const creds = await getTenantCredentials(tenantId, "instagram");
-    if (creds?.business_account_id) return creds.business_account_id;
-  }
-  return process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID || undefined;
+/** Resolve IG business account ID for a tenant. Returns null if not configured. */
+async function resolveIGBusinessAccountId(tenantId?: string): Promise<string | null> {
+  const creds = await getTenantCredentials(tenantId, "instagram");
+  return creds?.business_account_id ?? null;
 }
 
 // ---------- Cache ----------
@@ -186,6 +180,7 @@ export async function discoverIGAccountId(tenantId?: string): Promise<string | n
   // 3. Auto-discover via Pages API (requires pages_show_list permission)
   try {
     const token = await resolveIGToken(tenantId);
+    if (!token) return null; // Not configured
     const data = await graphFetch("/me/accounts", {
       fields: "instagram_business_account{id,username},name",
       limit: "100",
@@ -217,6 +212,7 @@ export async function fetchIGAccount(igUserId: string, tenantId?: string): Promi
   if (cached) return cached;
 
   const token = await resolveIGToken(tenantId);
+  if (!token) throw new Error("INSTAGRAM_NOT_CONFIGURED");
   const data = await graphFetch(`/${igUserId}`, {
     fields: "username,name,biography,followers_count,follows_count,media_count,profile_picture_url",
   }, token);
@@ -243,6 +239,7 @@ export async function fetchIGMedia(igUserId: string, limit = 50, tenantId?: stri
   if (cached) return cached;
 
   const token = await resolveIGToken(tenantId);
+  if (!token) throw new Error("INSTAGRAM_NOT_CONFIGURED");
   const data = await graphFetch(`/${igUserId}/media`, {
     fields: "id,caption,media_type,media_url,thumbnail_url,permalink,timestamp,like_count,comments_count",
     limit: String(limit),
@@ -276,6 +273,7 @@ export async function fetchIGMediaInsights(mediaId: string, tenantId?: string): 
   if (cached) return cached;
 
   const token = await resolveIGToken(tenantId);
+  if (!token) throw new Error("INSTAGRAM_NOT_CONFIGURED");
   const data = await graphFetch(`/${mediaId}/insights`, {
     metric: "reach,saved,likes,comments,shares,total_interactions",
   }, token);
@@ -335,6 +333,7 @@ export async function fetchIGDailyInsights(
   }
 
   const token = await resolveIGToken(tenantId);
+  if (!token) throw new Error("INSTAGRAM_NOT_CONFIGURED");
   const allResults = await Promise.all(
     chunks.map((chunk) =>
       graphFetch(`/${igUserId}/insights`, {
@@ -394,6 +393,7 @@ export async function fetchIGPeriodTotals(
   const until = Math.floor(new Date(endDate + "T23:59:59").getTime() / 1000);
 
   const token = await resolveIGToken(tenantId);
+  if (!token) throw new Error("INSTAGRAM_NOT_CONFIGURED");
   const data = await graphFetch(`/${igUserId}/insights`, {
     metric: "views,total_interactions,accounts_engaged,follows_and_unfollows",
     period: "day",
@@ -436,6 +436,7 @@ export async function fetchIGAudienceDemographics(
   if (cached) return cached;
 
   const token = await resolveIGToken(tenantId);
+  if (!token) throw new Error("INSTAGRAM_NOT_CONFIGURED");
   const [genderAgeData, countryData, cityData] = await Promise.all([
     graphFetch(`/${igUserId}/insights`, {
       metric: "follower_demographics",
@@ -561,6 +562,7 @@ export async function fetchIGBusinessDiscovery(handle: string, tenantId?: string
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let data: any;
   const token = await resolveIGToken(tenantId);
+  if (!token) throw new Error("INSTAGRAM_NOT_CONFIGURED");
   try {
     data = await graphFetch(`/${ownAccountId}`, {
       fields: `business_discovery.fields(${fields}).username(${cleanHandle})`,
@@ -615,6 +617,7 @@ export async function fetchIGOnlineFollowers(igUserId: string, tenantId?: string
   if (cached) return cached;
 
   const token = await resolveIGToken(tenantId);
+  if (!token) throw new Error("INSTAGRAM_NOT_CONFIGURED");
   const data = await graphFetch(`/${igUserId}/insights`, {
     metric: "online_followers",
     period: "lifetime",

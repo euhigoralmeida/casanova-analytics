@@ -26,6 +26,12 @@ export async function GET(request: NextRequest) {
   /* ---- DADOS REAIS (GA4) ---- */
   try {
     const client = await getGA4ClientAsync(tenantId);
+    if (!client) {
+      return NextResponse.json({
+        source: "not_configured",
+        updatedAt: new Date().toISOString(),
+      });
+    }
 
     const [funnelData, summary, dailySeries, channelAcquisition] = await Promise.all([
       fetchEcommerceFunnel(client, startDate, endDate, tenantId),

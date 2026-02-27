@@ -1,4 +1,4 @@
-import { getGSCClient, getSiteUrl } from "./google-search-console";
+import { getGSCClientAsync, getSiteUrl } from "./google-search-console";
 import type { GSCKeywordRow, GSCPageRow, GSCDailyPoint } from "./organic-types";
 
 /* =========================
@@ -55,8 +55,10 @@ export async function fetchKeywordMetrics(
   const cached = getGSCCached<GSCKeywordRow[]>(cacheKey);
   if (cached) return cached;
 
-  const client = getGSCClient(tenantId);
+  const client = await getGSCClientAsync(tenantId);
+  if (!client) return [];
   const siteUrl = getSiteUrl(tenantId);
+  if (!siteUrl) return [];
 
   const response = await client.searchanalytics.query({
     siteUrl,
@@ -96,8 +98,10 @@ export async function fetchPageMetrics(
   const cached = getGSCCached<GSCPageRow[]>(cacheKey);
   if (cached) return cached;
 
-  const client = getGSCClient(tenantId);
+  const client = await getGSCClientAsync(tenantId);
+  if (!client) return [];
   const siteUrl = getSiteUrl(tenantId);
+  if (!siteUrl) return [];
 
   const response = await client.searchanalytics.query({
     siteUrl,
@@ -137,8 +141,10 @@ export async function fetchDailyOrganicTrend(
   const cached = getGSCCached<GSCDailyPoint[]>(cacheKey);
   if (cached) return cached;
 
-  const client = getGSCClient(tenantId);
+  const client = await getGSCClientAsync(tenantId);
+  if (!client) return [];
   const siteUrl = getSiteUrl(tenantId);
+  if (!siteUrl) return [];
 
   const response = await client.searchanalytics.query({
     siteUrl,
@@ -179,8 +185,10 @@ export async function fetchKeywordsByPage(
   const cached = getGSCCached<GSCKeywordRow[]>(cacheKey);
   if (cached) return cached;
 
-  const client = getGSCClient(tenantId);
+  const client = await getGSCClientAsync(tenantId);
+  if (!client) return [];
   const siteUrl = getSiteUrl(tenantId);
+  if (!siteUrl) return [];
 
   const response = await client.searchanalytics.query({
     siteUrl,

@@ -19,69 +19,33 @@ export function isConfigured(): boolean {
 const _clients = new Map<string, GoogleAdsApi>();
 const _customers = new Map<string, Customer>();
 
-function getClient(tenantId?: string): GoogleAdsApi {
+/**
+ * Get a Google Ads Customer for a tenant.
+ * Returns null if the tenant has no Google Ads credentials configured.
+ */
+export async function getCustomerAsync(tenantId?: string): Promise<Customer | null> {
   const key = tenantId ?? "default";
+  const existing = _customers.get(key);
+  if (existing) return existing;
+
+  const creds = await getTenantCredentials(tenantId, "google_ads");
+  if (!creds) return null;
+
   let client = _clients.get(key);
   if (!client) {
     client = new GoogleAdsApi({
-      client_id: process.env.GOOGLE_ADS_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_ADS_CLIENT_SECRET!,
-      developer_token: process.env.GOOGLE_ADS_DEVELOPER_TOKEN!,
+      client_id: creds.client_id,
+      client_secret: creds.client_secret,
+      developer_token: creds.developer_token,
     });
     _clients.set(key, client);
   }
-  return client;
-}
-
-/**
- * Get a Google Ads Customer for a tenant.
- * Tries DB credentials first (via getTenantCredentials), falls back to env vars.
- */
-export async function getCustomerAsync(tenantId?: string): Promise<Customer> {
-  const key = tenantId ?? "default";
-  let customer = _customers.get(key);
-  if (customer) return customer;
-
-  const creds = await getTenantCredentials(tenantId, "google_ads");
-  if (creds) {
-    let client = _clients.get(key);
-    if (!client) {
-      client = new GoogleAdsApi({
-        client_id: creds.client_id,
-        client_secret: creds.client_secret,
-        developer_token: creds.developer_token,
-      });
-      _clients.set(key, client);
-    }
-    customer = client.Customer({
-      customer_id: creds.customer_id,
-      login_customer_id: creds.login_customer_id || undefined,
-      refresh_token: creds.refresh_token,
-    });
-  } else {
-    customer = getClient(tenantId).Customer({
-      customer_id: process.env.GOOGLE_ADS_CUSTOMER_ID!,
-      login_customer_id: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID,
-      refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN!,
-    });
-  }
+  const customer = client.Customer({
+    customer_id: creds.customer_id,
+    login_customer_id: creds.login_customer_id || undefined,
+    refresh_token: creds.refresh_token,
+  });
   _customers.set(key, customer);
-  return customer;
-}
-
-/** Sync version for backward compatibility (uses env vars only). */
-export function getCustomer(tenantId?: string): Customer {
-  const key = tenantId ?? "default";
-  let customer = _customers.get(key);
-  if (!customer) {
-    const client = getClient(tenantId);
-    customer = client.Customer({
-      customer_id: process.env.GOOGLE_ADS_CUSTOMER_ID!,
-      login_customer_id: process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID,
-      refresh_token: process.env.GOOGLE_ADS_REFRESH_TOKEN!,
-    });
-    _customers.set(key, customer);
-  }
   return customer;
 }
 

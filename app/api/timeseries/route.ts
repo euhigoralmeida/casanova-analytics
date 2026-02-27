@@ -81,6 +81,15 @@ export async function GET(request: NextRequest) {
   /* ---- DADOS REAIS (Google Ads) ---- */
   try {
     const customer = await getCustomerAsync(tenantId);
+    if (!customer) {
+      return NextResponse.json({
+        scope,
+        sku: scope === "sku" ? sku : undefined,
+        period,
+        source: "not_configured",
+        series: [],
+      });
+    }
 
       let daily: DailyMetrics[];
       if (scope === "campaign" && campaignId) {

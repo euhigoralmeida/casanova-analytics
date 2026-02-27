@@ -17,6 +17,7 @@ import { StrategicAdvisorCard } from "@/components/intelligence/strategic-adviso
 import { useLastUpdated } from "@/hooks/use-last-updated";
 import { exportToCSV } from "@/lib/export-csv";
 import { RefreshCw, Download } from "lucide-react";
+import { EmptyIntegrationState } from "@/components/ui/empty-integration-state";
 
 export default function VisaoGeralPage() {
   const { dateRange, setDateRange, buildParams } = useDateRange();
@@ -85,7 +86,7 @@ export default function VisaoGeralPage() {
           <h1 className="text-xl font-bold text-zinc-900">Visão Geral</h1>
           <p className="text-sm text-zinc-500 mt-0.5">
             {fmtDateSlash(dateRange.startDate)} — {fmtDateSlash(dateRange.endDate)}
-            {overview && overview.source !== "google-ads" && (
+            {overview && overview.source !== "google-ads" && overview.source !== "not_configured" && (
               <span className="ml-2 text-zinc-400">Dados mock</span>
             )}
             {updatedLabel && !loading && (
@@ -167,8 +168,17 @@ export default function VisaoGeralPage() {
         </>
       )}
 
+      {/* ─── NÃO CONFIGURADO ─── */}
+      {overview && overview.source === "not_configured" && !loading && (
+        <EmptyIntegrationState
+          platform="Google Ads"
+          showWelcome
+          message="Configure suas integrações para começar a ver dados do seu e-commerce. Comece conectando o Google Ads nas configurações."
+        />
+      )}
+
       {/* ─── ROW 2: KPI Cards ─── */}
-      {overview && acct && !loading && (() => {
+      {overview && overview.source !== "not_configured" && acct && !loading && (() => {
         const ltvValue = retention?.summary
           ? (retention.summary.purchasers > 0 ? retention.summary.revenue / retention.summary.purchasers : 0)
           : null;
@@ -239,7 +249,7 @@ export default function VisaoGeralPage() {
       })()}
 
       {/* ─── ROW 3: Consultor Estratégico ─── */}
-      {!loading && (
+      {!loading && overview?.source !== "not_configured" && (
         <StrategicAdvisorCard startDate={dateRange.startDate} endDate={dateRange.endDate} />
       )}
 

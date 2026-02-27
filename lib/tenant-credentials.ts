@@ -13,12 +13,21 @@ export type Platform =
 const cache = new Map<string, { data: Record<string, string>; ts: number }>();
 const CACHE_TTL = 2 * 60 * 1000;
 
+// Legacy tenants that are allowed to use env var credentials.
+// Only the original Casanova tenant (and "default" for backward compat) should fall back to env vars.
+// All new tenants MUST have DB credentials or they get no data.
+const LEGACY_ENV_TENANT_IDS = new Set(["casanova", "default"]);
+
+function isLegacyEnvTenant(tenantId: string): boolean {
+  return LEGACY_ENV_TENANT_IDS.has(tenantId);
+}
+
 /**
  * Fetch credentials for a tenant+platform.
  * 1. Check DB (Integration table) — decrypt if found
- * 2. Fall back to env vars if no DB entry or CREDENTIALS_ENCRYPTION_KEY is missing
+ * 2. Fall back to env vars ONLY for legacy tenants (casanova)
  *
- * Returns null if neither DB nor env vars have the credentials.
+ * Returns null if tenant has no configured credentials.
  */
 export async function getTenantCredentials(
   tenantId: string | undefined,
@@ -49,12 +58,16 @@ export async function getTenantCredentials(
     }
   }
 
-  // Fallback to env vars
-  const envCreds = getEnvCredentials(platform);
-  if (envCreds) {
-    cache.set(cacheKey, { data: envCreds, ts: Date.now() });
+  // Env var fallback ONLY for legacy tenants — new tenants get null (no data leak)
+  if (isLegacyEnvTenant(tid)) {
+    const envCreds = getEnvCredentials(platform);
+    if (envCreds) {
+      cache.set(cacheKey, { data: envCreds, ts: Date.now() });
+    }
+    return envCreds;
   }
-  return envCreds;
+
+  return null;
 }
 
 /**

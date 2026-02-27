@@ -66,6 +66,12 @@ export async function GET(request: NextRequest) {
 
   try {
     const client = await getGA4ClientAsync(tenantId);
+    if (!client) {
+      return NextResponse.json({
+        source: "not_configured",
+        updatedAt: new Date().toISOString(),
+      } satisfies Partial<RetentionData>);
+    }
 
     const [cohorts, summary, channelLTV] = await Promise.all([
       fetchCohortRetention(client, startDate, endDate, tenantId),

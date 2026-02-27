@@ -12,7 +12,7 @@ export type DateRange = {
 export type ApiResponse = {
   sku: string;
   period: string;
-  source: "google-ads" | "mock";
+  source: "google-ads" | "mock" | "not_configured";
   skuTitle: string;
   updatedAt: string;
   cards: {
@@ -38,7 +38,7 @@ export type ApiResponse = {
 
 export type OverviewResponse = {
   period: string;
-  source: "google-ads" | "mock";
+  source: "google-ads" | "mock" | "not_configured";
   updatedAt: string;
   totalSkus: number;
   accountTotals?: {
@@ -106,7 +106,7 @@ export type CampaignData = {
 
 export type CampaignsResponse = {
   period: string;
-  source: "google-ads" | "mock";
+  source: "google-ads" | "mock" | "not_configured";
   updatedAt: string;
   campaigns: CampaignData[];
 };
@@ -127,7 +127,7 @@ export type TimeSeriesResponse = {
   scope: string;
   sku?: string;
   period: string;
-  source: "google-ads" | "mock";
+  source: "google-ads" | "mock" | "not_configured";
   series: TimeSeriesPoint[];
 };
 

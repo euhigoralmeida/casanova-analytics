@@ -33,10 +33,8 @@ export async function GET(request: NextRequest) {
   }
 
   // Try to get GSC client — if not configured, return empty
-  let gscClient;
-  try {
-    gscClient = await getGSCClientAsync(tenantId);
-  } catch {
+  const gscClient = await getGSCClientAsync(tenantId);
+  if (!gscClient) {
     const empty: OrganicDataResponse = {
       source: "not_configured",
       updatedAt: new Date().toISOString(),
@@ -137,6 +135,7 @@ export async function GET(request: NextRequest) {
 
 async function fetchGA4DataForOrganic(startDate: string, endDate: string, tenantId?: string) {
   const client = await getGA4ClientAsync(tenantId);
+  if (!client) return null;
 
   const [landingPages, summary, channelLTV, siteSummary] = await Promise.all([
     fetchOrganicLandingPages(client, startDate, endDate, tenantId).catch(() => []),
@@ -176,5 +175,6 @@ async function fetchGA4DataForOrganic(startDate: string, endDate: string, tenant
 
 async function fetchAdsSearchTerms(startDate: string, endDate: string, tenantId?: string) {
   const customer = await getCustomerAsync(tenantId);
+  if (!customer) return [];
   return await fetchSearchTerms(customer, startDate, endDate, tenantId);
 }

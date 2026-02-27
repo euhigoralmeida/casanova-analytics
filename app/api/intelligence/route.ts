@@ -98,6 +98,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const customer = await getCustomerAsync(tenantId);
+    if (customer) {
       const [acctData, allSkuData, campData, deviceData] = await Promise.all([
         fetchAccountTotals(customer, period, startDate, endDate, tenantId),
         fetchAllSkuMetrics(customer, period, startDate, endDate, tenantId),
@@ -150,6 +151,7 @@ export async function GET(req: NextRequest) {
       }));
 
       devices = deviceData;
+    }
   } catch (err) {
     logger.error("Intelligence: Google Ads error", { route: "/api/intelligence", tenantId }, err);
   }
@@ -160,6 +162,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const ga4Client = await getGA4ClientAsync(tenantId);
+    if (ga4Client) {
     const [summary, channelData, ga4Demo, ga4Geo, ga4Dev] = await Promise.all([
       fetchGA4Summary(ga4Client, startDate ?? "", endDate ?? "", tenantId),
       fetchChannelAcquisition(ga4Client, startDate ?? "", endDate ?? "", tenantId),
@@ -226,6 +229,7 @@ export async function GET(req: NextRequest) {
           users: d.users,
         }));
       }
+    }
   } catch (err) {
     logger.error("Intelligence: GA4 error", { route: "/api/intelligence", tenantId }, err);
   }

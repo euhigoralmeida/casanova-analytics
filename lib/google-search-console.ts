@@ -56,37 +56,42 @@ export function getGSCClient(tenantId?: string): searchconsole_v1.Searchconsole 
   return client;
 }
 
-/** Async version — checks DB credentials first. */
-export async function getGSCClientAsync(tenantId?: string): Promise<searchconsole_v1.Searchconsole> {
+/**
+ * Async version — checks DB credentials first.
+ * Returns null if the tenant has no GSC credentials configured.
+ */
+export async function getGSCClientAsync(tenantId?: string): Promise<searchconsole_v1.Searchconsole | null> {
   const key = tenantId ?? "default";
-  let client = _clients.get(key);
-  if (client) return client;
+  const existing = _clients.get(key);
+  if (existing) return existing;
 
   const creds = await getTenantCredentials(tenantId, "google_search_console");
-  const email = creds?.client_email ?? getClientEmail();
-  const pk = creds?.private_key ?? getPrivateKey();
+  if (!creds) return null;
 
   // Store site URL from DB credentials if available
-  if (creds?.site_url) {
+  if (creds.site_url) {
     _siteUrls.set(key, creds.site_url);
   }
 
   const auth = new google.auth.JWT({
-    email,
-    key: pk,
+    email: creds.client_email,
+    key: creds.private_key,
     scopes: ["https://www.googleapis.com/auth/webmasters.readonly"],
   });
-  client = google.searchconsole({ version: "v1", auth });
+  const client = google.searchconsole({ version: "v1", auth });
   _clients.set(key, client);
   return client;
 }
 
-export function getSiteUrl(tenantId?: string): string {
-  // Site URL from DB-cached credentials (if already loaded by getGSCClientAsync)
+/**
+ * Returns the site URL for a tenant.
+ * Returns null if no site URL is available (tenant not configured).
+ */
+export function getSiteUrl(tenantId?: string): string | null {
   const key = tenantId ?? "default";
   const cached = _siteUrls.get(key);
   if (cached) return cached;
-  return process.env.GSC_SITE_URL ?? "";
+  return null;
 }
 
 const _siteUrls = new Map<string, string>();

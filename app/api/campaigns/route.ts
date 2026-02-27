@@ -76,6 +76,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const customer = await getCustomerAsync(tenantId);
+    if (!customer) {
+      return NextResponse.json({
+        period,
+        source: "not_configured",
+        updatedAt: new Date().toISOString(),
+        campaigns: [],
+      });
+    }
     const allCampaigns = await fetchAllCampaignMetrics(customer, period, startDate, endDate, tenantId);
 
       const campaigns = allCampaigns
