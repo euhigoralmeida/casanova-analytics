@@ -15,7 +15,7 @@ export function EmptyIntegrationState({ platform, message, showWelcome }: Props)
     <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-gray-300 bg-gray-50 px-6 py-16 text-center">
       {showWelcome && (
         <h2 className="mb-2 text-xl font-semibold text-gray-800">
-          Bem-vindo ao Casanova Analytics!
+          Bem-vindo ao FiveP Analytics!
         </h2>
       )}
       <div className="mb-4 rounded-full bg-gray-200 p-4">

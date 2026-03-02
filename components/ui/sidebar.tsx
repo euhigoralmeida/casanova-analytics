@@ -84,10 +84,10 @@ export default function Sidebar({
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }) {
-  // Platform admin sees FiveP logo; clients see their tenant logo (or default Casanova)
+  // Platform admin sees FiveP logo; clients see their tenant logo (or default FiveP)
   const logoSrc = globalRole === "platform_admin"
     ? "/logo-fivep.png"
-    : (tenantLogo || "/logo-casanova.png");
+    : (tenantLogo || "/logo-fivep.png");
   const pathname = usePathname();
   const router = useRouter();
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>(() => {
