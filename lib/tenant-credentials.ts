@@ -16,10 +16,31 @@ const CACHE_TTL = 2 * 60 * 1000;
 // Legacy tenants that are allowed to use env var credentials.
 // Only the original Casanova tenant (and "default" for backward compat) should fall back to env vars.
 // All new tenants MUST have DB credentials or they get no data.
-const LEGACY_ENV_TENANT_IDS = new Set(["casanova", "default"]);
+const LEGACY_ENV_TENANT_SLUGS = new Set(["casanova", "default"]);
 
-function isLegacyEnvTenant(tenantId: string): boolean {
-  return LEGACY_ENV_TENANT_IDS.has(tenantId);
+// Cache tenant slug lookups (tenantId → slug) to avoid repeated DB queries
+const slugCache = new Map<string, { slug: string | null; ts: number }>();
+
+async function isLegacyEnvTenant(tenantId: string): Promise<boolean> {
+  // Direct match on slug/id (backward compat when DB is down or tenantId is a slug)
+  if (LEGACY_ENV_TENANT_SLUGS.has(tenantId)) return true;
+
+  // Resolve slug from DB (with cache)
+  const cached = slugCache.get(tenantId);
+  if (cached && Date.now() - cached.ts < CACHE_TTL) {
+    return cached.slug ? LEGACY_ENV_TENANT_SLUGS.has(cached.slug) : false;
+  }
+
+  try {
+    const tenant = await prisma.tenant.findFirst({
+      where: { id: tenantId },
+      select: { slug: true },
+    });
+    slugCache.set(tenantId, { slug: tenant?.slug ?? null, ts: Date.now() });
+    return tenant?.slug ? LEGACY_ENV_TENANT_SLUGS.has(tenant.slug) : false;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -59,7 +80,7 @@ export async function getTenantCredentials(
   }
 
   // Env var fallback ONLY for legacy tenants — new tenants get null (no data leak)
-  if (isLegacyEnvTenant(tid)) {
+  if (await isLegacyEnvTenant(tid)) {
     const envCreds = getEnvCredentials(platform);
     if (envCreds) {
       cache.set(cacheKey, { data: envCreds, ts: Date.now() });
