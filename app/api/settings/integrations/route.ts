@@ -117,7 +117,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, platform });
   } catch (e) {
     console.error("[settings/integrations] POST error:", e);
-    return NextResponse.json({ error: "Erro ao salvar credenciais" }, { status: 500 });
+    const msg = e instanceof Error ? e.message : String(e);
+    // Expose error class for debugging without leaking secrets
+    const hint = msg.includes("Foreign key")
+      ? " (tenant não encontrado no banco)"
+      : msg.includes("CREDENTIALS_ENCRYPTION_KEY")
+        ? " (chave de criptografia não configurada)"
+        : "";
+    return NextResponse.json({ error: `Erro ao salvar credenciais${hint}` }, { status: 500 });
   }
 }
 
