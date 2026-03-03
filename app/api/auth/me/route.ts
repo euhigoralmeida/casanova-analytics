@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
       role: session.role,
       globalRole: session.globalRole ?? null,
     },
-    tenant: { id: tenant.id, name: tenant.name },
+    tenant: { id: tenant.id, name: tenant.name, slug: tenant.slug },
     activeTenantId: session.activeTenantId ?? null,
   });
 }

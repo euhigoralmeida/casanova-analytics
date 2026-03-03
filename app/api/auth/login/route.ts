@@ -47,7 +47,7 @@ export async function POST(req: NextRequest) {
         role: result.user.role,
         globalRole: result.user.globalRole ?? null,
       },
-      tenant: { id: result.tenant.id, name: result.tenant.name, logo: result.tenant.logo ?? null },
+      tenant: { id: result.tenant.id, name: result.tenant.name, slug: result.tenant.slug, logo: result.tenant.logo ?? null },
     });
 
     response.cookies.set(SESSION_COOKIE, token, {

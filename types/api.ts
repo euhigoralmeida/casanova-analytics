@@ -232,6 +232,8 @@ export type PlanningRowDef = {
   formula?: string;
 };
 
+export { YELLA_INPUT_METRICS } from "@/lib/planning-yella-calc";
+
 /* =========================
    Planning Target types (Planejamento 2026)
 ========================= */

@@ -5,18 +5,51 @@ import { Save, Loader2, CheckCircle2, AlertCircle, RefreshCw, Download } from "l
 import { YearSelector } from "@/components/planning/year-selector";
 import { AnnualPlanningTable } from "@/components/planning/annual-planning-table";
 import { TargetPlanningTable } from "@/components/planning/target-planning-table";
+import { YellaPlanningTable } from "@/components/planning/yella-planning-table";
 import ConfirmDialog from "@/components/ui/confirm-dialog";
 import type { PlanningYearData } from "@/types/api";
 import { PLANNING_TARGET_ROWS, computeTargetFullYear } from "@/lib/planning-target-calc";
+import { YELLA_PLANNING_ROWS, computeYellaFullYear } from "@/lib/planning-yella-calc";
 
 type SaveStatus = "idle" | "saving" | "saved" | "error";
 type SyncStatus = "idle" | "syncing" | "synced" | "error";
 type SourcesMap = Record<number, Record<string, string>>;
 type ActiveTab = "target" | "actual";
 
+function getTenantSlug(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem("ca_tenant");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.slug ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export default function PlanningPage() {
   const [year, setYear] = useState(new Date().getFullYear());
   const [activeTab, setActiveTab] = useState<ActiveTab>("target");
+  const [tenantSlug, setTenantSlug] = useState<string | null>(null);
+
+  // Detect tenant slug
+  useEffect(() => {
+    const slug = getTenantSlug();
+    if (slug) {
+      setTenantSlug(slug);
+    } else {
+      // Fallback: fetch from /api/auth/me
+      fetch("/api/auth/me")
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.tenant?.slug) setTenantSlug(data.tenant.slug);
+        })
+        .catch(() => { /* ignore */ });
+    }
+  }, []);
+
+  const isYella = tenantSlug === "yellalife";
 
   // Actual (existing) data
   const [actualData, setActualData] = useState<PlanningYearData>({});
@@ -48,10 +81,13 @@ export default function PlanningPage() {
 
   function exportPlanningCSV() {
     const data = isActual ? actualData : targetData;
-    const computed = computeTargetFullYear(data);
-    const rows = PLANNING_TARGET_ROWS;
     const bom = "\uFEFF";
     const sep = ";";
+
+    // Use Yella rows/calc if tenant is Yella and we're on the actual tab
+    const useYella = isYella && isActual;
+    const rows = useYella ? YELLA_PLANNING_ROWS : PLANNING_TARGET_ROWS;
+    const computed = useYella ? computeYellaFullYear(data) : computeTargetFullYear(data);
 
     const header = ["Métrica", ...MONTH_LABELS].join(sep);
     const lines = rows.map((row) => {
@@ -382,7 +418,18 @@ export default function PlanningPage() {
       {/* Legend */}
       <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-zinc-500">
         <div className="flex items-center gap-4">
-          {isActual ? (
+          {isActual && isYella ? (
+            <>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-3 w-3 rounded border border-zinc-300 bg-white" />
+                Editável
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-3 w-3 rounded border border-zinc-200 bg-zinc-50" />
+                Cálculo automático
+              </span>
+            </>
+          ) : isActual ? (
             <>
               <span className="flex items-center gap-1.5">
                 <span className="inline-block h-3 w-3 rounded border border-zinc-300 bg-white" />
@@ -436,6 +483,11 @@ export default function PlanningPage() {
           year={year}
           data={targetData}
           onCellChange={handleTargetCellChange}
+        />
+      ) : isYella ? (
+        <YellaPlanningTable
+          data={actualData}
+          onCellChange={handleActualCellChange}
         />
       ) : (
         <AnnualPlanningTable

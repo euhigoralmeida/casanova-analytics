@@ -15,6 +15,7 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
+  Calendar,
 } from "lucide-react";
 
 type TenantRow = {
@@ -30,7 +31,6 @@ type TenantRow = {
 type CreateForm = {
   name: string;
   slug: string;
-  plan: string;
   adminEmail: string;
   adminName: string;
   adminPassword: string;
@@ -40,7 +40,6 @@ type CreateForm = {
 const INITIAL_FORM: CreateForm = {
   name: "",
   slug: "",
-  plan: "pro",
   adminEmail: "",
   adminName: "",
   adminPassword: "",
@@ -114,7 +113,7 @@ export default function AdminTenantsPage() {
         body: JSON.stringify({
           name: form.name,
           slug: form.slug,
-          plan: form.plan,
+          plan: "pro",
           adminEmail: form.adminEmail,
           adminName: form.adminName,
           adminPassword: form.autoPassword ? undefined : form.adminPassword,
@@ -178,7 +177,7 @@ export default function AdminTenantsPage() {
         <div>
           <h1 className="text-xl font-bold text-zinc-900">Clientes</h1>
           <p className="text-sm text-zinc-500 mt-0.5">
-            Gerencie os tenants da plataforma
+            Gerencie os clientes da plataforma{!loading && tenants.length > 0 ? ` (${tenants.length} ${tenants.length === 1 ? "cliente" : "clientes"})` : ""}
           </p>
         </div>
         <button
@@ -190,113 +189,74 @@ export default function AdminTenantsPage() {
         </button>
       </div>
 
-      {/* Tenants Table */}
+      {/* Tenants Cards */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <Loader2 className="h-6 w-6 animate-spin text-zinc-400" />
         </div>
       ) : tenants.length === 0 ? (
         <div className="text-center py-12 text-zinc-400 text-sm">
-          Nenhum tenant encontrado
+          Nenhum cliente encontrado
         </div>
       ) : (
-        <div className="rounded-xl border border-zinc-200 bg-white overflow-hidden">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-zinc-100 bg-zinc-50/50">
-                <th className="text-left px-4 py-3 font-medium text-zinc-600">
-                  Empresa
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-zinc-600">
-                  Slug
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-zinc-600">
-                  Plano
-                </th>
-                <th className="text-center px-4 py-3 font-medium text-zinc-600">
-                  <Users size={14} className="inline mr-1" />
-                  Usuários
-                </th>
-                <th className="text-center px-4 py-3 font-medium text-zinc-600">
-                  <Plug size={14} className="inline mr-1" />
-                  Integrações
-                </th>
-                <th className="text-left px-4 py-3 font-medium text-zinc-600">
-                  Criado em
-                </th>
-                <th className="text-right px-4 py-3 font-medium text-zinc-600">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {tenants.map((t) => (
-                <tr
-                  key={t.id}
-                  className="border-b border-zinc-50 hover:bg-zinc-50/50 transition-colors"
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {tenants.map((t) => (
+            <div
+              key={t.id}
+              className="rounded-xl border border-zinc-200 bg-white p-5 hover:shadow-md transition-shadow space-y-4"
+            >
+              {/* Top — Name + slug */}
+              <div>
+                <div className="flex items-center gap-2">
+                  <Building2 size={18} className="text-emerald-600 shrink-0" />
+                  <h3 className="text-base font-semibold text-zinc-900 truncate">
+                    {t.name}
+                  </h3>
+                </div>
+                <code className="text-[11px] text-zinc-400 bg-zinc-50 px-1.5 py-0.5 rounded mt-1 inline-block">
+                  {t.slug}
+                </code>
+              </div>
+
+              {/* Middle — Stats */}
+              <div className="flex items-center gap-4 text-xs text-zinc-500">
+                <span className="flex items-center gap-1">
+                  <Users size={13} className="text-zinc-400" />
+                  {t._count.users} {t._count.users === 1 ? "usuário" : "usuários"}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Plug size={13} className="text-zinc-400" />
+                  {t._count.integrations} {t._count.integrations === 1 ? "integração" : "integrações"}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 text-[11px] text-zinc-400">
+                <Calendar size={12} />
+                Criado em {new Date(t.createdAt).toLocaleDateString("pt-BR")}
+              </div>
+
+              {/* Footer — Actions */}
+              <div className="flex items-center justify-end gap-2 pt-1 border-t border-zinc-100">
+                <Link
+                  href={`/admin/tenants/${t.id}`}
+                  className="text-xs px-3 py-1.5 border border-zinc-200 rounded-lg text-zinc-600 hover:bg-zinc-50 transition-colors"
                 >
-                  <td className="px-4 py-3 font-medium text-zinc-900">
-                    <div className="flex items-center gap-2">
-                      <Building2
-                        size={16}
-                        className="text-zinc-400 shrink-0"
-                      />
-                      {t.name}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 text-zinc-500">
-                    <code className="text-xs bg-zinc-100 px-1.5 py-0.5 rounded">
-                      {t.slug}
-                    </code>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span
-                      className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                        t.plan === "enterprise"
-                          ? "bg-purple-100 text-purple-700"
-                          : t.plan === "pro"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-zinc-100 text-zinc-600"
-                      }`}
-                    >
-                      {t.plan}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center text-zinc-600">
-                    {t._count.users}
-                  </td>
-                  <td className="px-4 py-3 text-center text-zinc-600">
-                    {t._count.integrations}
-                  </td>
-                  <td className="px-4 py-3 text-zinc-500 text-xs">
-                    {new Date(t.createdAt).toLocaleDateString("pt-BR")}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link
-                        href={`/admin/tenants/${t.id}`}
-                        className="text-xs px-2.5 py-1.5 border border-zinc-200 rounded-lg text-zinc-600 hover:bg-zinc-50 transition-colors"
-                      >
-                        Detalhes
-                      </Link>
-                      <button
-                        onClick={() => viewDashboard(t)}
-                        disabled={switchingId === t.id}
-                        className="flex items-center gap-1 text-xs px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
-                      >
-                        {switchingId === t.id ? (
-                          <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                          <ExternalLink size={12} />
-                        )}
-                        Ver Dashboard
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  Detalhes
+                </Link>
+                <button
+                  onClick={() => viewDashboard(t)}
+                  disabled={switchingId === t.id}
+                  className="flex items-center gap-1 text-xs px-3 py-1.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                >
+                  {switchingId === t.id ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <ExternalLink size={12} />
+                  )}
+                  Ver Dashboard
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
@@ -403,21 +363,6 @@ export default function AdminTenantsPage() {
                   <p className="text-[11px] text-zinc-400 mt-1">
                     3-30 caracteres, apenas letras minúsculas, números e hífens
                   </p>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-zinc-700 mb-1">
-                    Plano
-                  </label>
-                  <select
-                    value={form.plan}
-                    onChange={(e) => updateForm("plan", e.target.value)}
-                    className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-                  >
-                    <option value="starter">Starter</option>
-                    <option value="pro">Pro</option>
-                    <option value="enterprise">Enterprise</option>
-                  </select>
                 </div>
 
                 <hr className="border-zinc-100" />

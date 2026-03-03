@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, requireTenantContext } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
-import { PLANNING_INPUT_METRICS, PLANNING_TARGET_INPUT_METRICS } from "@/types/api";
+import { PLANNING_INPUT_METRICS, PLANNING_TARGET_INPUT_METRICS, YELLA_INPUT_METRICS } from "@/types/api";
 import type { PlanningYearData } from "@/types/api";
 
 /** Build response from DB rows, including source info */
@@ -21,10 +21,14 @@ function parsePlanType(val: string | null): "actual" | "target" {
   return val === "target" ? "target" : "actual";
 }
 
-function getValidMetrics(planType: "actual" | "target"): Set<string> {
-  return planType === "target"
-    ? new Set<string>(PLANNING_TARGET_INPUT_METRICS)
-    : new Set<string>(PLANNING_INPUT_METRICS);
+function getValidMetrics(planType: "actual" | "target", tenantSlug?: string): Set<string> {
+  if (planType === "target") {
+    return new Set<string>(PLANNING_TARGET_INPUT_METRICS);
+  }
+  if (tenantSlug === "yellalife") {
+    return new Set<string>(YELLA_INPUT_METRICS);
+  }
+  return new Set<string>(PLANNING_INPUT_METRICS);
 }
 
 /* =========================
@@ -96,7 +100,15 @@ export async function PUT(req: NextRequest) {
   }
 
   const planType = parsePlanType(rawPlanType ?? null);
-  const validMetrics = getValidMetrics(planType);
+
+  // Look up tenant slug for tenant-aware metric validation
+  let tenantSlug: string | undefined;
+  try {
+    const tenant = await prisma.tenant.findUnique({ where: { id: tenantId }, select: { slug: true } });
+    tenantSlug = tenant?.slug ?? undefined;
+  } catch { /* fallback: use default metrics */ }
+
+  const validMetrics = getValidMetrics(planType, tenantSlug);
 
   const validEntries = entries.filter(
     (e) =>

@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, isPlatformAdmin } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
+import { getTenantCredentials, type Platform } from "@/lib/tenant-credentials";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { logger } from "@/lib/logger";
+
+const ALL_PLATFORMS: Platform[] = [
+  "google_ads",
+  "ga4",
+  "meta_ads",
+  "google_search_console",
+  "clarity",
+  "instagram",
+];
 
 export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
@@ -15,7 +25,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const tenants = await prisma.tenant.findMany({
-      where: { active: true },
+      where: { active: true, slug: { not: "fivep" } },
       select: {
         id: true,
         name: true,
@@ -23,12 +33,25 @@ export async function GET(req: NextRequest) {
         logo: true,
         plan: true,
         createdAt: true,
-        _count: { select: { users: true, integrations: { where: { active: true } } } },
+        _count: { select: { users: true } },
       },
       orderBy: { name: "asc" },
     });
 
-    return NextResponse.json({ tenants });
+    // Resolve real integration count (DB + env var fallback for legacy tenants)
+    const enriched = await Promise.all(
+      tenants.map(async (t) => {
+        const checks = await Promise.all(
+          ALL_PLATFORMS.map((p) => getTenantCredentials(t.id, p).then((c) => !!c)),
+        );
+        return {
+          ...t,
+          _count: { ...t._count, integrations: checks.filter(Boolean).length },
+        };
+      }),
+    );
+
+    return NextResponse.json({ tenants: enriched });
   } catch {
     return NextResponse.json({ tenants: [] });
   }
