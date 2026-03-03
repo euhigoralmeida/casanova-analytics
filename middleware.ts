@@ -56,7 +56,7 @@ export async function middleware(req: NextRequest) {
   }
 
   // Permitir assets estáticos e _next
-  if (pathname.startsWith("/_next") || pathname.startsWith("/favicon") || pathname.endsWith(".png") || pathname.endsWith(".ico")) {
+  if (pathname.startsWith("/_next") || pathname.startsWith("/favicon") || pathname.endsWith(".png") || pathname.endsWith(".ico") || pathname.endsWith(".svg")) {
     return NextResponse.next();
   }
 
