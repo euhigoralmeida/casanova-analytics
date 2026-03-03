@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getCustomerAsync } from "@/lib/google-ads";
 import { fetchAllCampaignMetrics } from "@/lib/queries";
 import { requireAuthWithRateLimit, requireTenantContext } from "@/lib/api-helpers";
+import { logger } from "@/lib/logger";
 
 /* =========================
    Mock data (fallback)
@@ -110,7 +111,7 @@ export async function GET(request: NextRequest) {
         campaigns,
       });
   } catch (err) {
-    console.error("Google Ads API error in campaigns:", err);
+    logger.error("Google Ads API error in campaigns", { route: "/api/campaigns", tenantId }, err);
   }
 
   return NextResponse.json({

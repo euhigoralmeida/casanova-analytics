@@ -3,6 +3,7 @@ import { requireAuth, isPlatformAdmin } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import { logger } from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
   const auth = requireAuth(req);
@@ -133,7 +134,7 @@ export async function POST(req: NextRequest) {
     if (e instanceof Error && e.message?.includes("Unique constraint")) {
       return NextResponse.json({ error: "Slug já existe" }, { status: 409 });
     }
-    console.error("[admin/tenants] POST error:", e);
+    logger.error("Admin tenants POST error", { route: "/api/admin/tenants" }, e);
     return NextResponse.json({ error: "Erro ao criar tenant" }, { status: 500 });
   }
 }

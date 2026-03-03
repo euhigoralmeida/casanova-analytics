@@ -3,6 +3,7 @@ import { getGA4ClientAsync } from "@/lib/google-analytics";
 import { fetchCohortRetention, fetchRetentionSummary, fetchUserLifetimeValue } from "@/lib/ga4-queries";
 import type { RetentionData } from "@/lib/ga4-queries";
 import { requireAuth, requireTenantContext } from "@/lib/api-helpers";
+import { logger } from "@/lib/logger";
 
 /* =========================
    Mock data for when GA4 is not configured
@@ -89,7 +90,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(result);
   } catch (err) {
-    console.error("Retention API error:", err);
+    logger.error("Retention API error", { route: "/api/retention", tenantId }, err);
     // Fall back to mock data
     return NextResponse.json(generateMockData(), { status: 200 });
   }

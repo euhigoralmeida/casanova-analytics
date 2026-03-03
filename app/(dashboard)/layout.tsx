@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/ui/sidebar";
 import Header from "@/components/ui/header";
@@ -30,20 +30,9 @@ type TenantData = { id?: string; name?: string; logo?: string };
 function readTenantData(): TenantData {
   if (typeof window === "undefined") return {};
   try {
-    const raw = localStorage.getItem("ca_tenant");
+    const raw = sessionStorage.getItem("ca_tenant");
     if (!raw) return {};
     return JSON.parse(raw) as TenantData;
-  } catch {
-    return {};
-  }
-}
-
-function readUserData(): { globalRole?: string } {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = localStorage.getItem("ca_user");
-    if (!raw) return {};
-    return JSON.parse(raw);
   } catch {
     return {};
   }
@@ -63,8 +52,20 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(readSidebarCollapsed);
   const [tenantData] = useState(readTenantData);
-  const [userData] = useState(readUserData);
+  const [globalRole, setGlobalRole] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
   const dateRange = useMemo(() => defaultRange(), []);
+
+  // Fetch globalRole + role from server (not stored client-side)
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.user?.globalRole) setGlobalRole(data.user.globalRole);
+        if (data.user?.role) setUserRole(data.user.role);
+      })
+      .catch(() => {});
+  }, []);
 
   const title = pageTitles[pathname]
     ?? (pathname.startsWith("/influencers/") && !pathname.includes("/comparar") && !pathname.includes("/consultor")
@@ -87,7 +88,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           <Sidebar
             tenantName={tenantData.name}
             tenantLogo={tenantData.logo}
-            globalRole={userData.globalRole}
+            globalRole={globalRole}
+            userRole={userRole}
             collapsed={sidebarCollapsed}
             onToggleCollapse={toggleCollapse}
           />
@@ -102,7 +104,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             onClick={() => setSidebarOpen(false)}
           />
           <div className="fixed inset-y-0 left-0 z-50 lg:hidden">
-            <Sidebar tenantName={tenantData.name} tenantLogo={tenantData.logo} globalRole={userData.globalRole} onClose={() => setSidebarOpen(false)} />
+            <Sidebar tenantName={tenantData.name} tenantLogo={tenantData.logo} globalRole={globalRole} userRole={userRole} onClose={() => setSidebarOpen(false)} />
           </div>
         </>
       )}
@@ -117,7 +119,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           title={title}
           sidebarOpen={sidebarOpen}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          globalRole={userData.globalRole}
+          globalRole={globalRole}
           activeTenantId={tenantData.id}
           activeTenantName={tenantData.name}
         />

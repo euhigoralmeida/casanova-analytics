@@ -104,8 +104,8 @@ export default function IntegrationsPage() {
 
   useEffect(() => {
     try {
-      const user = JSON.parse(localStorage.getItem("ca_user") || "{}");
-      setIsAdmin(user.role === "admin" || user.globalRole === "platform_admin");
+      const user = JSON.parse(sessionStorage.getItem("ca_user") || "{}");
+      setIsAdmin(user.role === "admin");
     } catch {
       // not admin
     }

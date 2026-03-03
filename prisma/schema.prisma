@@ -42,6 +42,7 @@ model User {
 
   @@unique([tenantId, email])
   @@index([email])
+  @@index([tenantId])
 }
 
 model Integration {
@@ -58,6 +59,7 @@ model Integration {
 
   @@unique([tenantId, platform])
   @@index([tenantId])
+  @@index([tenantId, active])
 }
 
 // ─── Existing Models ───

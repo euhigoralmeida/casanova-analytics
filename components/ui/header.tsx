@@ -32,7 +32,7 @@ export default function Header({
       const res = await fetch("/api/admin/clear-impersonation", { method: "POST" });
       const data = await res.json();
       if (data.ok) {
-        localStorage.removeItem("ca_tenant");
+        sessionStorage.removeItem("ca_tenant");
         router.push("/admin");
       }
     } catch {

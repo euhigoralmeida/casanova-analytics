@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchClarityFromApi, saveClarityToDB, getClarityFromDB } from "@/lib/clarity";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 /* =========================
    GET /api/cron/clarity
@@ -63,7 +64,7 @@ export async function GET(request: NextRequest) {
       };
     } catch (err) {
       const errMsg = String(err);
-      console.error(`Cron clarity error for tenant ${tenantId}:`, errMsg);
+      logger.error("Cron clarity error", { route: "/api/cron/clarity", tenantId }, err);
       results[tenantId] = {
         status: "error",
         reason: errMsg.includes("429") ? "Rate limited (429)" : errMsg.slice(0, 200),

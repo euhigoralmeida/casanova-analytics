@@ -7,6 +7,7 @@ import {
 } from "@/lib/tenant-credentials";
 import { encryptCredentials } from "@/lib/secrets";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 const PLATFORMS: Platform[] = [
   "google_ads",
@@ -116,7 +117,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, platform });
   } catch (e) {
-    console.error("[settings/integrations] POST error:", e);
+    logger.error("Settings integrations POST error", { route: "/api/settings/integrations", tenantId }, e);
     const msg = e instanceof Error ? e.message : String(e);
     // Expose error class for debugging without leaking secrets
     const hint = msg.includes("Foreign key")
@@ -168,7 +169,7 @@ export async function DELETE(req: NextRequest) {
 
     return NextResponse.json({ ok: true });
   } catch (e) {
-    console.error("[settings/integrations] DELETE error:", e);
+    logger.error("Settings integrations DELETE error", { route: "/api/settings/integrations", tenantId }, e);
     return NextResponse.json({ error: "Erro ao remover integração" }, { status: 500 });
   }
 }

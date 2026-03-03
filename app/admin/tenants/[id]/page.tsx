@@ -99,7 +99,7 @@ export default function TenantDetailPage() {
       });
       const data = await res.json();
       if (data.ok) {
-        localStorage.setItem("ca_tenant", JSON.stringify(data.tenant));
+        sessionStorage.setItem("ca_tenant", JSON.stringify(data.tenant));
         router.push("/overview");
       }
     } catch {

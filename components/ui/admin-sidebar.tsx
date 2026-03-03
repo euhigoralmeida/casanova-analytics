@@ -15,8 +15,8 @@ export default function AdminSidebar() {
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    localStorage.removeItem("ca_tenant");
-    localStorage.removeItem("ca_user");
+    sessionStorage.removeItem("ca_tenant");
+    sessionStorage.removeItem("ca_user");
     router.push("/login");
   }
 

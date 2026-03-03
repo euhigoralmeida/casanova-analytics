@@ -20,6 +20,11 @@ export function isGSCConfigured(): boolean {
 // Multi-tenant: Map de clients por tenantId
 const _clients = new Map<string, searchconsole_v1.Searchconsole>();
 
+/** Clear cached clients for a tenant (call when credentials are rotated). */
+export function clearGSCClients(tenantId: string): void {
+  _clients.delete(tenantId);
+}
+
 function getPrivateKey(): string {
   if (process.env.GSC_PRIVATE_KEY_BASE64) {
     return Buffer.from(process.env.GSC_PRIVATE_KEY_BASE64, "base64").toString("utf-8");

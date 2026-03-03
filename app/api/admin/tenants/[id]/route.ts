@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requirePlatformAdmin } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
+import { logger } from "@/lib/logger";
 
 export async function GET(
   req: NextRequest,
@@ -48,7 +49,7 @@ export async function GET(
 
     return NextResponse.json({ tenant });
   } catch (e) {
-    console.error("[admin/tenants/[id]] GET error:", e);
+    logger.error("Admin tenant detail GET error", { route: "/api/admin/tenants/[id]", tenantId: id }, e);
     return NextResponse.json({ error: "Erro ao carregar tenant" }, { status: 500 });
   }
 }
@@ -101,7 +102,7 @@ export async function PATCH(
 
     return NextResponse.json({ tenant });
   } catch (e) {
-    console.error("[admin/tenants/[id]] PATCH error:", e);
+    logger.error("Admin tenant detail PATCH error", { route: "/api/admin/tenants/[id]", tenantId: id }, e);
     return NextResponse.json({ error: "Erro ao atualizar tenant" }, { status: 500 });
   }
 }

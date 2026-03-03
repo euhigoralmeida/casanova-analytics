@@ -5,6 +5,7 @@ import { createLLMProvider } from "@/lib/ai/llm-provider";
 import { buildStrategicBrief } from "@/lib/ai/strategic-brief";
 import { strategicAdvisorSystemPrompt, strategicAdvisorUserPrompt } from "@/lib/ai/prompts";
 import { cacheGet, cacheSet } from "@/lib/ai/cache";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -138,7 +139,7 @@ export async function GET(req: NextRequest) {
 
     return Response.json(response);
   } catch (err) {
-    console.error("Strategic Advisor error:", err);
+    logger.error("Strategic Advisor error", { route: "/api/strategic-advisor", tenantId }, err);
     const msg = err instanceof Error ? err.message : String(err);
     const isRateLimit = msg.includes("429") || msg.includes("Resource exhausted");
     return new Response(

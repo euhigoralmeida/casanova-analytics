@@ -60,6 +60,17 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
+  // CSRF: validate Origin header on mutation requests to API
+  if (pathname.startsWith("/api/") && ["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    const origin = req.headers.get("origin");
+    if (origin) {
+      const allowed = req.nextUrl.origin;
+      if (origin !== allowed) {
+        return NextResponse.json({ error: "Origin não permitido" }, { status: 403 });
+      }
+    }
+  }
+
   const token = req.cookies.get(SESSION_COOKIE)?.value;
   const payload = token ? await verifyAndDecode(token) : null;
 

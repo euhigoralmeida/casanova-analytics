@@ -18,9 +18,9 @@ async function main() {
   // Upsert tenant
   const tenant = await prisma.tenant.upsert({
     where: { slug: "casanova" },
-    update: { name: "Casanova Metais", logo: "/logo-casanova.png", onboardingStatus: "complete" },
+    update: { name: "Casanova", logo: "/logo-casanova.png", onboardingStatus: "complete" },
     create: {
-      name: "Casanova Metais",
+      name: "Casanova",
       slug: "casanova",
       logo: "/logo-casanova.png",
       plan: "pro",

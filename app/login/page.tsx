@@ -29,11 +29,12 @@ export default function LoginPage() {
         return;
       }
 
-      localStorage.setItem("ca_tenant", JSON.stringify(data.tenant));
-      localStorage.setItem("ca_user", JSON.stringify(data.user));
+      sessionStorage.setItem("ca_tenant", JSON.stringify(data.tenant));
+      sessionStorage.setItem("ca_user", JSON.stringify({ email: data.user.email, name: data.user.name, role: data.user.role }));
 
-      // Platform admin → admin panel; client → dashboard
-      if (data.user.globalRole === "platform_admin") {
+      // Check globalRole from server response to decide redirect
+      // (globalRole is NOT stored client-side)
+      if (data.user?.globalRole === "platform_admin") {
         router.push("/admin");
       } else {
         router.push("/overview");

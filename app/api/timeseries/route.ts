@@ -3,6 +3,7 @@ import { getCustomerAsync } from "@/lib/google-ads";
 import { fetchSkuTimeSeries, fetchAllTimeSeries, fetchAccountTimeSeries, fetchCampaignTimeSeries, DailyMetrics } from "@/lib/queries";
 import { fmtDate } from "@/lib/format";
 import { requireAuthWithRateLimit, requireTenantContext } from "@/lib/api-helpers";
+import { logger } from "@/lib/logger";
 
 /* =========================
    Mock data (fallback)
@@ -123,7 +124,7 @@ export async function GET(request: NextRequest) {
         series,
       });
   } catch (err) {
-    console.error("Google Ads API error in timeseries, falling back to mock:", err);
+    logger.error("Google Ads API error in timeseries, falling back to mock", { route: "/api/timeseries", tenantId }, err);
   }
 
   /* ---- MOCK (fallback) ---- */

@@ -73,6 +73,7 @@ export default function Sidebar({
   tenantName,
   tenantLogo,
   globalRole,
+  userRole,
   onClose,
   collapsed = false,
   onToggleCollapse,
@@ -80,6 +81,7 @@ export default function Sidebar({
   tenantName?: string;
   tenantLogo?: string;
   globalRole?: string | null;
+  userRole?: string | null;
   onClose?: () => void;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
@@ -89,6 +91,12 @@ export default function Sidebar({
     ? "/logo-fivep.png"
     : (tenantLogo || "/logo-fivep.png");
   const pathname = usePathname();
+
+  // Hide Settings from viewers (API rejects mutations, but no need to show UI)
+  const isViewer = userRole === "viewer" && globalRole !== "platform_admin";
+  const visibleNavItems = isViewer
+    ? navItems.filter((item) => item.label !== "Configurações")
+    : navItems;
   const router = useRouter();
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};
@@ -106,8 +114,8 @@ export default function Sidebar({
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" });
-    localStorage.removeItem("ca_tenant");
-    localStorage.removeItem("ca_user");
+    sessionStorage.removeItem("ca_tenant");
+    sessionStorage.removeItem("ca_user");
     router.push("/login");
   }
 
@@ -146,7 +154,7 @@ export default function Sidebar({
 
       {/* Nav */}
       <nav className={`flex-1 py-3 space-y-0.5 overflow-y-auto ${collapsed ? "px-1.5" : "px-3"}`}>
-        {navItems.map((item) => {
+        {visibleNavItems.map((item) => {
           const Icon = item.icon;
           const hasChildren = !!item.children;
           const parentActive = isParentActive(item);

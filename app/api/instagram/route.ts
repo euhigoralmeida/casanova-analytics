@@ -11,6 +11,7 @@ import {
   fetchIGOnlineFollowers,
 } from "@/lib/instagram";
 import type { IGInsightsResponse } from "@/lib/instagram";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
@@ -83,7 +84,7 @@ export async function GET(request: NextRequest) {
       onlineFollowers,
     } satisfies IGInsightsResponse);
   } catch (err) {
-    console.error("Instagram API error:", err);
+    logger.error("Instagram API error", { route: "/api/instagram", tenantId }, err);
     return NextResponse.json({
       source: "not_configured",
       updatedAt: new Date().toISOString(),

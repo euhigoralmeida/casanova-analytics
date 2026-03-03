@@ -21,7 +21,7 @@ export type Tenant = {
 const FALLBACK_TENANTS: Tenant[] = [
   {
     id: "casanova",
-    name: "Casanova Metais",
+    name: "Casanova",
     slug: "casanova",
     logo: "/logo-casanova.png",
     users: [

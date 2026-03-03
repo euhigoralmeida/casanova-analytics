@@ -4,6 +4,7 @@ import { fetchEcommerceFunnel, fetchGA4Summary, fetchGA4FunnelTimeSeries, fetchC
 import { getClarityDashboardUrl, getClarityFromDB } from "@/lib/clarity";
 import { requireAuth, requireTenantContext } from "@/lib/api-helpers";
 import type { CRODataResponse } from "@/types/api";
+import { logger } from "@/lib/logger";
 
 
 /* =========================
@@ -65,7 +66,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json(response);
   } catch (err) {
-    console.error("CRO API error:", err);
+    logger.error("CRO API error", { route: "/api/cro", tenantId }, err);
     return NextResponse.json({ source: "error", error: "Erro interno ao buscar dados CRO" }, { status: 500 });
   }
 }

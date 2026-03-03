@@ -4,6 +4,7 @@ import { getSession } from "@/lib/auth";
 import { requireTenantContext } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
 import bcrypt from "bcryptjs";
+import { logger } from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
   const session = getSession(req);
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ user, tempPassword });
   } catch (e) {
-    console.error("Team create error:", e);
+    logger.error("Team create error", { route: "/api/settings/team", tenantId }, e);
     return NextResponse.json({ error: "Erro ao criar usuário" }, { status: 500 });
   }
 }

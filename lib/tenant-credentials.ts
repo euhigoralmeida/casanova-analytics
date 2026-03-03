@@ -159,13 +159,39 @@ function getEnvCredentials(platform: Platform): Record<string, string> | null {
   }
 }
 
-/** Invalidate cached credentials for a tenant+platform (e.g., after update). */
+/** Invalidate cached credentials AND API clients for a tenant+platform (e.g., after update). */
 export function invalidateCredentialsCache(tenantId: string, platform?: Platform): void {
   if (platform) {
     cache.delete(`${tenantId}:${platform}`);
+    clearApiClients(tenantId, platform);
   } else {
     for (const key of cache.keys()) {
       if (key.startsWith(`${tenantId}:`)) cache.delete(key);
     }
+    clearApiClients(tenantId);
+  }
+}
+
+/**
+ * Clear in-memory API client instances so they are re-created
+ * with fresh credentials on next use.
+ * Lazy-imported to avoid circular deps.
+ */
+function clearApiClients(tenantId: string, platform?: Platform): void {
+  // Dynamic imports would be cleaner but we need sync.
+  // These are safe to import since they only reference Maps.
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { clearGoogleAdsClients } = require("@/lib/google-ads");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { clearGA4Clients } = require("@/lib/google-analytics");
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { clearGSCClients } = require("@/lib/google-search-console");
+
+    if (!platform || platform === "google_ads") clearGoogleAdsClients(tenantId);
+    if (!platform || platform === "ga4") clearGA4Clients(tenantId);
+    if (!platform || platform === "google_search_console") clearGSCClients(tenantId);
+  } catch {
+    // Client modules not loaded yet — no cached clients to clear
   }
 }

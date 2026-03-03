@@ -6,6 +6,7 @@ import {
   fetchMetaTimeSeries,
 } from "@/lib/meta-ads";
 import type { MetaAdsResponse } from "@/lib/meta-ads";
+import { logger } from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   const auth = requireAuth(request);
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest) {
       timeSeries,
     } satisfies MetaAdsResponse);
   } catch (err) {
-    console.error("Meta Ads API error:", err);
+    logger.error("Meta Ads API error", { route: "/api/meta", tenantId }, err);
     return NextResponse.json({
       source: "not_configured",
       updatedAt: new Date().toISOString(),

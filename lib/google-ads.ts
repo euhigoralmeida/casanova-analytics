@@ -19,6 +19,12 @@ export function isConfigured(): boolean {
 const _clients = new Map<string, GoogleAdsApi>();
 const _customers = new Map<string, Customer>();
 
+/** Clear cached clients for a tenant (call when credentials are rotated). */
+export function clearGoogleAdsClients(tenantId: string): void {
+  _clients.delete(tenantId);
+  _customers.delete(tenantId);
+}
+
 /**
  * Get a Google Ads Customer for a tenant.
  * Returns null if the tenant has no Google Ads credentials configured.

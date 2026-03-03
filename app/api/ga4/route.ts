@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getGA4ClientAsync } from "@/lib/google-analytics";
 import { fetchEcommerceFunnel, fetchGA4Summary, fetchGA4FunnelTimeSeries, fetchChannelAcquisition } from "@/lib/ga4-queries";
 import { requireAuth, requireTenantContext } from "@/lib/api-helpers";
+import { logger } from "@/lib/logger";
 
 /* =========================
    GET handler — v2
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
       channelAcquisition,
     });
   } catch (err) {
-    console.error("GA4 API error:", err);
+    logger.error("GA4 API error", { route: "/api/ga4", tenantId }, err);
     return NextResponse.json({ source: "error", error: "Erro interno ao buscar dados GA4" }, { status: 500 });
   }
 }

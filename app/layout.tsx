@@ -14,7 +14,10 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "FiveP Analytics",
-  description: "Dashboard de métricas por SKU — ROAS, CPA, margem, estoque",
+  description: "Fivep - Sistema Operacional",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

@@ -7,6 +7,7 @@
  */
 
 import { getTenantCredentials } from "@/lib/tenant-credentials";
+import { logger } from "@/lib/logger";
 
 const GRAPH_API_VERSION = "v21.0";
 const BASE_URL = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
@@ -113,7 +114,7 @@ async function graphFetch(path: string, params: Record<string, string>, accessTo
   const res = await fetch(url.toString(), { next: { revalidate: 0 } });
   if (!res.ok) {
     const body = await res.text();
-    console.error(`Meta Graph API error (${res.status}):`, body);
+    logger.error("Meta Graph API error", { route: "lib/meta-ads", statusCode: res.status }, body);
     throw new Error(`Meta API ${res.status}: ${body.slice(0, 200)}`);
   }
   return res.json();

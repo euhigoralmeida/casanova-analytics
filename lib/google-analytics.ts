@@ -17,6 +17,12 @@ export function isGA4Configured(): boolean {
 const _clients = new Map<string, BetaAnalyticsDataClient>();
 const _propertyIds = new Map<string, string>();
 
+/** Clear cached clients for a tenant (call when credentials are rotated). */
+export function clearGA4Clients(tenantId: string): void {
+  _clients.delete(tenantId);
+  _propertyIds.delete(tenantId);
+}
+
 function getPrivateKey(): string {
   if (process.env.GA4_PRIVATE_KEY_BASE64) {
     return Buffer.from(process.env.GA4_PRIVATE_KEY_BASE64, "base64").toString("utf-8");

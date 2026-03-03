@@ -73,3 +73,25 @@ export function requirePlatformAdmin(req: NextRequest): AuthSuccess | AuthFailur
   }
   return auth;
 }
+
+type TenantAuthContext = {
+  session: SessionPayload;
+  tenantId: string;
+};
+
+/**
+ * Combined auth + tenant context resolution.
+ * Returns session + effective tenantId, or an error response.
+ * Use this in data API routes to avoid repeating auth + tenant boilerplate.
+ */
+export function withTenantAuth(req: NextRequest): { ctx: TenantAuthContext } | AuthFailure {
+  const auth = requireAuth(req);
+  if ("error" in auth) return auth;
+
+  const tenantId = requireTenantContext(auth.session);
+  if (!tenantId) {
+    return { error: NextResponse.json({ error: "Nenhum tenant selecionado" }, { status: 400 }) };
+  }
+
+  return { ctx: { session: auth.session, tenantId } };
+}

@@ -5,6 +5,7 @@ import { getCustomerAsync } from "@/lib/google-ads";
 import { getGA4ClientAsync } from "@/lib/google-analytics";
 import { fetchAccountTotals } from "@/lib/queries";
 import { fetchGA4Summary, fetchChannelAcquisition } from "@/lib/ga4-queries";
+import { logger } from "@/lib/logger";
 
 function daysInMonth(year: number, month: number): number {
   return new Date(year, month, 0).getDate();
@@ -63,7 +64,7 @@ async function fetchMonthDataRange(
       }
     }
   } catch (err) {
-    console.error(`Sync: Google Ads error for month ${month}:`, err);
+    logger.error("Sync: Google Ads error", { route: "/api/planning/sync", tenantId, month }, err);
   }
 
   // GA4 data
@@ -92,7 +93,7 @@ async function fetchMonthDataRange(
         { metric: "taxa_rejeicao", month, value: Math.round(summary.bounceRate * 10000) / 10000 },
       );
   } catch (err) {
-    console.error(`Sync: GA4 error for month ${month}:`, err);
+    logger.error("Sync: GA4 error", { route: "/api/planning/sync", tenantId, month }, err);
   }
 
   return entries;
