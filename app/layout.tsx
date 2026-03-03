@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FiveP Analytics",
+  title: "Fivep - Sistema Operacional",
   description: "Fivep - Sistema Operacional",
   icons: {
     icon: "/icon.svg",
