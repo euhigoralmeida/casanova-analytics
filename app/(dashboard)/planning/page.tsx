@@ -266,10 +266,11 @@ export default function PlanningPage() {
       setSyncStatus("synced");
 
       setTimeout(() => setSyncStatus("idle"), 10000);
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Erro ao sincronizar";
       setSyncStatus("error");
-      setSyncWarnings([]);
-      setTimeout(() => setSyncStatus("idle"), 5000);
+      setSyncWarnings([msg]);
+      setTimeout(() => setSyncStatus("idle"), 10000);
     }
   }, [year]);
 
@@ -478,9 +479,9 @@ export default function PlanningPage() {
       </div>
 
       {/* Sync warnings */}
-      {isActual && syncWarnings.length > 0 && syncStatus === "synced" && (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          <p className="font-medium mb-1">Algumas fontes não foram sincronizadas:</p>
+      {isActual && syncWarnings.length > 0 && (syncStatus === "synced" || syncStatus === "error") && (
+        <div className={`rounded-xl border p-4 text-sm ${syncStatus === "error" ? "border-red-200 bg-red-50 text-red-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+          <p className="font-medium mb-1">{syncStatus === "error" ? "Erro na sincronização:" : "Algumas fontes não foram sincronizadas:"}</p>
           <ul className="list-disc list-inside space-y-0.5">
             {syncWarnings.map((w, i) => <li key={i}>{w}</li>)}
           </ul>

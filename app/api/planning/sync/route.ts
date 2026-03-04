@@ -189,85 +189,91 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ano futuro, sem dados para sincronizar" }, { status: 400 });
   }
 
-  // Fetch data for each month (sequentially to avoid rate limits)
-  const allEntries: SyncEntry[] = [];
-  const sourceStatuses = new Map<string, SourceStatus>();
-  for (let m = 1; m <= maxMonth; m++) {
-    const monthEntries = await fetchMonthData(year, m, tenantId, sourceStatuses);
-    allEntries.push(...monthEntries);
-  }
-
-  // Build warnings from source statuses
-  const warnings: string[] = [];
-  for (const [, s] of sourceStatuses) {
-    if (s.status === "not_configured") {
-      warnings.push(`${s.source}: ${s.detail}`);
-    } else if (s.status === "error") {
-      warnings.push(`${s.source}: Erro — ${s.detail}`);
+  try {
+    // Fetch data for each month (sequentially to avoid rate limits)
+    const allEntries: SyncEntry[] = [];
+    const sourceStatuses = new Map<string, SourceStatus>();
+    for (let m = 1; m <= maxMonth; m++) {
+      const monthEntries = await fetchMonthData(year, m, tenantId, sourceStatuses);
+      allEntries.push(...monthEntries);
     }
-  }
 
-  if (allEntries.length === 0) {
-    return NextResponse.json({
-      error: "Nenhum dado disponível nas plataformas",
-      warnings,
-    }, { status: 404 });
-  }
+    // Build warnings from source statuses
+    const warnings: string[] = [];
+    for (const [, s] of sourceStatuses) {
+      if (s.status === "not_configured") {
+        warnings.push(`${s.source}: ${s.detail}`);
+      } else if (s.status === "error") {
+        warnings.push(`${s.source}: Erro — ${s.detail}`);
+      }
+    }
 
-  // Upsert all sync entries — always overwrites since these are platform-owned metrics
-  for (const e of allEntries) {
-    await prisma.planningEntry.upsert({
-      where: {
-        tenantId_year_month_metric_planType: {
+    if (allEntries.length === 0) {
+      return NextResponse.json({
+        error: "Nenhum dado disponível nas plataformas",
+        warnings,
+      }, { status: 404 });
+    }
+
+    // Upsert all sync entries — always overwrites since these are platform-owned metrics
+    for (const e of allEntries) {
+      await prisma.planningEntry.upsert({
+        where: {
+          tenantId_year_month_metric_planType: {
+            tenantId: tenantId,
+            year,
+            month: e.month,
+            metric: e.metric,
+            planType: "actual",
+          },
+        },
+        update: { value: e.value, source: "sync" },
+        create: {
           tenantId: tenantId,
           year,
           month: e.month,
           metric: e.metric,
+          value: e.value,
+          source: "sync",
           planType: "actual",
         },
-      },
-      update: { value: e.value, source: "sync" },
-      create: {
+      });
+    }
+
+    // Log the sync
+    await prisma.planningSyncLog.create({
+      data: {
         tenantId: tenantId,
         year,
-        month: e.month,
-        metric: e.metric,
-        value: e.value,
-        source: "sync",
-        planType: "actual",
+        metrics: allEntries.length,
       },
     });
-  }
 
-  // Log the sync
-  await prisma.planningSyncLog.create({
-    data: {
-      tenantId: tenantId,
+    // Return updated data
+    const rows = await prisma.planningEntry.findMany({
+      where: { tenantId: tenantId, year, planType: "actual" },
+    });
+
+    const entries: Record<number, Record<string, number>> = {};
+    const sources: Record<number, Record<string, string>> = {};
+    for (const row of rows) {
+      if (!entries[row.month]) entries[row.month] = {};
+      entries[row.month][row.metric] = row.value;
+      if (!sources[row.month]) sources[row.month] = {};
+      sources[row.month][row.metric] = row.source;
+    }
+
+    return NextResponse.json({
       year,
-      metrics: allEntries.length,
-    },
-  });
-
-  // Return updated data
-  const rows = await prisma.planningEntry.findMany({
-    where: { tenantId: tenantId, year, planType: "actual" },
-  });
-
-  const entries: Record<number, Record<string, number>> = {};
-  const sources: Record<number, Record<string, string>> = {};
-  for (const row of rows) {
-    if (!entries[row.month]) entries[row.month] = {};
-    entries[row.month][row.metric] = row.value;
-    if (!sources[row.month]) sources[row.month] = {};
-    sources[row.month][row.metric] = row.source;
+      entries,
+      sources,
+      syncedAt: new Date().toISOString(),
+      syncedMetrics: allEntries.length,
+      warnings,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error("Sync: unhandled error", { route: "/api/planning/sync", tenantId, year }, err);
+    return NextResponse.json({ error: `Erro interno: ${msg.slice(0, 300)}` }, { status: 500 });
   }
-
-  return NextResponse.json({
-    year,
-    entries,
-    sources,
-    syncedAt: new Date().toISOString(),
-    syncedMetrics: allEntries.length,
-    warnings,
-  });
 }
