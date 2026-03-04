@@ -252,6 +252,9 @@ export default function PlanningPage() {
 
       if (!res.ok) {
         const err = await res.json();
+        if (err.warnings?.length) {
+          setSyncWarnings([err.error, ...err.warnings]);
+        }
         throw new Error(err.error ?? "Erro ao sincronizar");
       }
 
