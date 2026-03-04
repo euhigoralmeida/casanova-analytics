@@ -440,7 +440,7 @@ export default function PlanningPage() {
                 Editável
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="inline-block h-3 w-3 rounded border border-zinc-200 bg-zinc-50" />
+                <span className="inline-block h-3 w-3 rounded border border-amber-200 bg-amber-50" />
                 Cálculo automático
               </span>
               <span className="flex items-center gap-1.5">

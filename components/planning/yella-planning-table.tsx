@@ -234,13 +234,13 @@ function SectionBlock({
           <tr
             key={row.key}
             className={`${
-              isCalc ? "bg-zinc-50" : isSyncable ? "bg-zinc-100" : "bg-white hover:bg-zinc-50"
+              isCalc ? "bg-amber-50" : isSyncable ? "bg-zinc-100" : "bg-white hover:bg-zinc-50"
             } border-b border-zinc-100`}
           >
             {/* Metric label */}
             <td
               className={`sticky left-0 z-10 border-r border-zinc-200 py-1 text-xs font-medium whitespace-nowrap ${
-                isCalc ? "bg-zinc-50 text-zinc-600" : isSyncable ? "bg-zinc-100 text-zinc-700" : "bg-white text-zinc-800"
+                isCalc ? "bg-amber-50 text-amber-900" : isSyncable ? "bg-zinc-100 text-zinc-700" : "bg-white text-zinc-800"
               }`}
               style={{ paddingLeft: `${paddingLeft}px`, paddingRight: "12px" }}
               title={row.formula ?? undefined}
@@ -252,7 +252,7 @@ function SectionBlock({
                   onChange={(name) => onNameChange(row.labelKey!, name)}
                 />
               ) : (
-                <span className={`${row.formula ? "cursor-help border-b border-dashed border-zinc-400" : ""} ${indent > 0 ? "text-zinc-600 italic" : ""}`}>
+                <span className={`${row.formula ? "cursor-help border-b border-dashed border-amber-400" : ""} ${indent > 0 ? "text-zinc-600 italic" : ""}`}>
                   {displayLabel}
                 </span>
               )}
@@ -269,7 +269,7 @@ function SectionBlock({
                 return (
                   <td
                     key={month}
-                    className="border border-zinc-200 px-1.5 py-0.5 text-right text-xs bg-zinc-50 font-medium text-zinc-700"
+                    className="border border-zinc-200 px-1.5 py-0.5 text-right text-xs bg-amber-50 font-medium text-zinc-700"
                     title={isEmpty ? "Sem dados suficientes para cálculo" : undefined}
                   >
                     <span className={isEmpty ? "text-zinc-400" : ""}>
@@ -293,7 +293,7 @@ function SectionBlock({
             {/* TOTAL column */}
             <td
               className={`border border-zinc-300 px-1.5 py-0.5 text-right text-xs font-bold ${
-                isCalc ? "bg-zinc-100 text-zinc-900" : "bg-blue-50 text-zinc-900"
+                isCalc ? "bg-amber-100 text-zinc-900" : "bg-blue-50 text-zinc-900"
               }`}
               title={totals[row.key] == null ? "Sem dados suficientes" : undefined}
             >
