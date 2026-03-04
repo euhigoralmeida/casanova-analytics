@@ -11,6 +11,7 @@ import DateRangePicker from "@/components/ui/date-range-picker";
 import OrganicTrendChart from "@/components/charts/organic-trend-chart";
 import KeywordPositionChart from "@/components/charts/keyword-position-chart";
 import CannibalizationChart from "@/components/charts/cannibalization-chart";
+import { EmptyIntegrationState } from "@/components/ui/empty-integration-state";
 import { KpiSkeleton, ChartSkeleton, TableSkeleton } from "@/components/ui/skeleton";
 import {
   RefreshCw,
@@ -190,25 +191,10 @@ export default function OrganicPage() {
 
       {/* --- NOT CONFIGURED --- */}
       {data?.source === "not_configured" && (
-        <div className="rounded-2xl border border-zinc-200 bg-white p-8">
-          <div className="max-w-lg mx-auto text-center">
-            <div className="mx-auto w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center mb-4">
-              <Search className="h-6 w-6 text-emerald-600" />
-            </div>
-            <p className="text-lg font-semibold text-zinc-700 mb-2">Configuracao necessaria</p>
-            <p className="text-sm text-zinc-500 mb-6">Para visualizar dados de inteligencia organica, configure as credenciais do Google Search Console no <code className="text-xs bg-zinc-100 px-1.5 py-0.5 rounded">.env.local</code></p>
-            <div className="rounded-xl border border-zinc-200 p-4 text-left">
-              <p className="text-sm font-semibold text-zinc-700 mb-1">Google Search Console</p>
-              <p className="text-xs text-zinc-500 mb-2">Keywords, posicoes, cliques e impressoes organicas</p>
-              <div className="space-y-1">
-                <code className="block text-[10px] text-zinc-400 bg-zinc-50 px-2 py-1 rounded">GSC_CLIENT_EMAIL</code>
-                <code className="block text-[10px] text-zinc-400 bg-zinc-50 px-2 py-1 rounded">GSC_PRIVATE_KEY_BASE64</code>
-                <code className="block text-[10px] text-zinc-400 bg-zinc-50 px-2 py-1 rounded">GSC_SITE_URL</code>
-              </div>
-              <p className="text-xs text-zinc-400 mt-3">Opcional: GA4 (receita organica) + Google Ads (canibalizacao)</p>
-            </div>
-          </div>
-        </div>
+        <EmptyIntegrationState
+          platform="Google Search Console"
+          message="Para visualizar dados de inteligência orgânica (keywords, posições, cliques), configure a integração com o Google Search Console."
+        />
       )}
 
       {/* --- SAVINGS BADGE --- */}

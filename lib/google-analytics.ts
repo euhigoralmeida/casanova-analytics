@@ -13,9 +13,10 @@ export function isGA4Configured(): boolean {
   );
 }
 
-// Multi-tenant: Map de clients por tenantId
-const _clients = new Map<string, BetaAnalyticsDataClient>();
-const _propertyIds = new Map<string, string>();
+// Multi-tenant: Map de clients por tenantId (with TTL)
+const CLIENT_TTL = 5 * 60 * 1000; // 5 minutes
+const _clients = new Map<string, { client: BetaAnalyticsDataClient; ts: number }>();
+const _propertyIds = new Map<string, { id: string; ts: number }>();
 
 /** Clear cached clients for a tenant (call when credentials are rotated). */
 export function clearGA4Clients(tenantId: string): void {
@@ -34,16 +35,16 @@ function getPrivateKey(): string {
 /** Sync version (env vars only) — backward compatible. */
 export function getGA4Client(tenantId?: string): BetaAnalyticsDataClient {
   const key = tenantId ?? "default";
-  let client = _clients.get(key);
-  if (!client) {
-    client = new BetaAnalyticsDataClient({
-      credentials: {
-        client_email: process.env.GA4_CLIENT_EMAIL!,
-        private_key: getPrivateKey(),
-      },
-    });
-    _clients.set(key, client);
-  }
+  const entry = _clients.get(key);
+  if (entry && Date.now() - entry.ts < CLIENT_TTL) return entry.client;
+
+  const client = new BetaAnalyticsDataClient({
+    credentials: {
+      client_email: process.env.GA4_CLIENT_EMAIL!,
+      private_key: getPrivateKey(),
+    },
+  });
+  _clients.set(key, { client, ts: Date.now() });
   return client;
 }
 
@@ -54,19 +55,24 @@ export function getGA4Client(tenantId?: string): BetaAnalyticsDataClient {
 export async function getGA4ClientAsync(tenantId?: string): Promise<BetaAnalyticsDataClient | null> {
   const key = tenantId ?? "default";
   const existing = _clients.get(key);
-  if (existing) return existing;
+  if (existing && Date.now() - existing.ts < CLIENT_TTL) return existing.client;
+
+  // TTL expired or not cached
+  _clients.delete(key);
+  _propertyIds.delete(key);
 
   const creds = await getTenantCredentials(tenantId, "ga4");
   if (!creds) return null;
 
+  const now = Date.now();
   const client = new BetaAnalyticsDataClient({
     credentials: {
       client_email: creds.client_email,
       private_key: creds.private_key,
     },
   });
-  _propertyIds.set(key, creds.property_id);
-  _clients.set(key, client);
+  _propertyIds.set(key, { id: creds.property_id, ts: now });
+  _clients.set(key, { client, ts: now });
   return client;
 }
 
@@ -77,6 +83,6 @@ export async function getGA4ClientAsync(tenantId?: string): Promise<BetaAnalytic
 export function getPropertyId(tenantId?: string): string | null {
   const key = tenantId ?? "default";
   const cached = _propertyIds.get(key);
-  if (cached) return `properties/${cached}`;
+  if (cached && Date.now() - cached.ts < CLIENT_TTL) return `properties/${cached.id}`;
   return null;
 }

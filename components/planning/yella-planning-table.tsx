@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useCallback, useRef } from "react";
+import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import {
   YELLA_PLANNING_ROWS,
@@ -31,24 +31,6 @@ const SYNCABLE_METRICS = new Set([
 ]);
 
 type SourcesMap = Record<number, Record<string, string>>;
-
-const INFLU_NAMES_STORAGE_KEY = "yella_influ_names";
-
-function loadInfluNames(): Record<string, string> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = localStorage.getItem(INFLU_NAMES_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveInfluNames(names: Record<string, string>) {
-  try {
-    localStorage.setItem(INFLU_NAMES_STORAGE_KEY, JSON.stringify(names));
-  } catch { /* ignore */ }
-}
 
 function formatDisplay(value: number | undefined | null, format: PlanningRowFormat): string {
   if (value == null) return "\u2014";
@@ -102,12 +84,31 @@ export function YellaPlanningTable({ data, sources, onCellChange }: YellaPlannin
   const { months, totals } = useMemo(() => computeYellaFullYear(data), [data]);
   const sectionGroups = useMemo(() => getRowsBySection(), []);
   const [influsExpanded, setInflusExpanded] = useState(false);
-  const [influNames, setInfluNames] = useState<Record<string, string>>(loadInfluNames);
+  const [influNames, setInfluNames] = useState<Record<string, string>>({});
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Load influencer names from DB on mount
+  useEffect(() => {
+    fetch("/api/planning/influ-names")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data?.names) setInfluNames(data.names);
+      })
+      .catch(() => { /* ignore */ });
+  }, []);
 
   const handleNameChange = useCallback((labelKey: string, name: string) => {
     setInfluNames((prev) => {
       const next = { ...prev, [labelKey]: name };
-      saveInfluNames(next);
+      // Debounce save to DB (500ms)
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = setTimeout(() => {
+        fetch("/api/planning/influ-names", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ names: next }),
+        }).catch(() => { /* ignore */ });
+      }, 500);
       return next;
     });
   }, []);

@@ -164,7 +164,7 @@ export async function POST(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
-  if (session.role !== "admin") {
+  if (session.role !== "admin" && session.globalRole !== "platform_admin") {
     return NextResponse.json({ error: "Permissão negada" }, { status: 403 });
   }
   const tenantId = requireTenantContext(session);

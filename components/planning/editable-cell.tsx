@@ -35,13 +35,34 @@ function parseInput(raw: string, format: PlanningRowFormat): number | undefined 
   return num;
 }
 
+function validateValue(value: number | undefined, format: PlanningRowFormat): string | null {
+  if (value == null) return null;
+  switch (format) {
+    case "currency":
+      if (value < 0) return "Valor não pode ser negativo";
+      return null;
+    case "percent":
+      if (value < 0) return "Percentual não pode ser negativo";
+      if (value > 1) return "Percentual não pode ser maior que 100%";
+      return null;
+    case "number":
+    case "number2":
+      if (value < 0) return "Valor não pode ser negativo";
+      return null;
+    default:
+      return null;
+  }
+}
+
 export function EditableCell({ value, format, synced, onChange }: EditableCellProps) {
   const [editing, setEditing] = useState(false);
   const [rawValue, setRawValue] = useState("");
+  const [validationError, setValidationError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFocus = useCallback(() => {
     setEditing(true);
+    setValidationError(null);
     if (value != null) {
       if (format === "percent") {
         setRawValue((value * 100).toFixed(2).replace(".", ","));
@@ -56,8 +77,15 @@ export function EditableCell({ value, format, synced, onChange }: EditableCellPr
   }, [value, format]);
 
   const handleBlur = useCallback(() => {
-    setEditing(false);
     const parsed = parseInput(rawValue, format);
+    const error = validateValue(parsed, format);
+    if (error) {
+      setValidationError(error);
+      // Keep editing so user can fix
+      return;
+    }
+    setEditing(false);
+    setValidationError(null);
     if (parsed !== value) {
       onChange(parsed);
     }
@@ -70,6 +98,7 @@ export function EditableCell({ value, format, synced, onChange }: EditableCellPr
       } else if (e.key === "Escape") {
         setEditing(false);
         setRawValue("");
+        setValidationError(null);
       }
     },
     []
@@ -78,7 +107,7 @@ export function EditableCell({ value, format, synced, onChange }: EditableCellPr
   return (
     <td
       className={`border border-zinc-200 px-1 py-0.5 ${synced ? "bg-zinc-100" : ""}`}
-      title={synced ? "Preenchido automaticamente via plataforma" : undefined}
+      title={synced ? "Preenchido automaticamente via plataforma" : validationError ?? undefined}
     >
       {editing ? (
         <input
@@ -86,11 +115,14 @@ export function EditableCell({ value, format, synced, onChange }: EditableCellPr
           type="text"
           inputMode="decimal"
           value={rawValue}
-          onChange={(e) => setRawValue(e.target.value)}
+          onChange={(e) => { setRawValue(e.target.value); setValidationError(null); }}
           onBlur={handleBlur}
           onKeyDown={handleKeyDown}
           autoFocus
-          className="w-full rounded bg-white px-1.5 py-0.5 text-right text-xs font-medium text-zinc-900 outline-none ring-2 ring-blue-500"
+          className={`w-full rounded bg-white px-1.5 py-0.5 text-right text-xs font-medium text-zinc-900 outline-none ring-2 ${
+            validationError ? "ring-red-500" : "ring-blue-500"
+          }`}
+          title={validationError ?? undefined}
         />
       ) : (
         <button

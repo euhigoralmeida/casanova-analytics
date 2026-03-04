@@ -15,9 +15,10 @@ export function isConfigured(): boolean {
   );
 }
 
-// Multi-tenant: Map de clients por tenantId
-const _clients = new Map<string, GoogleAdsApi>();
-const _customers = new Map<string, Customer>();
+// Multi-tenant: Map de clients por tenantId (with TTL)
+const CLIENT_TTL = 5 * 60 * 1000; // 5 minutes
+const _clients = new Map<string, { api: GoogleAdsApi; ts: number }>();
+const _customers = new Map<string, { customer: Customer; ts: number }>();
 
 /** Clear cached clients for a tenant (call when credentials are rotated). */
 export function clearGoogleAdsClients(tenantId: string): void {
@@ -32,26 +33,34 @@ export function clearGoogleAdsClients(tenantId: string): void {
 export async function getCustomerAsync(tenantId?: string): Promise<Customer | null> {
   const key = tenantId ?? "default";
   const existing = _customers.get(key);
-  if (existing) return existing;
+  if (existing && Date.now() - existing.ts < CLIENT_TTL) return existing.customer;
+
+  // TTL expired or not cached — remove stale entries
+  _clients.delete(key);
+  _customers.delete(key);
 
   const creds = await getTenantCredentials(tenantId, "google_ads");
   if (!creds) return null;
 
-  let client = _clients.get(key);
-  if (!client) {
+  const now = Date.now();
+  const entry = _clients.get(key);
+  let client: GoogleAdsApi;
+  if (!entry) {
     client = new GoogleAdsApi({
       client_id: creds.client_id,
       client_secret: creds.client_secret,
       developer_token: creds.developer_token,
     });
-    _clients.set(key, client);
+    _clients.set(key, { api: client, ts: now });
+  } else {
+    client = entry.api;
   }
   const customer = client.Customer({
     customer_id: creds.customer_id,
     login_customer_id: creds.login_customer_id || undefined,
     refresh_token: creds.refresh_token,
   });
-  _customers.set(key, customer);
+  _customers.set(key, { customer, ts: now });
   return customer;
 }
 

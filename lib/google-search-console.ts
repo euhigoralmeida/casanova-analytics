@@ -17,8 +17,9 @@ export function isGSCConfigured(): boolean {
   return !!(process.env.GSC_SITE_URL && (hasGSCCreds || hasGA4Creds));
 }
 
-// Multi-tenant: Map de clients por tenantId
-const _clients = new Map<string, searchconsole_v1.Searchconsole>();
+// Multi-tenant: Map de clients por tenantId (with TTL)
+const CLIENT_TTL = 5 * 60 * 1000; // 5 minutes
+const _clients = new Map<string, { client: searchconsole_v1.Searchconsole; ts: number }>();
 
 /** Clear cached clients for a tenant (call when credentials are rotated). */
 export function clearGSCClients(tenantId: string): void {
@@ -48,16 +49,16 @@ function getClientEmail(): string {
 /** Sync version (env vars only). */
 export function getGSCClient(tenantId?: string): searchconsole_v1.Searchconsole {
   const key = tenantId ?? "default";
-  let client = _clients.get(key);
-  if (!client) {
-    const auth = new google.auth.JWT({
-      email: getClientEmail(),
-      key: getPrivateKey(),
-      scopes: ["https://www.googleapis.com/auth/webmasters.readonly"],
-    });
-    client = google.searchconsole({ version: "v1", auth });
-    _clients.set(key, client);
-  }
+  const entry = _clients.get(key);
+  if (entry && Date.now() - entry.ts < CLIENT_TTL) return entry.client;
+
+  const auth = new google.auth.JWT({
+    email: getClientEmail(),
+    key: getPrivateKey(),
+    scopes: ["https://www.googleapis.com/auth/webmasters.readonly"],
+  });
+  const client = google.searchconsole({ version: "v1", auth });
+  _clients.set(key, { client, ts: Date.now() });
   return client;
 }
 
@@ -68,7 +69,11 @@ export function getGSCClient(tenantId?: string): searchconsole_v1.Searchconsole 
 export async function getGSCClientAsync(tenantId?: string): Promise<searchconsole_v1.Searchconsole | null> {
   const key = tenantId ?? "default";
   const existing = _clients.get(key);
-  if (existing) return existing;
+  if (existing && Date.now() - existing.ts < CLIENT_TTL) return existing.client;
+
+  // TTL expired or not cached
+  _clients.delete(key);
+  _siteUrls.delete(key);
 
   const creds = await getTenantCredentials(tenantId, "google_search_console");
   if (!creds) return null;
@@ -84,7 +89,7 @@ export async function getGSCClientAsync(tenantId?: string): Promise<searchconsol
     scopes: ["https://www.googleapis.com/auth/webmasters.readonly"],
   });
   const client = google.searchconsole({ version: "v1", auth });
-  _clients.set(key, client);
+  _clients.set(key, { client, ts: Date.now() });
   return client;
 }
 
