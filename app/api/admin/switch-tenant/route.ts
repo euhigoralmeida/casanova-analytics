@@ -23,9 +23,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Tenant não encontrado" }, { status: 404 });
   }
 
-  // Re-issue token with the new activeTenantId
+  // Re-issue token with the new activeTenantId (always use the resolved DB ID)
   // If switching back to own tenant, clear activeTenantId
-  const activeTenantId = tenantId === session.tenantId ? undefined : tenantId;
+  const activeTenantId = tenant.id === session.tenantId ? undefined : tenant.id;
 
   const token = createSessionToken(session.tenantId, session.email, session.role, {
     globalRole: session.globalRole,
