@@ -29,16 +29,21 @@ async function main() {
   });
   console.log(`  ✓ Tenant: ${tenant.name} (${tenant.id})`);
 
-  // Upsert admin user (same password hash from hardcoded config)
+  // Delete old user (email changed from admin@casanova.com → casanova@fivep.com.br)
+  await prisma.user.deleteMany({
+    where: { tenantId: tenant.id, email: { not: "casanova@fivep.com.br" } },
+  });
+
+  // Upsert admin user
   const user = await prisma.user.upsert({
-    where: { tenantId_email: { tenantId: tenant.id, email: "admin@casanova.com" } },
-    update: { name: "Admin Casanova", role: "admin" },
+    where: { tenantId_email: { tenantId: tenant.id, email: "casanova@fivep.com.br" } },
+    update: { name: "Admin Casanova", role: "admin", passwordHash: "$2b$12$T2f9oRaehlbIR0/hnVJ12eoPdDiUJBfU8jV7VV1RiyO1pPUqmzRgu" },
     create: {
-      email: "admin@casanova.com",
+      email: "casanova@fivep.com.br",
       name: "Admin Casanova",
       role: "admin",
-      // Hash for "casanova2024"
-      passwordHash: "$2b$10$KmWh4VEMh1vOMCuXbe2KRe/lUansSYhDyKX7H5h/ZcEuDyKnfwWe2",
+      // Hash for "casanova2026$"
+      passwordHash: "$2b$12$T2f9oRaehlbIR0/hnVJ12eoPdDiUJBfU8jV7VV1RiyO1pPUqmzRgu",
       tenantId: tenant.id,
     },
   });
@@ -82,15 +87,21 @@ async function main() {
   });
   console.log(`  ✓ Tenant: ${fivepTenant.name} (${fivepTenant.id})`);
 
+  // Delete old user (email changed from contato@fivep.com.br → adm@fivep.com.br)
+  await prisma.user.deleteMany({
+    where: { tenantId: fivepTenant.id, email: { not: "adm@fivep.com.br" } },
+  });
+
   const fivepUser = await prisma.user.upsert({
-    where: { tenantId_email: { tenantId: fivepTenant.id, email: "contato@fivep.com.br" } },
-    update: { name: "Higo Almeida", role: "admin", globalRole: "platform_admin" },
+    where: { tenantId_email: { tenantId: fivepTenant.id, email: "adm@fivep.com.br" } },
+    update: { name: "Higo Almeida", role: "admin", globalRole: "platform_admin", passwordHash: "$2b$12$xTXW7iLmNQR6/HjF24oYvOI7g1/yI8fzBSL.VD9WWZB9rSZvbY7vy" },
     create: {
-      email: "contato@fivep.com.br",
+      email: "adm@fivep.com.br",
       name: "Higo Almeida",
       role: "admin",
       globalRole: "platform_admin",
-      passwordHash: "$2b$10$BP4iT6uj62HBkZ5COZ7IeuTVTsShRHW2T4ofZzIqv8GKy1lF1AEQG",
+      // Hash for "fivep2026$"
+      passwordHash: "$2b$12$xTXW7iLmNQR6/HjF24oYvOI7g1/yI8fzBSL.VD9WWZB9rSZvbY7vy",
       tenantId: fivepTenant.id,
     },
   });
@@ -112,15 +123,20 @@ async function main() {
   });
   console.log(`  ✓ Tenant: ${yellaTenant.name} (${yellaTenant.id})`);
 
+  // Delete old user (email changed from admin@yellalife.com → yella@fivep.com.br)
+  await prisma.user.deleteMany({
+    where: { tenantId: yellaTenant.id, email: { not: "yella@fivep.com.br" } },
+  });
+
   const yellaUser = await prisma.user.upsert({
-    where: { tenantId_email: { tenantId: yellaTenant.id, email: "admin@yellalife.com" } },
-    update: { name: "Admin Yella Life", role: "admin" },
+    where: { tenantId_email: { tenantId: yellaTenant.id, email: "yella@fivep.com.br" } },
+    update: { name: "Admin Yella Life", role: "admin", passwordHash: "$2b$12$WyHPLeDXsTxTI87w7Ic.JOByfM7POqDVngoU/c4di4dC3nDsfpXEW" },
     create: {
-      email: "admin@yellalife.com",
+      email: "yella@fivep.com.br",
       name: "Admin Yella Life",
       role: "admin",
-      // Hash for "yellalife2024"
-      passwordHash: "$2b$10$Il8qPPEBxJgtC3aBrv/ci.GwaP1qSdl117QdvmWarjZ6Y9tF6SSAG",
+      // Hash for "yella2026$"
+      passwordHash: "$2b$12$WyHPLeDXsTxTI87w7Ic.JOByfM7POqDVngoU/c4di4dC3nDsfpXEW",
       tenantId: yellaTenant.id,
     },
   });

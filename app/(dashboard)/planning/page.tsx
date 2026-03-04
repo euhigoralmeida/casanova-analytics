@@ -71,6 +71,7 @@ export default function PlanningPage() {
   const [syncedCount, setSyncedCount] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showSyncConfirm, setShowSyncConfirm] = useState(false);
+  const [syncWarnings, setSyncWarnings] = useState<string[]>([]);
 
   // Derived
   const isActual = activeTab === "actual";
@@ -259,13 +260,15 @@ export default function PlanningPage() {
       setActualSources(json.sources ?? {});
       setLastSyncedAt(json.syncedAt ?? null);
       setSyncedCount(json.syncedMetrics ?? 0);
+      setSyncWarnings(json.warnings ?? []);
       actualPending.current = [];
       setActualDirty(false);
       setSyncStatus("synced");
 
-      setTimeout(() => setSyncStatus("idle"), 5000);
+      setTimeout(() => setSyncStatus("idle"), 10000);
     } catch {
       setSyncStatus("error");
+      setSyncWarnings([]);
       setTimeout(() => setSyncStatus("idle"), 5000);
     }
   }, [year]);
@@ -339,6 +342,11 @@ export default function PlanningPage() {
           {isActual && syncStatus === "synced" && (
             <span className="flex items-center gap-1 text-xs text-emerald-600">
               <CheckCircle2 className="h-4 w-4" /> {syncedCount} métricas sincronizadas
+            </span>
+          )}
+          {isActual && syncStatus === "synced" && syncWarnings.length > 0 && (
+            <span className="flex items-center gap-1 text-xs text-amber-600" title={syncWarnings.join("\n")}>
+              <AlertCircle className="h-4 w-4" /> {syncWarnings.length} fonte(s) indisponível(is)
             </span>
           )}
           {isActual && syncStatus === "error" && (
@@ -428,6 +436,10 @@ export default function PlanningPage() {
                 <span className="inline-block h-3 w-3 rounded border border-zinc-200 bg-zinc-50" />
                 Cálculo automático
               </span>
+              <span className="flex items-center gap-1.5">
+                <span className="inline-block h-3 w-3 rounded border border-zinc-300 bg-zinc-100" />
+                Sincronizado (plataforma)
+              </span>
             </>
           ) : isActual ? (
             <>
@@ -465,6 +477,16 @@ export default function PlanningPage() {
         )}
       </div>
 
+      {/* Sync warnings */}
+      {isActual && syncWarnings.length > 0 && syncStatus === "synced" && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          <p className="font-medium mb-1">Algumas fontes não foram sincronizadas:</p>
+          <ul className="list-disc list-inside space-y-0.5">
+            {syncWarnings.map((w, i) => <li key={i}>{w}</li>)}
+          </ul>
+        </div>
+      )}
+
       {/* Error */}
       {loadError && (
         <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
@@ -487,6 +509,7 @@ export default function PlanningPage() {
       ) : isYella ? (
         <YellaPlanningTable
           data={actualData}
+          sources={actualSources}
           onCellChange={handleActualCellChange}
         />
       ) : (

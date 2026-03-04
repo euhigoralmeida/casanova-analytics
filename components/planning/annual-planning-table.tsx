@@ -11,6 +11,7 @@ const MONTHS = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "
 /** Metrics that are auto-synced from Google Ads / GA4 */
 const SYNCABLE_METRICS = new Set([
   "google_ads",
+  "meta_ads",
   "usuarios_visitantes",
   "sessoes_totais",
   "sessoes_midia",

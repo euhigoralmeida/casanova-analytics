@@ -14,6 +14,24 @@ import { EditableCell } from "./editable-cell";
 
 const MONTHS = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 
+/** Metrics that are auto-synced from platforms */
+const SYNCABLE_METRICS = new Set([
+  "google_ads",
+  "google_ads_faturamento",
+  "google_ads_vendas",
+  "meta_ads",
+  "meta_ads_faturamento",
+  "meta_ads_vendas",
+  "usuarios_visitantes",
+  "sessoes_totais",
+  "sessoes_midia",
+  "sessoes_organicas",
+  "sessoes_engajadas",
+  "taxa_rejeicao",
+]);
+
+type SourcesMap = Record<number, Record<string, string>>;
+
 const INFLU_NAMES_STORAGE_KEY = "yella_influ_names";
 
 function loadInfluNames(): Record<string, string> {
@@ -76,10 +94,11 @@ const INFLU_INDIVIDUAL_KEYS = new Set(
 
 interface YellaPlanningTableProps {
   data: PlanningYearData;
+  sources?: SourcesMap;
   onCellChange: (month: number, metric: string, value: number | undefined) => void;
 }
 
-export function YellaPlanningTable({ data, onCellChange }: YellaPlanningTableProps) {
+export function YellaPlanningTable({ data, sources, onCellChange }: YellaPlanningTableProps) {
   const { months, totals } = useMemo(() => computeYellaFullYear(data), [data]);
   const sectionGroups = useMemo(() => getRowsBySection(), []);
   const [influsExpanded, setInflusExpanded] = useState(false);
@@ -123,6 +142,7 @@ export function YellaPlanningTable({ data, onCellChange }: YellaPlanningTablePro
               months={months}
               totals={totals}
               rawData={data}
+              sources={sources}
               onCellChange={onCellChange}
               influsExpanded={influsExpanded}
               onToggleInflus={() => setInflusExpanded((prev) => !prev)}
@@ -146,6 +166,7 @@ function SectionBlock({
   months,
   totals,
   rawData,
+  sources,
   onCellChange,
   influsExpanded,
   onToggleInflus,
@@ -157,6 +178,7 @@ function SectionBlock({
   months: Record<number, MonthlyValues>;
   totals: MonthlyValues;
   rawData: PlanningYearData;
+  sources?: SourcesMap;
   onCellChange: (month: number, metric: string, value: number | undefined) => void;
   influsExpanded: boolean;
   onToggleInflus: () => void;
@@ -195,6 +217,7 @@ function SectionBlock({
         }
 
         const isCalc = row.type === "calc";
+        const isSyncable = !isCalc && SYNCABLE_METRICS.has(row.key);
         const indent = row.indent ?? 0;
         const paddingLeft = 12 + indent * 16; // px
 
@@ -211,13 +234,13 @@ function SectionBlock({
           <tr
             key={row.key}
             className={`${
-              isCalc ? "bg-zinc-50" : "bg-white hover:bg-zinc-50"
+              isCalc ? "bg-zinc-50" : isSyncable ? "bg-zinc-100" : "bg-white hover:bg-zinc-50"
             } border-b border-zinc-100`}
           >
             {/* Metric label */}
             <td
               className={`sticky left-0 z-10 border-r border-zinc-200 py-1 text-xs font-medium whitespace-nowrap ${
-                isCalc ? "bg-zinc-50 text-zinc-600" : "bg-white text-zinc-800"
+                isCalc ? "bg-zinc-50 text-zinc-600" : isSyncable ? "bg-zinc-100 text-zinc-700" : "bg-white text-zinc-800"
               }`}
               style={{ paddingLeft: `${paddingLeft}px`, paddingRight: "12px" }}
               title={row.formula ?? undefined}
@@ -261,6 +284,7 @@ function SectionBlock({
                   key={month}
                   value={rawData[month]?.[row.key]}
                   format={row.format}
+                  synced={isSyncable}
                   onChange={(val) => onCellChange(month, row.key, val)}
                 />
               );

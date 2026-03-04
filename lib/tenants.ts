@@ -26,8 +26,8 @@ const FALLBACK_TENANTS: Tenant[] = [
     logo: "/logo-casanova.png",
     users: [
       {
-        email: "admin@casanova.com",
-        passwordHash: "$2b$10$KmWh4VEMh1vOMCuXbe2KRe/lUansSYhDyKX7H5h/ZcEuDyKnfwWe2",
+        email: "casanova@fivep.com.br",
+        passwordHash: "$2b$12$T2f9oRaehlbIR0/hnVJ12eoPdDiUJBfU8jV7VV1RiyO1pPUqmzRgu",
         role: "admin",
         name: "Admin Casanova",
       },
@@ -40,8 +40,8 @@ const FALLBACK_TENANTS: Tenant[] = [
     logo: "/logo-fivep.png",
     users: [
       {
-        email: "contato@fivep.com.br",
-        passwordHash: "$2b$10$BP4iT6uj62HBkZ5COZ7IeuTVTsShRHW2T4ofZzIqv8GKy1lF1AEQG",
+        email: "adm@fivep.com.br",
+        passwordHash: "$2b$12$xTXW7iLmNQR6/HjF24oYvOI7g1/yI8fzBSL.VD9WWZB9rSZvbY7vy",
         role: "admin",
         globalRole: "platform_admin",
         name: "Higo Almeida",
@@ -55,8 +55,8 @@ const FALLBACK_TENANTS: Tenant[] = [
     logo: "/logo-yellalife.png",
     users: [
       {
-        email: "admin@yellalife.com",
-        passwordHash: "$2b$10$Il8qPPEBxJgtC3aBrv/ci.GwaP1qSdl117QdvmWarjZ6Y9tF6SSAG",
+        email: "yella@fivep.com.br",
+        passwordHash: "$2b$12$WyHPLeDXsTxTI87w7Ic.JOByfM7POqDVngoU/c4di4dC3nDsfpXEW",
         role: "admin",
         name: "Admin Yella Life",
       },

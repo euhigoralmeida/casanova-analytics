@@ -120,10 +120,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
   }
 
-  const [targets, skuExtras] = await Promise.all([
-    getPlanningTargets(tenantId),
-    loadSkuExtras(tenantId),
-  ]);
+  const defaults: PlanningTargets = { revenueTarget: 150000, revenueCaptadaTarget: 0, roasTarget: 7, roasFaturadoTarget: 0, marginTarget: 25, adsTarget: 0, approvalRate: 0, pedidosCaptadosTarget: 0, ticketMedioTarget: 0 };
+  let targets: PlanningTargets = defaults;
+  let skuExtras: Record<string, import("@/lib/sku-master").SkuExtras> = {};
+  try {
+    [targets, skuExtras] = await Promise.all([
+      getPlanningTargets(tenantId),
+      loadSkuExtras(tenantId),
+    ]);
+  } catch (err) {
+    logger.error("Failed to load planning targets/SKU extras", { route: "/api/overview", tenantId }, err);
+  }
 
   /* ---- DADOS REAIS (Google Ads) ---- */
   try {

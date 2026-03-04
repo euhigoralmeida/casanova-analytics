@@ -166,7 +166,10 @@ export async function GET(request: NextRequest) {
     // Fetch retention data from GA4
     const retentionSummary = await getGA4ClientAsync(tenantId)
       .then((ga4Client) => ga4Client ? fetchRetentionSummary(ga4Client, startDate, endDate, tenantId) : undefined)
-      .catch(() => undefined);
+      .catch((err) => {
+        logger.error("GA4 retention fetch failed for alerts", { route: "/api/alerts", tenantId }, err);
+        return undefined;
+      });
 
       const alerts = computeAllSmartAlerts(
         currentAccount,

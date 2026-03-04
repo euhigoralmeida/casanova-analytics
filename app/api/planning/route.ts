@@ -83,6 +83,9 @@ export async function PUT(req: NextRequest) {
   const auth = requireAuth(req);
   if ("error" in auth) return auth.error;
   const { session } = auth;
+  if (session.role !== "admin") {
+    return NextResponse.json({ error: "Permissão negada" }, { status: 403 });
+  }
   const tenantId = requireTenantContext(session);
   if (!tenantId) {
     return NextResponse.json({ error: "Selecione um cliente" }, { status: 400 });
