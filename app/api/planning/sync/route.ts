@@ -3,8 +3,8 @@ export const maxDuration = 60;
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, requireTenantContext } from "@/lib/api-helpers";
 import { prisma } from "@/lib/db";
-import { getCustomerAsync } from "@/lib/google-ads";
-import { getGA4ClientAsync } from "@/lib/google-analytics";
+import { getCustomerAsync, clearGoogleAdsClients } from "@/lib/google-ads";
+import { getGA4ClientAsync, clearGA4Clients } from "@/lib/google-analytics";
 import { fetchAccountTotals } from "@/lib/queries";
 import { fetchGA4Summary, fetchChannelAcquisition } from "@/lib/ga4-queries";
 import { fetchMetaAccountTotals } from "@/lib/meta-ads";
@@ -190,6 +190,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // Clear cached API clients to pick up rotated credentials
+    clearGoogleAdsClients(tenantId);
+    clearGA4Clients(tenantId);
+
     // Fetch data for each month (sequentially to avoid rate limits)
     const allEntries: SyncEntry[] = [];
     const sourceStatuses = new Map<string, SourceStatus>();
