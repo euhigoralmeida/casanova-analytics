@@ -159,12 +159,18 @@ export async function authenticateUser(
     // DB not available, try fallback
   }
 
-  // Fallback to hardcoded
-  for (const tenant of FALLBACK_TENANTS) {
-    const user = tenant.users.find((u) => u.email === email);
+  // Fallback to hardcoded credentials
+  for (const fallbackTenant of FALLBACK_TENANTS) {
+    const user = fallbackTenant.users.find((u) => u.email === email);
     if (user) {
       const valid = await bcrypt.compare(password, user.passwordHash);
-      if (valid) return { tenant, user };
+      if (valid) {
+        // Try to resolve real DB tenant ID to avoid mismatch with
+        // admin impersonation which always uses the DB ID
+        const dbTenant = await getTenant(fallbackTenant.slug);
+        const tenant = dbTenant ?? fallbackTenant;
+        return { tenant, user: { ...user, globalRole: dbTenant?.users.find(u => u.email === email)?.globalRole ?? user.globalRole } };
+      }
     }
   }
   return null;
