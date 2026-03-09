@@ -5,8 +5,6 @@ import { getGA4ClientAsync } from "@/lib/google-analytics";
 import {
   fetchEcommerceFunnel,
   fetchGA4Summary,
-  fetchRetentionSummary,
-  fetchUserLifetimeValue,
   fetchChannelAcquisition,
 } from "@/lib/ga4-queries";
 import { fetchCognitiveDirectly } from "./fetch-cognitive";
@@ -134,27 +132,10 @@ export async function buildStrategicBrief(
     }
   }
 
-  // 3. RETENCAO & LTV
-  if (ga4Extras.retention) {
-    sections.push("## RETENCAO & LTV");
-    const r = ga4Extras.retention;
-    sections.push(`Usuarios totais: ${r.totalUsers.toLocaleString("pt-BR")} | Novos: ${r.newUsers.toLocaleString("pt-BR")} | Retornaram: ${r.returningUsers.toLocaleString("pt-BR")}`);
-    sections.push(`Taxa retorno: ${r.returnRate}%`);
-    sections.push(`Sessoes/usuario: ${r.avgSessionsPerUser}`);
-    sections.push(`Compradores: ${r.purchasers.toLocaleString("pt-BR")} | Compras: ${r.purchases}`);
-    sections.push(`Receita: ${formatBRL(r.revenue)} | Ticket medio: ${formatBRL(r.avgOrderValue)}`);
-    const ltv = r.purchasers > 0 ? Math.round((r.revenue / r.purchasers) * 100) / 100 : 0;
-    sections.push(`LTV por comprador: ${formatBRL(ltv)}`);
-    sections.push(`Estimativa recompra: ${r.repurchaseEstimate}`);
-    sections.push("");
-  }
-
-  // 4. LTV por canal
-  if (ga4Extras.channelLTV && ga4Extras.channelLTV.length > 0) {
-    sections.push("## LTV POR CANAL");
-    for (const c of ga4Extras.channelLTV.slice(0, 8)) {
-      sections.push(`- ${c.channel}: ${c.users} usuarios, ${formatBRL(c.revenue)} receita, LTV ${formatBRL(c.revenuePerPurchaser)}, ticket ${formatBRL(c.avgTicket)}`);
-    }
+  // 3. RETENCAO & LTV (CRM — pedidos reais)
+  const crmSection = await fetchCRMSection(tenantId, startDate, endDate);
+  if (crmSection) {
+    sections.push(crmSection);
     sections.push("");
   }
 
@@ -196,11 +177,9 @@ async function fetchGA4Extras(tenantId: string, startDate: string, endDate: stri
   const client = await getGA4ClientAsync(tenantId);
   if (!client) return {};
 
-  const [funnelData, summary, retention, channelLTV, channels] = await Promise.all([
+  const [funnelData, summary, channels] = await Promise.all([
     fetchEcommerceFunnel(client, startDate, endDate, tenantId).catch(() => null),
     fetchGA4Summary(client, startDate, endDate, tenantId).catch(() => null),
-    fetchRetentionSummary(client, startDate, endDate, tenantId).catch(() => null),
-    fetchUserLifetimeValue(client, startDate, endDate, tenantId).catch(() => null),
     fetchChannelAcquisition(client, startDate, endDate, tenantId).catch(() => null),
   ]);
 
@@ -208,8 +187,6 @@ async function fetchGA4Extras(tenantId: string, startDate: string, endDate: stri
     funnel: funnelData?.funnel,
     overallConversionRate: funnelData?.overallConversionRate,
     summary,
-    retention,
-    channelLTV,
     channels,
   };
 }
@@ -342,6 +319,38 @@ async function fetchOrganicSection(tenantId: string, startDate: string, endDate:
     return lines.join("\n");
   } catch (err) {
     console.error("Error fetching organic section for brief:", err);
+    return null;
+  }
+}
+
+async function fetchCRMSection(tenantId: string, startDate: string, endDate: string): Promise<string | null> {
+  try {
+    const { getMagazordCredentials } = await import("@/lib/magazord");
+    const { fetchOrders } = await import("@/lib/magazord-queries");
+    const { computeCRMAnalytics } = await import("@/lib/crm-engine");
+    const creds = await getMagazordCredentials(tenantId);
+    if (!creds) return null;
+    const orders = await fetchOrders(startDate, endDate, tenantId);
+    if (orders.length === 0) return null;
+    const analytics = computeCRMAnalytics(orders);
+    const s = analytics.summary;
+
+    const lines: string[] = ["## RETENCAO & LTV (CRM — pedidos reais)"];
+    lines.push(`Total clientes: ${s.totalCustomers.toLocaleString("pt-BR")} | Total pedidos: ${s.totalOrders.toLocaleString("pt-BR")}`);
+    lines.push(`Receita: ${formatBRL(s.totalRevenue)} | Ticket medio: ${formatBRL(s.avgTicket)}`);
+    lines.push(`Taxa recompra (2+ pedidos): ${s.repurchaseRate.toFixed(1)}%`);
+    lines.push(`LTV medio: ${formatBRL(s.avgLTV)} | Churn 90d: ${s.churn90d.toFixed(1)}%`);
+
+    // RFM distribution
+    if (analytics.rfmDistribution.length > 0) {
+      lines.push("Distribuicao RFM:");
+      for (const r of analytics.rfmDistribution) {
+        lines.push(`- ${r.segment}: ${r.count} clientes, ${formatBRL(r.revenue)} receita, ticket ${formatBRL(r.avgTicket)}`);
+      }
+    }
+
+    return lines.join("\n");
+  } catch {
     return null;
   }
 }

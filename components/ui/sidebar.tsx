@@ -7,11 +7,11 @@ import {
   LayoutDashboard,
   CalendarDays,
   Megaphone,
-  Heart,
   MousePointerClick,
   Search,
   Instagram,
   Users,
+  Heart,
   Bell,
   Settings,
   LogOut,
@@ -29,6 +29,7 @@ type NavItem = {
   icon: React.ElementType;
   comingSoon?: boolean;
   children?: ChildItem[];
+  hiddenForTenants?: string[];
 };
 
 const navItems: NavItem[] = [
@@ -44,7 +45,16 @@ const navItems: NavItem[] = [
       { label: "Segmentação", href: "/acquisition/segments" },
     ],
   },
-  { label: "Retenção", href: "/retention", icon: Heart },
+  {
+    label: "Retenção",
+    icon: Heart,
+    hiddenForTenants: ["yellalife"],
+    children: [
+      { label: "Visão Geral", href: "/retention" },
+      { label: "Análise RFM", href: "/retention/rfm" },
+      { label: "Cohorts", href: "/retention/cohorts" },
+    ],
+  },
   { label: "CRO", href: "/funnel", icon: MousePointerClick },
   { label: "SEO", href: "/organic", icon: Search },
   { label: "Instagram", href: "/instagram", icon: Instagram },
@@ -70,6 +80,7 @@ function ComingSoonBadge() {
 }
 
 export default function Sidebar({
+  tenantId,
   tenantName,
   tenantLogo,
   globalRole,
@@ -78,6 +89,7 @@ export default function Sidebar({
   collapsed = false,
   onToggleCollapse,
 }: {
+  tenantId?: string;
   tenantName?: string;
   tenantLogo?: string;
   globalRole?: string | null;
@@ -94,9 +106,12 @@ export default function Sidebar({
 
   // Hide Settings from viewers (API rejects mutations, but no need to show UI)
   const isViewer = userRole === "viewer" && globalRole !== "platform_admin";
-  const visibleNavItems = isViewer
-    ? navItems.filter((item) => item.label !== "Configurações")
-    : navItems;
+  const isPlatformAdmin = globalRole === "platform_admin";
+  const visibleNavItems = navItems.filter((item) => {
+    if (isViewer && item.label === "Configurações") return false;
+    if (!isPlatformAdmin && item.hiddenForTenants && tenantId && item.hiddenForTenants.includes(tenantId)) return false;
+    return true;
+  });
   const router = useRouter();
   const [expandedMenus, setExpandedMenus] = useState<Record<string, boolean>>(() => {
     const initial: Record<string, boolean> = {};

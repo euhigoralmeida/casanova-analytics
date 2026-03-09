@@ -128,9 +128,9 @@ export const GEMINI_TOOLS: FunctionDeclaration[] = [
     },
   },
   {
-    name: "get_retention_metrics",
+    name: "get_crm_metrics",
     description:
-      "Métricas de retenção GA4: novos vs retornantes, taxa de retorno, LTV por canal, cohort analysis semanal.",
+      "Métricas de Retenção (pedidos reais Magazord): recompra, churn, LTV, RFM, cohort mensal, ticket médio, frequência.",
     parameters: {
       type: SchemaType.OBJECT,
       properties: {

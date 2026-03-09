@@ -7,7 +7,8 @@ export type Platform =
   | "meta_ads"
   | "google_search_console"
   | "clarity"
-  | "instagram";
+  | "instagram"
+  | "magazord";
 
 // Cache decrypted credentials in-memory for 2 min per tenant+platform
 const cache = new Map<string, { data: Record<string, string>; ts: number }>();
@@ -152,6 +153,14 @@ function getEnvCredentials(platform: Platform): Record<string, string> | null {
       return {
         access_token: process.env.META_ADS_ACCESS_TOKEN ?? "",
         business_account_id: process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID ?? "",
+      };
+    }
+    case "magazord": {
+      if (!process.env.MAGAZORD_USERNAME) return null;
+      return {
+        username: process.env.MAGAZORD_USERNAME ?? "",
+        password: process.env.MAGAZORD_PASSWORD ?? "",
+        base_url: process.env.MAGAZORD_BASE_URL ?? "https://api.magazord.com.br",
       };
     }
     default:

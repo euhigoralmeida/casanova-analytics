@@ -1,6 +1,11 @@
 import type { SmartAlert } from "./alert-types";
 import type { AccountTotals, CampaignMetrics, SkuMetrics, DailyMetrics } from "./queries";
-import type { RetentionSummary } from "./ga4-queries";
+
+export type CRMRetentionInput = {
+  repurchaseRate: number;
+  churnRate: number;
+  avgLTV: number;
+};
 
 /* =========================
    Helpers
@@ -493,80 +498,92 @@ function computeTrendAlerts(dailyData: DailyMetrics[]): SmartAlert[] {
 }
 
 /* =========================
-   Alertas de Retenção
+   Alertas de Retenção (CRM)
 ========================= */
 
-function computeRetentionAlerts(summary: RetentionSummary): SmartAlert[] {
+function computeRetentionAlerts(crm: CRMRetentionInput): SmartAlert[] {
   const alerts: SmartAlert[] = [];
 
-  // Taxa de retorno
-  if (summary.returnRate < 15) {
+  // Taxa de recompra (CRM transacional)
+  if (crm.repurchaseRate < 10) {
     alerts.push({
-      id: "ret-return-rate-danger",
+      id: "ret-repurchase-danger",
       category: "retention",
       severity: "danger",
-      title: "Taxa de retorno muito baixa",
-      description: `Apenas ${summary.returnRate.toFixed(1)}% dos usuários retornam ao site.`,
-      metric: "return_rate",
-      currentValue: summary.returnRate,
+      title: "Taxa de recompra muito baixa",
+      description: `Apenas ${crm.repurchaseRate.toFixed(1)}% dos clientes fizeram 2+ pedidos.`,
+      metric: "repurchase_rate",
+      currentValue: crm.repurchaseRate,
       previousValue: 0,
       deltaPct: 0,
       recommendation: "Invista em remarketing, e-mail marketing e programas de fidelidade",
     });
-  } else if (summary.returnRate < 25) {
+  } else if (crm.repurchaseRate < 20) {
     alerts.push({
-      id: "ret-return-rate-warn",
+      id: "ret-repurchase-warn",
       category: "retention",
       severity: "warn",
-      title: "Taxa de retorno abaixo do ideal",
-      description: `Taxa de retorno de ${summary.returnRate.toFixed(1)}% — ideal é acima de 25%.`,
-      metric: "return_rate",
-      currentValue: summary.returnRate,
+      title: "Taxa de recompra abaixo do ideal",
+      description: `Taxa de recompra de ${crm.repurchaseRate.toFixed(1)}% — ideal é acima de 20%.`,
+      metric: "repurchase_rate",
+      currentValue: crm.repurchaseRate,
       previousValue: 0,
       deltaPct: 0,
-      recommendation: "Considere campanhas de reativação para usuários inativos",
+      recommendation: "Considere campanhas de reativação para clientes inativos",
     });
-  } else if (summary.returnRate >= 35) {
+  } else if (crm.repurchaseRate >= 30) {
     alerts.push({
-      id: "ret-return-rate-healthy",
+      id: "ret-repurchase-healthy",
       category: "retention",
       severity: "success",
-      title: "Taxa de retorno saudável",
-      description: `${summary.returnRate.toFixed(1)}% dos usuários retornam — excelente retenção.`,
-      metric: "return_rate",
-      currentValue: summary.returnRate,
+      title: "Taxa de recompra saudável",
+      description: `${crm.repurchaseRate.toFixed(1)}% dos clientes recompram — excelente retenção.`,
+      metric: "repurchase_rate",
+      currentValue: crm.repurchaseRate,
       previousValue: 0,
       deltaPct: 0,
     });
   }
 
-  // Frequência de recompra
-  if (summary.repurchaseEstimate < 1) {
+  // Churn alto
+  if (crm.churnRate > 70) {
     alerts.push({
-      id: "ret-repurchase-low",
+      id: "ret-churn-danger",
+      category: "retention",
+      severity: "danger",
+      title: "Churn muito elevado",
+      description: `${crm.churnRate.toFixed(1)}% dos clientes não compram há 90+ dias.`,
+      metric: "churn_rate",
+      currentValue: crm.churnRate,
+      previousValue: 0,
+      deltaPct: 0,
+      recommendation: "Implemente campanhas de win-back e automações pós-compra",
+    });
+  } else if (crm.churnRate > 50) {
+    alerts.push({
+      id: "ret-churn-warn",
       category: "retention",
       severity: "warn",
-      title: "Baixa frequência de recompra",
-      description: `Frequência estimada de ${summary.repurchaseEstimate.toFixed(2)} compras por cliente retornante.`,
-      metric: "repurchase_frequency",
-      currentValue: summary.repurchaseEstimate,
+      title: "Churn elevado",
+      description: `${crm.churnRate.toFixed(1)}% dos clientes inativos há 90+ dias.`,
+      metric: "churn_rate",
+      currentValue: crm.churnRate,
       previousValue: 0,
       deltaPct: 0,
-      recommendation: "Implemente cross-sell, bundles e automações pós-compra",
+      recommendation: "Considere campanhas de reativação com cupons exclusivos",
     });
   }
 
-  // LTV médio por comprador
-  const ltvPerPurchaser = summary.purchasers > 0 ? summary.revenue / summary.purchasers : 0;
-  if (ltvPerPurchaser > 0 && ltvPerPurchaser < 150) {
+  // LTV baixo
+  if (crm.avgLTV > 0 && crm.avgLTV < 150) {
     alerts.push({
       id: "ret-ltv-low",
       category: "retention",
       severity: "warn",
-      title: "LTV médio por comprador baixo",
-      description: `LTV médio de ${fmtBRL(ltvPerPurchaser)} por comprador — considere estratégias de upsell.`,
+      title: "LTV médio por cliente baixo",
+      description: `LTV médio de ${fmtBRL(crm.avgLTV)} por cliente — considere estratégias de upsell.`,
       metric: "ltv",
-      currentValue: Math.round(ltvPerPurchaser * 100) / 100,
+      currentValue: Math.round(crm.avgLTV * 100) / 100,
       previousValue: 0,
       deltaPct: 0,
       recommendation: "Foque em aumentar ticket médio e frequência de compra",
@@ -680,7 +697,7 @@ export function computeAllSmartAlerts(
   currentSkus: SkuMetrics[],
   previousSkus: SkuMetrics[],
   dailyTimeSeries: DailyMetrics[],
-  retentionSummary?: RetentionSummary,
+  crmRetention?: CRMRetentionInput,
   organicInput?: OrganicAlertInput,
 ): SmartAlert[] {
   const all = [
@@ -688,7 +705,7 @@ export function computeAllSmartAlerts(
     ...computeCampaignAlerts(currentCampaigns, previousCampaigns),
     ...computeSkuAlerts(currentSkus, previousSkus),
     ...computeTrendAlerts(dailyTimeSeries),
-    ...(retentionSummary ? computeRetentionAlerts(retentionSummary) : []),
+    ...(crmRetention ? computeRetentionAlerts(crmRetention) : []),
     ...(organicInput ? computeOrganicAlerts(organicInput) : []),
   ];
 

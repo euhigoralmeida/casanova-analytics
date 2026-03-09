@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCustomerAsync, computeComparisonDates } from "@/lib/google-ads";
-import { getGA4ClientAsync } from "@/lib/google-analytics";
 import { fetchAccountTotals, fetchAllCampaignMetrics, fetchAllSkuMetrics, fetchAccountTimeSeries } from "@/lib/queries";
-import { fetchRetentionSummary } from "@/lib/ga4-queries";
 import { computeAllSmartAlerts } from "@/lib/alert-engine";
 import type { SmartAlert, SmartAlertsResponse } from "@/lib/alert-types";
 import { requireAuthWithRateLimit, requireTenantContext } from "@/lib/api-helpers";
+import { getMagazordCredentials } from "@/lib/magazord";
+import { fetchOrders } from "@/lib/magazord-queries";
+import { computeCRMAnalytics } from "@/lib/crm-engine";
 import { logger } from "@/lib/logger";
 
 /* =========================
@@ -163,13 +164,20 @@ export async function GET(request: NextRequest) {
       fetchAccountTimeSeries(customer, period, startDate, endDate, tenantId),
     ]);
 
-    // Fetch retention data from GA4
-    const retentionSummary = await getGA4ClientAsync(tenantId)
-      .then((ga4Client) => ga4Client ? fetchRetentionSummary(ga4Client, startDate, endDate, tenantId) : undefined)
-      .catch((err) => {
-        logger.error("GA4 retention fetch failed for alerts", { route: "/api/alerts", tenantId }, err);
+    // Fetch CRM data for retention alerts
+    const crmRetention = await (async () => {
+      try {
+        const creds = await getMagazordCredentials(tenantId);
+        if (!creds) return undefined;
+        const orders = await fetchOrders(startDate, endDate, tenantId);
+        if (orders.length === 0) return undefined;
+        const analytics = computeCRMAnalytics(orders);
+        return { repurchaseRate: analytics.summary.repurchaseRate, churnRate: analytics.summary.churn90d, avgLTV: analytics.summary.avgLTV };
+      } catch (err) {
+        logger.error("CRM data fetch failed for alerts", { route: "/api/alerts", tenantId }, err);
         return undefined;
-      });
+      }
+    })();
 
       const alerts = computeAllSmartAlerts(
         currentAccount,
@@ -179,7 +187,7 @@ export async function GET(request: NextRequest) {
         currentSkus,
         previousSkus,
         dailyTimeSeries,
-        retentionSummary,
+        crmRetention,
       );
 
       const summary = {

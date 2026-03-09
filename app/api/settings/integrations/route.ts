@@ -16,6 +16,7 @@ const PLATFORMS: Platform[] = [
   "google_search_console",
   "clarity",
   "instagram",
+  "magazord",
 ];
 
 const REQUIRED_FIELDS: Record<Platform, string[]> = {
@@ -25,6 +26,7 @@ const REQUIRED_FIELDS: Record<Platform, string[]> = {
   clarity: ["project_id", "api_token"],
   google_search_console: ["site_url", "client_email", "private_key"],
   instagram: ["access_token", "business_account_id"],
+  magazord: ["username", "password"],
 };
 
 /**

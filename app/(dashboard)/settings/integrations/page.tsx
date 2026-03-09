@@ -60,6 +60,11 @@ const PLATFORM_FIELDS: Record<string, FieldDef[]> = {
     { key: "access_token", label: "Access Token", type: "password" },
     { key: "business_account_id", label: "Business Account ID", type: "text" },
   ],
+  magazord: [
+    { key: "username", label: "Username", type: "text", placeholder: "usuario@loja.com.br" },
+    { key: "password", label: "Password", type: "password" },
+    { key: "base_url", label: "Base URL", type: "text", placeholder: "https://api.magazord.com.br", optional: true },
+  ],
 };
 
 const PLATFORMS: IntegrationStatus[] = [
@@ -69,6 +74,7 @@ const PLATFORMS: IntegrationStatus[] = [
   { platform: "google_search_console", label: "Google Search Console", description: "SEO orgânico, queries, páginas, impressões, cliques", connected: false },
   { platform: "clarity", label: "Microsoft Clarity", description: "CRO, dead/rage clicks, scroll depth, heatmaps", connected: false },
   { platform: "instagram", label: "Instagram Business", description: "Insights do perfil, publicações, audiência, crescimento", connected: false },
+  { platform: "magazord", label: "Magazord", description: "CRM: pedidos, clientes, segmentação RFM, recompra, LTV", connected: false },
 ];
 
 export default function IntegrationsPage() {

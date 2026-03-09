@@ -14,7 +14,7 @@ import {
   fetchAccountTimeSeries,
   fetchSkuTimeSeries,
 } from "@/lib/queries";
-import { fetchEcommerceFunnel, fetchGA4Summary, fetchChannelAcquisition, fetchRetentionSummary, fetchUserLifetimeValue, fetchCohortRetention } from "@/lib/ga4-queries";
+import { fetchEcommerceFunnel, fetchGA4Summary, fetchChannelAcquisition } from "@/lib/ga4-queries";
 import { prisma } from "@/lib/db";
 import { computeTargetMonth } from "@/lib/planning-target-calc";
 
@@ -310,40 +310,41 @@ async function executeToolInternal(
       };
     }
 
-    case "get_retention_metrics": {
-      const ga4Client = await getGA4ClientAsync(tenantId);
-      if (!ga4Client) return { error: "GA4 não configurado" };
-      const [summary, ltv, cohorts] = await Promise.all([
-        fetchRetentionSummary(ga4Client, startDate, endDate, tenantId),
-        fetchUserLifetimeValue(ga4Client, startDate, endDate, tenantId),
-        fetchCohortRetention(ga4Client, startDate, endDate, tenantId),
-      ]);
+    case "get_crm_metrics": {
+      const { getMagazordCredentials } = await import("@/lib/magazord");
+      const { fetchOrders } = await import("@/lib/magazord-queries");
+      const { computeCRMAnalytics } = await import("@/lib/crm-engine");
+      const creds = await getMagazordCredentials(tenantId);
+      if (!creds) return { error: "CRM (Magazord) não configurado" };
+      const orders = await fetchOrders(startDate, endDate, tenantId);
+      if (orders.length === 0) return { error: "Nenhum pedido encontrado no período" };
+      const analytics = computeCRMAnalytics(orders);
       return {
         resumo: {
-          usuariosTotal: summary.totalUsers,
-          novos: summary.newUsers,
-          retornantes: summary.returningUsers,
-          taxaRetorno: summary.returnRate,
-          sessoesPorUsuario: summary.avgSessionsPerUser,
-          compras: summary.purchases,
-          compradores: summary.purchasers,
-          receita: summary.revenue,
-          ticketMedio: summary.avgOrderValue,
-          ltvPorComprador: summary.purchasers > 0 ? Math.round((summary.revenue / summary.purchasers) * 100) / 100 : 0,
-          frequenciaRecompra: summary.repurchaseEstimate,
+          totalClientes: analytics.summary.totalCustomers,
+          totalPedidos: analytics.summary.totalOrders,
+          receitaTotal: analytics.summary.totalRevenue,
+          ticketMedio: analytics.summary.avgTicket,
+          taxaRecompra: analytics.summary.repurchaseRate,
+          ltvMedio: analytics.summary.avgLTV,
+          churn90d: analytics.summary.churn90d,
         },
-        topCanaisLTV: ltv.slice(0, 5).map((c) => ({
-          canal: c.channel,
-          usuarios: c.users,
-          compradores: c.purchasers,
-          receita: c.revenue,
-          receitaPorComprador: c.revenuePerPurchaser,
-          comprasPorUsuario: c.purchasesPerUser,
+        rfm: analytics.rfmDistribution.map((r) => ({
+          segmento: r.segment,
+          clientes: r.count,
+          receita: r.revenue,
+          ticketMedio: r.avgTicket,
         })),
-        cohorts: cohorts.slice(0, 6).map((c) => ({
-          semana: c.cohortWeek,
-          usuariosIniciais: c.usersStart,
-          retencao: c.retention.slice(0, 5),
+        cohorts: analytics.cohorts.slice(0, 6).map((c) => ({
+          mes: c.cohortMonth,
+          clientesIniciais: c.totalCustomers,
+          recompra: c.months.slice(0, 6),
+        })),
+        topClientes: analytics.topCustomers.slice(0, 10).map((c) => ({
+          pedidos: c.orders,
+          receita: c.revenue,
+          segmento: c.segment,
+          ultimaCompra: c.lastOrderDate,
         })),
       };
     }

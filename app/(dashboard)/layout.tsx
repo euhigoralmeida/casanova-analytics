@@ -15,6 +15,8 @@ const pageTitles: Record<string, string> = {
   "/acquisition/meta": "Meta Ads",
   "/acquisition/segments": "Segmentação",
   "/retention": "Retenção",
+  "/retention/rfm": "Análise RFM",
+  "/retention/cohorts": "Cohorts de Recompra",
   "/funnel": "CRO & Funil",
   "/organic": "Inteligencia Organica",
   "/instagram": "Instagram",
@@ -86,6 +88,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <div className="hidden lg:block shrink-0">
         <div className="fixed inset-y-0 left-0 z-30">
           <Sidebar
+            tenantId={tenantData.id}
             tenantName={tenantData.name}
             tenantLogo={tenantData.logo}
             globalRole={globalRole}
@@ -104,7 +107,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             onClick={() => setSidebarOpen(false)}
           />
           <div className="fixed inset-y-0 left-0 z-50 lg:hidden">
-            <Sidebar tenantName={tenantData.name} tenantLogo={tenantData.logo} globalRole={globalRole} userRole={userRole} onClose={() => setSidebarOpen(false)} />
+            <Sidebar tenantId={tenantData.id} tenantName={tenantData.name} tenantLogo={tenantData.logo} globalRole={globalRole} userRole={userRole} onClose={() => setSidebarOpen(false)} />
           </div>
         </>
       )}

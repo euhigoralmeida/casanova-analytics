@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { DateRange, OverviewResponse, SmartAlertsResponse, TimeSeriesResponse, GA4DataResponse, RetentionData } from "@/types/api";
+import type { DateRange, OverviewResponse, SmartAlertsResponse, TimeSeriesResponse, GA4DataResponse } from "@/types/api";
+import type { CRMSummary } from "@/lib/crm-engine";
 import { useDateRange } from "@/hooks/use-date-range";
 import type { IntelligenceResponse } from "@/lib/intelligence/types";
 import type { CognitiveResponse } from "@/lib/intelligence/communication/types";
@@ -26,7 +27,7 @@ export default function VisaoGeralPage() {
   const [timeseries, setTimeseries] = useState<TimeSeriesResponse | null>(null);
   const [ga4Data, setGa4Data] = useState<GA4DataResponse | null>(null);
   const [intelligence, setIntelligence] = useState<IntelligenceResponse & Partial<CognitiveResponse> | null>(null);
-  const [retention, setRetention] = useState<RetentionData | null>(null);
+  const [crmSummary, setCrmSummary] = useState<CRMSummary | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sectionErrors, setSectionErrors] = useState<string[]>([]);
@@ -40,13 +41,13 @@ export default function VisaoGeralPage() {
       const base = buildParams(range);
       const errors: string[] = [];
 
-      const [overviewRes, alertsRes, tsRes, ga4Res, intelRes, retentionRes] = await Promise.all([
+      const [overviewRes, alertsRes, tsRes, ga4Res, intelRes, crmRes] = await Promise.all([
         fetch(`/api/overview?${base}`),
         fetch(`/api/alerts?${base}`).catch(() => null),
         fetch(`/api/timeseries?${buildParams(range, { scope: "account" })}`).catch(() => null),
         fetch(`/api/ga4?startDate=${range.startDate}&endDate=${range.endDate}`).catch(() => null),
         fetch(`/api/intelligence?${base}`).catch(() => null),
-        fetch(`/api/retention?startDate=${range.startDate}&endDate=${range.endDate}`).catch(() => null),
+        fetch(`/api/crm?startDate=${range.startDate}&endDate=${range.endDate}`).catch(() => null),
       ]);
 
       if (!overviewRes.ok) throw new Error("Erro ao carregar dados");
@@ -55,7 +56,10 @@ export default function VisaoGeralPage() {
       if (tsRes?.ok) setTimeseries(await tsRes.json()); else if (tsRes) errors.push("Gráficos");
       if (ga4Res?.ok) setGa4Data(await ga4Res.json()); else if (ga4Res) errors.push("GA4");
       if (intelRes?.ok) setIntelligence(await intelRes.json()); else if (intelRes) errors.push("Inteligência");
-      if (retentionRes?.ok) setRetention(await retentionRes.json()); else if (retentionRes) errors.push("Retenção");
+      if (crmRes?.ok) {
+        const crmData = await crmRes.json();
+        if (crmData.summary) setCrmSummary(crmData.summary);
+      } else if (crmRes) errors.push("CRM");
       if (errors.length > 0) setSectionErrors(errors);
       markUpdated();
     } catch {
@@ -179,14 +183,12 @@ export default function VisaoGeralPage() {
 
       {/* ─── ROW 2: KPI Cards ─── */}
       {overview && overview.source !== "not_configured" && acct && !loading && (() => {
-        const ltvValue = retention?.summary
-          ? (retention.summary.purchasers > 0 ? retention.summary.revenue / retention.summary.purchasers : 0)
-          : null;
+        const ltvValue = crmSummary ? crmSummary.avgLTV : null;
         const conversions = Math.round(acct.conversions * 100) / 100;
         const ticketMedio = conversions > 0 ? Math.round((acct.revenue / conversions) * 100) / 100 : 0;
         const pedidosTarget = overview.meta.pedidosCaptadosTarget ?? 0;
         const ticketTarget = overview.meta.ticketMedioTarget ?? 0;
-        const returnRate = retention?.summary?.returnRate ?? 0;
+        const repurchaseRate = crmSummary?.repurchaseRate ?? 0;
         return (
           <div className="grid gap-3 grid-cols-2 lg:grid-cols-6">
             <Kpi
@@ -240,8 +242,8 @@ export default function VisaoGeralPage() {
             <Kpi
               title="LTV Médio"
               value={ltvValue !== null ? formatBRL(ltvValue) : "—"}
-              subtitle={retention?.summary
-                ? `Taxa retorno: ${returnRate.toFixed(1).replace(".", ",")}% · ${retention.summary.purchasers.toLocaleString("pt-BR")} compradores`
+              subtitle={crmSummary
+                ? `Recompra: ${repurchaseRate.toFixed(1).replace(".", ",")}% · ${crmSummary.totalCustomers.toLocaleString("pt-BR")} clientes`
                 : "Carregando..."}
             />
           </div>

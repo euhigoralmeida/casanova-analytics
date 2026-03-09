@@ -139,6 +139,16 @@ export function getPresets(): { label: string; preset: string; range: () => { st
         return { start, end };
       },
     },
+    {
+      label: "Últimos 365 dias",
+      preset: "365d",
+      range: () => {
+        const end = new Date();
+        const start = new Date();
+        start.setDate(start.getDate() - 364);
+        return { start, end };
+      },
+    },
   ];
 }
 

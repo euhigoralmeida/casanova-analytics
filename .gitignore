@@ -47,3 +47,12 @@ casanova-analytics-mvp@*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# secrets / credentials
+yella/
+scripts/update-yella-*.ts
+scripts/read-yella-*.ts
+scripts/fix-yella-*.ts
+scripts/test-yella-*.ts
+scripts/verify-yella-*.ts
+scripts/generate-refresh-token.ts
