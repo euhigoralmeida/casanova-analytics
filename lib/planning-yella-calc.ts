@@ -89,6 +89,7 @@ export const YELLA_PLANNING_ROWS: YellaRowDef[] = [
   { key: "frete", label: "Frete", type: "input", format: "currency", section: "receita" },
   { key: "taxas", label: "Taxas", type: "input", format: "currency", section: "receita" },
   { key: "receita_faturada", label: "Receita faturada", type: "input", format: "currency", section: "receita" },
+  { key: "marketplace", label: "Marketplace", type: "input", format: "currency", section: "receita" },
   { key: "voce_recebe", label: "Você Recebe", type: "input", format: "currency", section: "receita" },
   { key: "lucro_liquido", label: "Lucro líquido (sem mídia + influ)", type: "calc", format: "currency", section: "receita", formula: "Você Recebe − Investimento total mídia+influ" },
   { key: "receita_cancelada", label: "Receita Cancelada", type: "input", format: "currency", section: "receita" },
